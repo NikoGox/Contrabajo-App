@@ -1,0 +1,17 @@
+❚❙❘ VERSIÓN 0.1-Pre-Alpha
+⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺
+├─• Se reemplazó la plantilla inicial de Android Studio por una estructura funcional de aplicación en Jetpack Compose.
+├─• Se implementó navegación base entre las pantallas de inicio, login, registro en dos pasos, principal, chats, perfil y detalle de servicio.
+├─• Se implementó persistencia local con SQLite para sostener la demo funcional del proyecto.
+├─• Se agregaron las entidades del dominio necesarias para esta etapa: Usuario, OfertaServicio, ChatCita, MensajeChat, CategoriaServicio, Estado, Foto, Direccion, Coordenadas y Valoracion.
+├─• Se agregaron las entidades locales SesionLocal y ConfiguracionApp para soporte de sesión persistente y configuración básica.
+├─• Se crearon repositorios locales para autenticación, perfil, ofertas y chats.
+├─• Se incorporaron datos semilla para usuario demo, oferta principal, mensajes de chat y valoración inicial.
+├─• Se ajustó la configuración del proyecto para soportar correctamente fecha y hora en dispositivos con API baja.
+├─• Se corrigió un crash de ejecución relacionado con rememberSaveable y el guardado de estado del registro en Compose.
+└─• Se alineó la versión del proyecto y del frontend para reflejar el estado actual como v0.1-Pre-Alpha.
+
+
+->>> Falta pulir visualmente las pantallas para acercarlas más al mockup final y reforzar la identidad de Contrabajo.
+->>> Falta enriquecer el flujo principal con más contenido en Home y mejor interacción en Chats.
+->>> Falta preparar la transición desde SQLite local hacia integración con backend.

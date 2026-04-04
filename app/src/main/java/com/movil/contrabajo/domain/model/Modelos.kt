@@ -1,0 +1,132 @@
+package com.movil.contrabajo.domain.model
+
+data class Usuario(
+    val idUsuario: Long = 0,
+    val run: String,
+    val dv: String,
+    val username: String,
+    val nombre: String,
+    val apellidoPaterno: String,
+    val apellidoMaterno: String,
+    val telefono: String,
+    val correo: String,
+    val contrasena: String,
+    val fechaRegistro: String,
+    val fechaNacimiento: String,
+    val verificado: Boolean
+)
+
+data class OfertaServicio(
+    val idOfertaServicio: Long = 0,
+    val titulo: String,
+    val descripcion: String,
+    val detalle: String,
+    val precioTexto: String,
+    val disponible: Boolean,
+    val fechaPublicacion: String,
+    val idCategoriaServicio: Long,
+    val idTrabajador: Long,
+    val idCliente: Long? = null,
+    val nombreTrabajador: String = "",
+    val puntuacionPromedio: Double = 0.0,
+    val ubicacionReferencia: String = ""
+)
+
+data class ChatCita(
+    val idChatCita: Long = 0,
+    val fechaCreacion: String,
+    val idTrabajador: Long,
+    val idCliente: Long,
+    val idCita: Long? = null,
+    val nombreContacto: String = "",
+    val ultimoMensaje: String = "",
+    val horaUltimoMensaje: String = ""
+)
+
+data class MensajeChat(
+    val idMensajeChat: Long = 0,
+    val fechaEnvio: String,
+    val fechaRecibido: String? = null,
+    val fechaLeido: String? = null,
+    val idEmisor: Long,
+    val idReceptor: Long,
+    val idChatCita: Long,
+    val idEstado: Long,
+    val contenido: String
+)
+
+data class CategoriaServicio(
+    val idCategoriaServicio: Long = 0,
+    val nombre: String
+)
+
+data class Estado(
+    val idEstado: Long = 0,
+    val codigo: String,
+    val nombre: String,
+    val descripcion: String
+)
+
+data class Foto(
+    val idFoto: Long = 0,
+    val fechaSubida: String,
+    val enlace: String,
+    val detalle: String
+)
+
+data class Direccion(
+    val idDireccion: Long = 0,
+    val calle: String,
+    val numero: String,
+    val villa: String,
+    val idCoordenadas: Long
+)
+
+data class Coordenadas(
+    val idCoordenadas: Long = 0,
+    val latitud: Double,
+    val longitud: Double,
+    val detalle: String
+)
+
+data class Valoracion(
+    val idValoracion: Long = 0,
+    val voto: Int,
+    val fechaVoto: String,
+    val comentario: String,
+    val idTrabajador: Long,
+    val idCliente: Long
+)
+
+data class SesionLocal(
+    val idSesionLocal: Long = 0,
+    val idUsuario: Long,
+    val tokenLocal: String,
+    val fechaInicio: String,
+    val fechaUltimoAcceso: String,
+    val recordarme: Boolean,
+    val activa: Boolean
+)
+
+data class ConfiguracionApp(
+    val idConfiguracionApp: Long = 0,
+    val idUsuario: Long? = null,
+    val tema: String,
+    val notificacionesActivas: Boolean,
+    val primeraEjecucion: Boolean,
+    val ultimaPantalla: String,
+    val fechaActualizacion: String
+)
+
+data class RegistroPendiente(
+    val nombre: String = "",
+    val apellidoPaterno: String = "",
+    val apellidoMaterno: String = "",
+    val run: String = "",
+    val dv: String = "",
+    val telefono: String = "",
+    val username: String = "",
+    val correo: String = "",
+    val contrasena: String = "",
+    val confirmarContrasena: String = ""
+)
