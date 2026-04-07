@@ -3,20 +3,14 @@ package com.movil.contrabajo.ui.screens.inicio
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,85 +20,82 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.movil.contrabajo.domain.model.Usuario
+import com.movil.contrabajo.ui.components.BotonPrimario
+import com.movil.contrabajo.ui.components.BotonSecundario
 import com.movil.contrabajo.ui.components.LogoContrabajo
+import com.movil.contrabajo.ui.components.PantallaBase
+import com.movil.contrabajo.ui.components.TarjetaBase
+import com.movil.contrabajo.ui.viewmodel.InicioViewModel
 import kotlinx.coroutines.delay
 
 @Composable
 fun PantallaInicial(
-    obtenerSesionActiva: () -> Usuario?,
+    viewModel: InicioViewModel,
     irALogin: () -> Unit,
     irARegistro: () -> Unit,
     irAPrincipal: () -> Unit
 ) {
+    val uiState = viewModel.uiState
     var visible by remember { mutableStateOf(false) }
-    var revisandoSesion by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         visible = true
-        delay(650)
-        if (obtenerSesionActiva() != null) {
+        delay(700)
+        viewModel.revisarSesionActiva()
+    }
+
+    LaunchedEffect(uiState.sesionActivaDetectada, uiState.revisandoSesion) {
+        if (!uiState.revisandoSesion && uiState.sesionActivaDetectada) {
             irAPrincipal()
-        } else {
-            revisandoSesion = false
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.secondaryContainer
-                    )
-                )
-            )
-            .padding(24.dp)
-    ) {
-        if (revisandoSesion) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (uiState.revisandoSesion) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         } else {
             AnimatedVisibility(
                 visible = visible,
-                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 })
+                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 5 })
             ) {
-                Column(
+                PantallaBase(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center
+                    scrollable = false
                 ) {
-                    LogoContrabajo()
-                    Spacer(modifier = Modifier.height(28.dp))
+                    Spacer(modifier = Modifier.weight(0.35f))
                     Text(
-                        text = "Bienvenido a Contrabajo",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
+                        text = "Bienvenido a",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    LogoContrabajo(modifier = Modifier.align(Alignment.CenterHorizontally))
+                    TarjetaBase {
+                        Text(
+                            text = "Servicios y oficios cerca de ti",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Encuentra trabajadores, revisa publicaciones destacadas y entra rapido a tus conversaciones desde una experiencia simple y directa.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        BotonPrimario(texto = "Iniciar sesion", onClick = irALogin)
+                        BotonSecundario(texto = "Crear cuenta", onClick = irARegistro)
+                    }
                     Text(
-                        text = "Encuentra servicios confiables, conversa con prestadores y mueve la app desde una base moderna en Compose.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Version activa v0.2-pre-alpha",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(top = 4.dp)
                     )
-                    Spacer(modifier = Modifier.height(32.dp))
-                    Button(
-                        onClick = irALogin,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) {
-                        Text("Iniciar sesion")
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedButton(
-                        onClick = irARegistro,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Crear cuenta")
-                    }
+                    Spacer(modifier = Modifier.weight(0.30f))
                 }
             }
         }

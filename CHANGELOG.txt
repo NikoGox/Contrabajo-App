@@ -1,17 +1,47 @@
-❚❙❘ VERSIÓN 0.1-Pre-Alpha
-⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺⎺
-├─• Se reemplazó la plantilla inicial de Android Studio por una estructura funcional de aplicación en Jetpack Compose.
-├─• Se implementó navegación base entre las pantallas de inicio, login, registro en dos pasos, principal, chats, perfil y detalle de servicio.
-├─• Se implementó persistencia local con SQLite para sostener la demo funcional del proyecto.
+VERSION 0.2-Pre-Alpha
+───────
+├─• Ahora las publicaciones se muestran con foto y en forma de cuadricula en la pantalla de marketplace.
+├─• Se agregaron animaciones a el navbar.
+├─• Se agregaron nuevas animaciones en general para toda la la aplicación
+├─• Se modificó el navbar para acercarlo al diseño esperado en el prototipo.
+├─• Se rehizo la direccion visual de la app para acercarla al mockup actual de Contrabajo.
+├─• Se reemplazaron componentes base por componentes de producto reutilizables para botones, inputs, indicadores, tarjetas y navbar.
+├─• Se rediseño la pantalla principal con una publicacion destacada mas cercana a la propuesta del proyecto.
+├─• Se mejoro la experiencia visual de chats, perfil y detalle de servicio para dar continuidad al resto de la app.
+├─• Se mantuvieron sin ruptura las rutas de navegacion, los repositorios locales y el modelo de datos SQLite.
+├─• Se ajusto la paleta y el sistema base para acercar mas la app al prototipo original, con una lectura mas limpia, directa y cercana al mockup.
+├─• Se retocaron `PantallaInicial`, `PantallaLogin` y el registro en dos pasos para alinearlos mejor con la composicion del prototipo.
+├─• Se consolidó la base MVVM con navegación principal persistente y shell estable para perfil, marketplace y mensajes.
+├─• Se implementó el flujo RF-02 en local con SQLite: creación/edición de servicio, disponibilidad visible/oculta y consulta de publicaciones en grilla.
+├─• Se separó la edición/creación de servicio en una pantalla dedicada (sin navbar), reduciendo carga visual y lógica en perfil.
+├─• Se simplificó el modelo de servicio para esta etapa (precio texto libre y una sola descripción principal), alineando mejor la UX real.
+├─• Se reforzó el dataset demo con múltiples usuarios/publicaciones y más categorías para validar scroll, filtros visuales y comportamiento de tarjetas.
+├─• Se integró recarga por gesto en el marketplace y se afinó la experiencia de desplazamiento para refrescar resultados.
+├─• Se corrigieron insets y solapes con barra de estado, mejorando legibilidad y jerarquía visual en todas las pantallas.
+├─• Se recuperó el acabado visual del navbar flotante con bordes/transparencia sutil sin reintroducir el artefacto de fondo.
+├─• Se añadió captura de foto desde cámara para servicios (permiso, FileProvider, URI temporal segura) junto al selector de galería.
+└─• Se refinaron componentes clave como `LogoContrabajo`, `CampoContrabajo`, `TarjetaOfertaServicio`, `ChipAccion` y `BarraInferior`.
+
+->>> Terminar de acercar Home, Detalle y Perfil al prototipo original con mas precision visual.
+->>> Mejorar continuidad entre navegacion, estados visuales y acciones del usuario.
+->>> Agregar logo de Contrabajo.
+
+
+
+VERSION 0.1-Pre-Alpha
+───────
+├─• Se reemplazo la plantilla inicial de Android Studio por una estructura funcional de aplicacion en Jetpack Compose.
+├─• Se implemento navegacion base entre las pantallas de inicio, login, registro en dos pasos, principal, chats, perfil y detalle de servicio.
+├─• Se implemento persistencia local con SQLite para sostener la demo funcional del proyecto.
 ├─• Se agregaron las entidades del dominio necesarias para esta etapa: Usuario, OfertaServicio, ChatCita, MensajeChat, CategoriaServicio, Estado, Foto, Direccion, Coordenadas y Valoracion.
-├─• Se agregaron las entidades locales SesionLocal y ConfiguracionApp para soporte de sesión persistente y configuración básica.
-├─• Se crearon repositorios locales para autenticación, perfil, ofertas y chats.
-├─• Se incorporaron datos semilla para usuario demo, oferta principal, mensajes de chat y valoración inicial.
-├─• Se ajustó la configuración del proyecto para soportar correctamente fecha y hora en dispositivos con API baja.
-├─• Se corrigió un crash de ejecución relacionado con rememberSaveable y el guardado de estado del registro en Compose.
-└─• Se alineó la versión del proyecto y del frontend para reflejar el estado actual como v0.1-Pre-Alpha.
+├─• Se agregaron las entidades locales SesionLocal y ConfiguracionApp para soporte de sesion persistente y configuracion basica.
+├─• Se crearon repositorios locales para autenticacion, perfil, ofertas y chats.
+├─• Se incorporaron datos semilla para usuario demo, oferta principal, mensajes de chat y valoracion inicial.
+├─• Se ajusto la configuracion del proyecto para soportar correctamente fecha y hora en dispositivos con API baja.
+├─• Se corrigio un crash de ejecucion relacionado con rememberSaveable y el guardado de estado del registro en Compose.
+└─• Se alineo la version del proyecto y del frontend para reflejar el estado actual como v0.1-pre-alpha.
 
 
-->>> Falta pulir visualmente las pantallas para acercarlas más al mockup final y reforzar la identidad de Contrabajo.
-->>> Falta enriquecer el flujo principal con más contenido en Home y mejor interacción en Chats.
-->>> Falta preparar la transición desde SQLite local hacia integración con backend.
+->>> Pendiente para v0.3: enriquecer el flujo principal con mas contenido en Home y mejor interaccion en Chats.
+->>> Pendiente para v0.3: reforzar continuidad entre navegacion, estados visuales y acciones del usuario.
+->>> Pendiente para futuro: preparar la transicion desde SQLite local hacia integracion con backend.

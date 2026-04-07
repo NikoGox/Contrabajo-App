@@ -1,0 +1,190 @@
+package com.movil.contrabajo.ui.components
+
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.ChatBubble
+import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import com.movil.contrabajo.ui.navigation.RutasApp
+import com.movil.contrabajo.ui.theme.Blanco
+import com.movil.contrabajo.ui.theme.NavbarBrillo
+import com.movil.contrabajo.ui.theme.NavbarIconoInactivo
+import com.movil.contrabajo.ui.theme.NavbarSeleccion
+import com.movil.contrabajo.ui.theme.NavbarVerde
+
+private data class ItemNavbar(
+    val ruta: String,
+    val descripcion: String,
+    val icono: ImageVector
+)
+
+val PaddingNavbarFlotante = PaddingValues(bottom = 0.dp)
+
+@Composable
+fun ContenedorConNavbarFlotante(
+    actual: String,
+    alNavegar: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable (PaddingValues) -> Unit
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        content(PaddingNavbarFlotante)
+        NavbarFlotante(
+            actual = actual,
+            alNavegar = alNavegar,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .zIndex(2f)
+        )
+    }
+}
+
+@Composable
+fun NavbarFlotante(
+    actual: String,
+    alNavegar: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val items = listOf(
+        ItemNavbar(RutasApp.Perfil.ruta, "Perfil", Icons.Outlined.AccountCircle),
+        ItemNavbar(RutasApp.Principal.ruta, "Marketplace", Icons.Outlined.Storefront),
+        ItemNavbar(RutasApp.Chats.ruta, "Mensajes", Icons.Outlined.ChatBubble)
+    )
+    val indiceSeleccionado = items.indexOfFirst { it.ruta == actual }.coerceAtLeast(0)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.86f),
+            shape = RoundedCornerShape(34.dp),
+            color = NavbarVerde.copy(alpha = 0.96f),
+            border = BorderStroke(1.dp, Blanco.copy(alpha = 0.28f)),
+            shadowElevation = 16.dp
+        ) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                NavbarVerde.copy(alpha = 0.78f),
+                                NavbarBrillo.copy(alpha = 0.12f),
+                                NavbarVerde.copy(alpha = 0.96f),
+                                NavbarBrillo.copy(alpha = 0.12f),
+                                NavbarVerde.copy(alpha = 0.78f)
+                            )
+                        )
+                    )
+                    .padding(horizontal = 10.dp, vertical = 10.dp)
+            ) {
+                val anchoSegmento = maxWidth / items.size
+                val anchoIndicador = 76.dp
+                val desplazamientoIndicador by animateDpAsState(
+                    targetValue = (anchoSegmento * indiceSeleccionado) + ((anchoSegmento - anchoIndicador) / 2),
+                    animationSpec = spring(dampingRatio = 0.8f, stiffness = 420f),
+                    label = "navbarIndicatorOffset"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .offset(x = desplazamientoIndicador)
+                        .size(width = anchoIndicador, height = 56.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    NavbarSeleccion.copy(alpha = 0.36f),
+                                    Blanco.copy(alpha = 0.14f)
+                                )
+                            )
+                        )
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items.forEachIndexed { indice, item ->
+                        val seleccionado = indice == indiceSeleccionado
+                        val escala by animateFloatAsState(
+                            targetValue = if (seleccionado) 1.08f else 1f,
+                            animationSpec = spring(dampingRatio = 0.72f, stiffness = 500f),
+                            label = "navbarIconScale"
+                        )
+                        val elevacionIcono by animateDpAsState(
+                            targetValue = if (seleccionado) (-3).dp else 0.dp,
+                            animationSpec = spring(dampingRatio = 0.8f, stiffness = 420f),
+                            label = "navbarIconLift"
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(28.dp))
+                                .clickable(
+                                    enabled = !seleccionado,
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) { alNavegar(item.ruta) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = item.icono,
+                                contentDescription = item.descripcion,
+                                tint = if (seleccionado) Blanco else NavbarIconoInactivo,
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .offset(y = elevacionIcono)
+                                    .graphicsLayer {
+                                        scaleX = escala
+                                        scaleY = escala
+                                    }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -5,7 +5,10 @@ import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import com.movil.contrabajo.domain.model.CategoriaServicio
 import com.movil.contrabajo.domain.model.ChatCita
+import com.movil.contrabajo.domain.model.FotoServicioLocal
+import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.domain.model.Usuario
@@ -64,7 +67,11 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "id_foto INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "fecha_subida TEXT NOT NULL," +
                 "enlace TEXT NOT NULL," +
-                "detalle TEXT NOT NULL)"
+                "detalle TEXT NOT NULL," +
+                "nombre_archivo TEXT NOT NULL DEFAULT ''," +
+                "mime_type TEXT NOT NULL DEFAULT ''," +
+                "estado_sincronizacion TEXT NOT NULL DEFAULT 'pendiente'," +
+                "url_remota TEXT)"
         )
         db.execSQL(
             "CREATE TABLE ofertas_servicio (" +
@@ -77,7 +84,8 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "fecha_publicacion TEXT NOT NULL," +
                 "id_categoria_servicio INTEGER NOT NULL," +
                 "id_trabajador INTEGER NOT NULL," +
-                "id_cliente INTEGER)"
+                "id_cliente INTEGER," +
+                "id_foto_portada INTEGER)"
         )
         db.execSQL(
             "CREATE TABLE chats_cita (" +
@@ -212,13 +220,35 @@ class ContrabajoSQLiteHelper(context: Context) :
     }
 
     fun obtenerOfertaPrincipal(): OfertaServicio? {
-        readableDatabase.rawQuery(
-            consultaOfertaSelect + consultaOfertaJoins + consultaOfertaGroupBy + " ORDER BY o.id_oferta_servicio ASC LIMIT 1",
+        return obtenerOfertasMarketplace().firstOrNull()
+    }
+
+    fun obtenerOfertasMarketplace(busqueda: String = ""): List<OfertaServicio> {
+        val filtros = busqueda.trim()
+        val where = if (filtros.isBlank()) {
+            " WHERE o.disponible = 1"
+        } else {
+            " WHERE o.disponible = 1 AND (" +
+                "o.titulo LIKE ? OR " +
+                "o.descripcion LIKE ? OR " +
+                "o.detalle LIKE ? OR " +
+                "cat.nombre LIKE ? OR " +
+                "(u.nombre || ' ' || u.apellido_paterno) LIKE ?)"
+        }
+        val args = if (filtros.isBlank()) {
             emptyArray()
-        )
-            .use { cursor ->
-                return if (cursor.moveToFirst()) cursor.toOfertaServicio() else null
-            }
+        } else {
+            Array(5) { "%$filtros%" }
+        }
+
+        readableDatabase.rawQuery(
+            consultaOfertaSelect + consultaOfertaJoins + where + consultaOfertaGroupBy + " ORDER BY o.id_oferta_servicio DESC",
+            args
+        ).use { cursor ->
+            val ofertas = mutableListOf<OfertaServicio>()
+            while (cursor.moveToNext()) ofertas += cursor.toOfertaServicio()
+            return ofertas
+        }
     }
 
     fun obtenerOfertaPorId(idOfertaServicio: Long): OfertaServicio? {
@@ -228,6 +258,105 @@ class ContrabajoSQLiteHelper(context: Context) :
         ).use { cursor ->
             return if (cursor.moveToFirst()) cursor.toOfertaServicio() else null
         }
+    }
+
+    fun obtenerOfertaPorTrabajador(idTrabajador: Long): OfertaServicio? {
+        readableDatabase.rawQuery(
+            consultaOfertaSelect + consultaOfertaJoins + " WHERE o.id_trabajador = ? " + consultaOfertaGroupBy + " ORDER BY o.id_oferta_servicio DESC LIMIT 1",
+            arrayOf(idTrabajador.toString())
+        ).use { cursor ->
+            return if (cursor.moveToFirst()) cursor.toOfertaServicio() else null
+        }
+    }
+
+    fun obtenerCategoriasServicio(): List<CategoriaServicio> {
+        readableDatabase.rawQuery(
+            "SELECT * FROM categorias_servicio ORDER BY nombre ASC",
+            emptyArray()
+        ).use { cursor ->
+            val categorias = mutableListOf<CategoriaServicio>()
+            while (cursor.moveToNext()) {
+                categorias += CategoriaServicio(
+                    idCategoriaServicio = cursor.getLong(cursor.getColumnIndexOrThrow("id_categoria_servicio")),
+                    nombre = cursor.getString(cursor.getColumnIndexOrThrow("nombre"))
+                )
+            }
+            return categorias
+        }
+    }
+
+    fun insertarFotoServicio(foto: FotoServicioLocal): Long {
+        return writableDatabase.insert("fotos", null, ContentValues().apply {
+            put("fecha_subida", ahora())
+            put("enlace", foto.uriLocal)
+            put("detalle", "Foto local lista para futura sincronizacion con backend")
+            put("nombre_archivo", foto.nombreArchivo)
+            put("mime_type", foto.mimeType)
+            put("estado_sincronizacion", if (foto.pendienteSincronizacion) "pendiente" else "sincronizada")
+            put("url_remota", foto.urlRemota)
+        })
+    }
+
+    fun actualizarFotoServicio(idFoto: Long, foto: FotoServicioLocal) {
+        writableDatabase.update(
+            "fotos",
+            ContentValues().apply {
+                put("enlace", foto.uriLocal)
+                put("detalle", "Foto local lista para futura sincronizacion con backend")
+                put("nombre_archivo", foto.nombreArchivo)
+                put("mime_type", foto.mimeType)
+                put("estado_sincronizacion", if (foto.pendienteSincronizacion) "pendiente" else "sincronizada")
+                put("url_remota", foto.urlRemota)
+            },
+            "id_foto = ?",
+            arrayOf(idFoto.toString())
+        )
+    }
+
+    fun insertarOfertaServicio(idTrabajador: Long, formulario: FormularioServicio, idFotoPortada: Long?): Long {
+        return writableDatabase.insert("ofertas_servicio", null, ContentValues().apply {
+            put("titulo", formulario.titulo.trim())
+            put("descripcion", formulario.descripcion.trim())
+            put("detalle", formulario.descripcion.trim())
+            put("precio_texto", formulario.precioTexto.trim())
+            put("disponible", formulario.disponible.toInt())
+            put("fecha_publicacion", ahora())
+            put("id_categoria_servicio", formulario.idCategoriaServicio)
+            put("id_trabajador", idTrabajador)
+            put("id_foto_portada", idFotoPortada)
+        })
+    }
+
+    fun actualizarOfertaServicio(idOfertaServicio: Long, formulario: FormularioServicio, idFotoPortada: Long?) {
+        writableDatabase.update(
+            "ofertas_servicio",
+            ContentValues().apply {
+                put("titulo", formulario.titulo.trim())
+                put("descripcion", formulario.descripcion.trim())
+                put("detalle", formulario.descripcion.trim())
+                put("precio_texto", formulario.precioTexto.trim())
+                put("disponible", formulario.disponible.toInt())
+                put("id_categoria_servicio", formulario.idCategoriaServicio)
+                put("id_foto_portada", idFotoPortada)
+            },
+            "id_oferta_servicio = ?",
+            arrayOf(idOfertaServicio.toString())
+        )
+    }
+
+    fun actualizarDisponibilidadOferta(idOfertaServicio: Long, disponible: Boolean) {
+        writableDatabase.update(
+            "ofertas_servicio",
+            ContentValues().apply {
+                put("disponible", disponible.toInt())
+            },
+            "id_oferta_servicio = ?",
+            arrayOf(idOfertaServicio.toString())
+        )
+    }
+
+    fun eliminarOfertaServicio(idOfertaServicio: Long) {
+        writableDatabase.delete("ofertas_servicio", "id_oferta_servicio = ?", arrayOf(idOfertaServicio.toString()))
     }
 
     fun obtenerChatsParaUsuario(idUsuario: Long): List<ChatCita> {
@@ -277,7 +406,21 @@ class ContrabajoSQLiteHelper(context: Context) :
             })
         }
 
-        listOf("Mecanica a domicilio", "Arquitectura 24/7", "Tecnico general").forEach { nombre ->
+        val categoriasBase = listOf(
+            "Mecanica a domicilio",
+            "Arquitectura y planos",
+            "Tecnico general",
+            "Electricidad",
+            "Gasfiteria",
+            "Carpinteria",
+            "Pintura",
+            "Soldadura",
+            "Jardineria",
+            "Computacion",
+            "Redes e internet",
+            "Aseo y mantencion"
+        )
+        categoriasBase.forEach { nombre ->
             db.insert("categorias_servicio", null, ContentValues().apply { put("nombre", nombre) })
         }
 
@@ -298,6 +441,10 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("fecha_subida", ahora())
             put("enlace", "local://perfil/jose-perez")
             put("detalle", "Foto demo del prestador")
+            put("nombre_archivo", "jose-perez-demo.jpg")
+            put("mime_type", "image/jpeg")
+            put("estado_sincronizacion", "sincronizada")
+            put("url_remota", "https://backend.contrabajo.dev/fotos/jose-perez-demo.jpg")
         })
 
         val trabajadorId = db.insert("usuarios", null, ContentValues().apply {
@@ -334,12 +481,65 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("titulo", "Mecanico a domicilio")
             put("descripcion", "Diagnostico y mantencion ligera en terreno")
             put("detalle", "Ofrezco servicio de mecanica automotriz a domicilio en la region metropolitana, con visita rapida, diagnostico inicial y presupuesto transparente.")
-            put("precio_texto", "Contactar para saber precio")
+            put("precio_texto", "Desde 25.000 CLP segun diagnostico")
             put("disponible", 1)
             put("fecha_publicacion", ahora())
             put("id_categoria_servicio", 1)
             put("id_trabajador", trabajadorId)
+            put("id_foto_portada", 1)
         })
+
+        val trabajadoresDemo = listOf(
+            listOf("Pedro", "Fuentes", "Lara", "PedroFx", "22334455", "7", "+56921110001", "pedro.fx@contrabajo.cl"),
+            listOf("Marcela", "Vera", "Mora", "MarceVm", "23334455", "6", "+56921110002", "marcela.vm@contrabajo.cl"),
+            listOf("Ramon", "Silva", "Pinto", "RamonSp", "24334455", "5", "+56921110003", "ramon.sp@contrabajo.cl"),
+            listOf("Claudio", "Nunez", "Saez", "ClaudioNs", "25334455", "4", "+56921110004", "claudio.ns@contrabajo.cl"),
+            listOf("Daniela", "Araya", "Rios", "DaniAr", "26334455", "3", "+56921110005", "daniela.ar@contrabajo.cl"),
+            listOf("Ignacio", "Mella", "Toro", "IgnaMt", "27334455", "2", "+56921110006", "ignacio.mt@contrabajo.cl"),
+            listOf("Paula", "Soto", "Guzman", "PaulaSg", "28334455", "1", "+56921110007", "paula.sg@contrabajo.cl"),
+            listOf("Victor", "Cid", "Tapia", "VictorCt", "29334455", "0", "+56921110008", "victor.ct@contrabajo.cl"),
+            listOf("Camila", "Lopez", "Reyes", "CamiLr", "30334455", "9", "+56921110009", "camila.lr@contrabajo.cl")
+        )
+        val publicacionesDemo = listOf(
+            listOf("Gasfiter urgente", "Reparo fugas, llaves y WC en menos de 24 horas.", "Desde 18.000 por visita"),
+            listOf("Arquitecta para planos", "Planos municipales y regularizacion de ampliaciones.", "Desde 120.000 por proyecto"),
+            listOf("Tecnico en computadores", "Formateo, limpieza interna y optimizacion de equipos.", "Desde 22.000 por equipo"),
+            listOf("Electricista domiciliario", "Cambio de enchufes, tableros y luminarias.", "Desde 20.000 segun trabajo"),
+            listOf("Maestra pintora", "Pintura interior y exterior con terminacion fina.", "Desde 55.000 por jornada"),
+            listOf("Soldador a domicilio", "Rejas, portones y refuerzos metalicos.", "Desde 35.000 por trabajo"),
+            listOf("Carpintera muebles", "Fabricacion y reparacion de muebles a medida.", "Desde 48.000 segun mueble"),
+            listOf("Tecnico en redes wifi", "Mejoro cobertura y estabilidad en hogar u oficina.", "Desde 25.000 por instalacion"),
+            listOf("Jardinero por mantencion", "Poda, limpieza y mantencion semanal de jardines.", "Desde 16.000 por visita")
+        )
+        trabajadoresDemo.forEachIndexed { index, trabajador ->
+            val trabajadorDemoId = db.insert("usuarios", null, ContentValues().apply {
+                put("run", trabajador[4])
+                put("dv", trabajador[5])
+                put("username", trabajador[3])
+                put("nombre", trabajador[0])
+                put("apellido_paterno", trabajador[1])
+                put("apellido_materno", trabajador[2])
+                put("telefono", trabajador[6])
+                put("correo", trabajador[7])
+                put("contrasena", "123456")
+                put("fecha_registro", ahora(index.toLong()))
+                put("fecha_nacimiento", "1992-01-15")
+                put("verificado", 1)
+            })
+
+            val publicacion = publicacionesDemo[index]
+            db.insert("ofertas_servicio", null, ContentValues().apply {
+                put("titulo", publicacion[0])
+                put("descripcion", publicacion[1])
+                put("detalle", publicacion[1])
+                put("precio_texto", publicacion[2])
+                put("disponible", 1)
+                put("fecha_publicacion", ahora(index.toLong()))
+                put("id_categoria_servicio", (index % categoriasBase.size) + 1)
+                put("id_trabajador", trabajadorDemoId)
+                putNull("id_foto_portada")
+            })
+        }
 
         db.insert("valoraciones", null, ContentValues().apply {
             put("voto", 4)
@@ -401,16 +601,21 @@ class ContrabajoSQLiteHelper(context: Context) :
         idOfertaServicio = getLong(getColumnIndexOrThrow("id_oferta_servicio")),
         titulo = getString(getColumnIndexOrThrow("titulo")),
         descripcion = getString(getColumnIndexOrThrow("descripcion")),
-        detalle = getString(getColumnIndexOrThrow("detalle")),
         precioTexto = getString(getColumnIndexOrThrow("precio_texto")),
         disponible = getInt(getColumnIndexOrThrow("disponible")) == 1,
         fechaPublicacion = getString(getColumnIndexOrThrow("fecha_publicacion")),
         idCategoriaServicio = getLong(getColumnIndexOrThrow("id_categoria_servicio")),
         idTrabajador = getLong(getColumnIndexOrThrow("id_trabajador")),
         idCliente = getLongNullable("id_cliente"),
+        idFotoPortada = getLongNullable("id_foto_portada"),
         nombreTrabajador = getStringNullable("nombre_trabajador").orEmpty(),
+        nombreCategoria = getStringNullable("nombre_categoria").orEmpty(),
         puntuacionPromedio = getDoubleNullable("puntuacion_promedio") ?: 0.0,
-        ubicacionReferencia = getStringNullable("ubicacion_referencia").orEmpty()
+        ubicacionReferencia = getStringNullable("ubicacion_referencia").orEmpty(),
+        fotoUrlReferencia = getStringNullable("foto_url_referencia").orEmpty(),
+        fotoNombreArchivo = getStringNullable("foto_nombre_archivo").orEmpty(),
+        fotoMimeType = getStringNullable("foto_mime_type").orEmpty(),
+        fotoPendienteSincronizacion = getStringNullable("foto_estado_sincronizacion") == "pendiente"
     )
 
     private fun Cursor.toChatCita(): ChatCita = ChatCita(
@@ -453,14 +658,21 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     companion object {
         private const val DATABASE_NAME = "contrabajo_local.db"
-        private const val DATABASE_VERSION = 1
+        private const val DATABASE_VERSION = 6
         private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
         private val consultaOfertaSelect =
             "SELECT o.*, u.nombre || ' ' || u.apellido_paterno AS nombre_trabajador, " +
-                "c.detalle AS ubicacion_referencia, COALESCE(AVG(v.voto), 0) AS puntuacion_promedio "
+                "cat.nombre AS nombre_categoria, c.detalle AS ubicacion_referencia, " +
+                "COALESCE(f.enlace, '') AS foto_url_referencia, " +
+                "COALESCE(f.nombre_archivo, '') AS foto_nombre_archivo, " +
+                "COALESCE(f.mime_type, '') AS foto_mime_type, " +
+                "COALESCE(f.estado_sincronizacion, '') AS foto_estado_sincronizacion, " +
+                "COALESCE(AVG(v.voto), 0) AS puntuacion_promedio "
         private val consultaOfertaJoins =
                 "FROM ofertas_servicio o " +
                 "INNER JOIN usuarios u ON u.id_usuario = o.id_trabajador " +
+                "INNER JOIN categorias_servicio cat ON cat.id_categoria_servicio = o.id_categoria_servicio " +
+                "LEFT JOIN fotos f ON f.id_foto = o.id_foto_portada " +
                 "LEFT JOIN direcciones d ON d.id_direccion = 1 " +
                 "LEFT JOIN coordenadas c ON c.id_coordenadas = d.id_coordenadas " +
                 "LEFT JOIN valoraciones v ON v.id_trabajador = o.id_trabajador "

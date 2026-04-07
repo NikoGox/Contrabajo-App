@@ -20,16 +20,21 @@ data class OfertaServicio(
     val idOfertaServicio: Long = 0,
     val titulo: String,
     val descripcion: String,
-    val detalle: String,
     val precioTexto: String,
     val disponible: Boolean,
     val fechaPublicacion: String,
     val idCategoriaServicio: Long,
     val idTrabajador: Long,
     val idCliente: Long? = null,
+    val idFotoPortada: Long? = null,
     val nombreTrabajador: String = "",
+    val nombreCategoria: String = "",
     val puntuacionPromedio: Double = 0.0,
-    val ubicacionReferencia: String = ""
+    val ubicacionReferencia: String = "",
+    val fotoUrlReferencia: String = "",
+    val fotoNombreArchivo: String = "",
+    val fotoMimeType: String = "",
+    val fotoPendienteSincronizacion: Boolean = false
 )
 
 data class ChatCita(
@@ -71,7 +76,29 @@ data class Foto(
     val idFoto: Long = 0,
     val fechaSubida: String,
     val enlace: String,
-    val detalle: String
+    val detalle: String,
+    val nombreArchivo: String = "",
+    val mimeType: String = "",
+    val estadoSincronizacion: String = "pendiente",
+    val urlRemota: String? = null
+)
+
+data class FotoServicioLocal(
+    val idFoto: Long? = null,
+    val uriLocal: String = "",
+    val nombreArchivo: String = "",
+    val mimeType: String = "",
+    val pendienteSincronizacion: Boolean = true,
+    val urlRemota: String? = null
+)
+
+data class FormularioServicio(
+    val titulo: String = "",
+    val descripcion: String = "",
+    val precioTexto: String = "",
+    val idCategoriaServicio: Long? = null,
+    val disponible: Boolean = true,
+    val foto: FotoServicioLocal? = null
 )
 
 data class Direccion(

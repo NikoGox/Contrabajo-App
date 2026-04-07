@@ -1,7 +1,9 @@
 package com.movil.contrabajo.data.repository
 
 import com.movil.contrabajo.data.local.ContrabajoSQLiteHelper
+import com.movil.contrabajo.domain.model.CategoriaServicio
 import com.movil.contrabajo.domain.model.ChatCita
+import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.domain.model.RegistroPendiente
@@ -23,7 +25,13 @@ interface RepositorioPerfil {
 
 interface RepositorioOfertas {
     fun obtenerOfertaPrincipal(): OfertaServicio?
+    fun obtenerOfertasMarketplace(busqueda: String = ""): List<OfertaServicio>
     fun obtenerOfertaPorId(idOfertaServicio: Long): OfertaServicio?
+    fun obtenerOfertaPropiaActual(): OfertaServicio?
+    fun obtenerCategoriasServicio(): List<CategoriaServicio>
+    fun guardarOfertaPropia(formulario: FormularioServicio): Result<OfertaServicio>
+    fun actualizarDisponibilidadOfertaPropia(disponible: Boolean): Result<OfertaServicio>
+    fun eliminarOfertaPropia(): Result<Unit>
 }
 
 interface RepositorioChats {
@@ -103,7 +111,82 @@ class RepositorioOfertasLocal(
     private val db: ContrabajoSQLiteHelper
 ) : RepositorioOfertas {
     override fun obtenerOfertaPrincipal(): OfertaServicio? = db.obtenerOfertaPrincipal()
+    override fun obtenerOfertasMarketplace(busqueda: String): List<OfertaServicio> = db.obtenerOfertasMarketplace(busqueda)
     override fun obtenerOfertaPorId(idOfertaServicio: Long): OfertaServicio? = db.obtenerOfertaPorId(idOfertaServicio)
+    override fun obtenerOfertaPropiaActual(): OfertaServicio? {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return null
+        return db.obtenerOfertaPorTrabajador(usuario.idUsuario)
+    }
+
+    override fun obtenerCategoriasServicio(): List<CategoriaServicio> = db.obtenerCategoriasServicio()
+
+    override fun guardarOfertaPropia(formulario: FormularioServicio): Result<OfertaServicio> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay una sesion activa para guardar el servicio"))
+
+        val error = validarFormularioServicio(formulario)
+        if (error != null) return Result.failure(IllegalArgumentException(error))
+
+        val ofertaExistente = db.obtenerOfertaPorTrabajador(usuario.idUsuario)
+        val idFotoPortada = when {
+            formulario.foto == null -> ofertaExistente?.idFotoPortada
+            formulario.foto.idFoto != null -> {
+                db.actualizarFotoServicio(formulario.foto.idFoto, formulario.foto)
+                formulario.foto.idFoto
+            }
+
+            else -> db.insertarFotoServicio(formulario.foto)
+        }
+
+        val idOferta = if (ofertaExistente == null) {
+            db.insertarOfertaServicio(usuario.idUsuario, formulario, idFotoPortada)
+        } else {
+            db.actualizarOfertaServicio(ofertaExistente.idOfertaServicio, formulario, idFotoPortada)
+            ofertaExistente.idOfertaServicio
+        }
+
+        val ofertaActualizada = db.obtenerOfertaPorId(idOferta)
+        return if (ofertaActualizada != null) {
+            Result.success(ofertaActualizada)
+        } else {
+            Result.failure(IllegalStateException("No se pudo guardar el servicio"))
+        }
+    }
+
+    override fun actualizarDisponibilidadOfertaPropia(disponible: Boolean): Result<OfertaServicio> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay una sesion activa para actualizar disponibilidad"))
+        val oferta = db.obtenerOfertaPorTrabajador(usuario.idUsuario)
+            ?: return Result.failure(IllegalStateException("No existe un servicio para actualizar"))
+
+        db.actualizarDisponibilidadOferta(oferta.idOfertaServicio, disponible)
+        val actualizada = db.obtenerOfertaPorId(oferta.idOfertaServicio)
+        return if (actualizada != null) {
+            Result.success(actualizada)
+        } else {
+            Result.failure(IllegalStateException("No se pudo actualizar la disponibilidad"))
+        }
+    }
+
+    override fun eliminarOfertaPropia(): Result<Unit> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay una sesion activa para eliminar el servicio"))
+        val oferta = db.obtenerOfertaPorTrabajador(usuario.idUsuario)
+            ?: return Result.failure(IllegalStateException("No existe un servicio para eliminar"))
+        db.eliminarOfertaServicio(oferta.idOfertaServicio)
+        return Result.success(Unit)
+    }
+
+    private fun validarFormularioServicio(formulario: FormularioServicio): String? = when {
+        formulario.titulo.isBlank() -> "Ingresa un titulo para tu servicio"
+        formulario.titulo.trim().length > 80 -> "El titulo permite hasta 80 caracteres"
+        formulario.descripcion.isBlank() -> "Ingresa la descripcion del servicio"
+        formulario.descripcion.trim().length > 500 -> "La descripcion permite hasta 500 caracteres"
+        formulario.precioTexto.isBlank() -> "Ingresa una referencia de precio"
+        formulario.idCategoriaServicio == null -> "Selecciona una categoria"
+        formulario.foto == null || formulario.foto.uriLocal.isBlank() -> "Selecciona una foto para tu servicio"
+        else -> null
+    }
 }
 
 class RepositorioChatsLocal(

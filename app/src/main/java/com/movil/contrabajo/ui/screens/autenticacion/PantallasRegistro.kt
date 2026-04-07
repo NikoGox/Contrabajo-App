@@ -1,158 +1,123 @@
 package com.movil.contrabajo.ui.screens.autenticacion
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.movil.contrabajo.data.repository.RepositorioAutenticacion
-import com.movil.contrabajo.domain.model.RegistroPendiente
+import com.movil.contrabajo.ui.components.BotonPrimario
+import com.movil.contrabajo.ui.components.BotonSecundario
+import com.movil.contrabajo.ui.components.CampoContrabajo
+import com.movil.contrabajo.ui.components.EncabezadoPantalla
+import com.movil.contrabajo.ui.components.IndicadorPasos
+import com.movil.contrabajo.ui.components.LogoContrabajo
+import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaBase
+import com.movil.contrabajo.ui.viewmodel.RegistroViewModel
 
 @Composable
 fun PantallaRegistroPasoUno(
-    estadoInicial: RegistroPendiente,
+    viewModel: RegistroViewModel,
     onVolver: () -> Unit,
-    onContinuar: (RegistroPendiente) -> Unit
+    onContinuar: () -> Unit
 ) {
-    var registro by remember { mutableStateOf(estadoInicial) }
+    val registro = viewModel.uiState.registro
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
+    PantallaBase {
+        LogoContrabajo(modifier = Modifier.align(Alignment.CenterHorizontally), compacto = true)
         TarjetaBase {
-            Text("Crear cuenta 1/2", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Datos personales del prestador o cliente.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedTextField(
-                value = registro.nombre,
-                onValueChange = { registro = registro.copy(nombre = it) },
-                label = { Text("Nombre") },
-                modifier = Modifier.fillMaxWidth()
+            IndicadorPasos(pasoActual = 1, totalPasos = 2)
+            EncabezadoPantalla(
+                titulo = "Crear cuenta",
+                subtitulo = "Datos personales"
             )
-            OutlinedTextField(
-                value = registro.apellidoPaterno,
-                onValueChange = { registro = registro.copy(apellidoPaterno = it) },
-                label = { Text("Apellido paterno") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = registro.apellidoMaterno,
-                onValueChange = { registro = registro.copy(apellidoMaterno = it) },
-                label = { Text("Apellido materno") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = registro.run,
-                    onValueChange = { registro = registro.copy(run = it) },
-                    label = { Text("RUN") },
+            CampoContrabajo(registro.nombre, viewModel::actualizarNombre, "Nombre")
+            CampoContrabajo(registro.apellidoPaterno, viewModel::actualizarApellidoPaterno, "Apellido paterno")
+            CampoContrabajo(registro.apellidoMaterno, viewModel::actualizarApellidoMaterno, "Apellido materno")
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                CampoContrabajo(
+                    valor = registro.run,
+                    onValueChange = viewModel::actualizarRun,
+                    etiqueta = "RUN",
                     modifier = Modifier.weight(1f)
                 )
-                OutlinedTextField(
-                    value = registro.dv,
-                    onValueChange = { registro = registro.copy(dv = it) },
-                    label = { Text("DV") },
-                    modifier = Modifier.weight(0.4f)
+                CampoContrabajo(
+                    valor = registro.dv,
+                    onValueChange = viewModel::actualizarDv,
+                    etiqueta = "DV",
+                    modifier = Modifier.weight(0.35f)
                 )
             }
-            OutlinedTextField(
-                value = registro.telefono,
-                onValueChange = { registro = registro.copy(telefono = it) },
-                label = { Text("Telefono") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Button(onClick = { onContinuar(registro) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Siguiente")
-            }
-            OutlinedButton(onClick = onVolver, modifier = Modifier.fillMaxWidth()) {
-                Text("Volver")
-            }
+            CampoContrabajo(registro.telefono, viewModel::actualizarTelefono, "Telefono")
+            BotonPrimario(texto = "Siguiente", onClick = onContinuar)
         }
+        BotonSecundario(texto = "Volver", onClick = onVolver)
     }
 }
 
 @Composable
 fun PantallaRegistroPasoDos(
-    estadoInicial: RegistroPendiente,
+    viewModel: RegistroViewModel,
     onVolver: () -> Unit,
-    onRegistroExitoso: () -> Unit,
-    repositorioAutenticacion: RepositorioAutenticacion
+    onRegistroExitoso: () -> Unit
 ) {
-    var registro by remember { mutableStateOf(estadoInicial) }
-    var error by remember { mutableStateOf<String?>(null) }
+    val uiState = viewModel.uiState
+    val registro = uiState.registro
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        TarjetaBase {
-            Text("Crear cuenta 2/2", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Datos de acceso para tu perfil.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            OutlinedTextField(
-                value = registro.username,
-                onValueChange = { registro = registro.copy(username = it) },
-                label = { Text("Nombre de usuario") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = registro.correo,
-                onValueChange = { registro = registro.copy(correo = it) },
-                label = { Text("Correo electronico") },
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = registro.contrasena,
-                onValueChange = { registro = registro.copy(contrasena = it) },
-                label = { Text("Contrasena") },
-                modifier = Modifier.fillMaxWidth(),
-                visualTransformation = PasswordVisualTransformation()
-            )
-            OutlinedTextField(
-                value = registro.confirmarContrasena,
-                onValueChange = { registro = registro.copy(confirmarContrasena = it) },
-                label = { Text("Confirmar contrasena") },
-                modifier = Modifier.fillMaxWidth(),
-                visualTransformation = PasswordVisualTransformation()
-            )
-            if (error != null) {
-                Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
-            }
-            Button(
-                onClick = {
-                    repositorioAutenticacion.registrarUsuario(registro)
-                        .onSuccess { onRegistroExitoso() }
-                        .onFailure { error = it.message }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Registrarme")
-            }
-            OutlinedButton(onClick = onVolver, modifier = Modifier.fillMaxWidth()) {
-                Text("Volver")
-            }
-            Spacer(modifier = Modifier.height(2.dp))
+    LaunchedEffect(uiState.registroExitoso) {
+        if (uiState.registroExitoso) {
+            onRegistroExitoso()
+            viewModel.consumirRegistroExitoso()
         }
+    }
+
+    PantallaBase {
+        LogoContrabajo(modifier = Modifier.align(Alignment.CenterHorizontally), compacto = true)
+        TarjetaBase {
+            IndicadorPasos(pasoActual = 2, totalPasos = 2)
+            EncabezadoPantalla(
+                titulo = "Crear cuenta",
+                subtitulo = "Datos de la cuenta"
+            )
+            CampoContrabajo(registro.username, viewModel::actualizarUsername, "Nombre de usuario")
+            CampoContrabajo(registro.correo, viewModel::actualizarCorreo, "Correo electronico")
+            CampoContrabajo(
+                valor = registro.contrasena,
+                onValueChange = viewModel::actualizarContrasena,
+                etiqueta = "Contrasena",
+                visualTransformation = PasswordVisualTransformation()
+            )
+            CampoContrabajo(
+                valor = registro.confirmarContrasena,
+                onValueChange = viewModel::actualizarConfirmarContrasena,
+                etiqueta = "Confirmar contrasena",
+                visualTransformation = PasswordVisualTransformation()
+            )
+            Text(
+                text = "Acepto los terminos y condiciones.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (uiState.error != null) {
+                Text(
+                    text = uiState.error.orEmpty(),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            BotonPrimario(
+                texto = "Registrarse",
+                onClick = viewModel::registrarUsuario
+            )
+        }
+        BotonSecundario(texto = "Volver", onClick = onVolver)
     }
 }
