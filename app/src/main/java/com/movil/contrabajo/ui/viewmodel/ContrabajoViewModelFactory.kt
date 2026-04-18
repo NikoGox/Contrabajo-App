@@ -20,7 +20,10 @@ class ContrabajoViewModelFactory(
             RegistroViewModel(repositorios.autenticacion) as T
 
         modelClass.isAssignableFrom(PrincipalViewModel::class.java) ->
-            PrincipalViewModel(repositorios.ofertas) as T
+            PrincipalViewModel(
+                repositorioOfertas = repositorios.ofertas,
+                repositorioPerfil = repositorios.perfil
+            ) as T
 
         modelClass.isAssignableFrom(ChatsViewModel::class.java) ->
             ChatsViewModel(repositorios.chats) as T

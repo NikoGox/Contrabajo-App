@@ -1,3 +1,26 @@
+VERSION 0.3-Pre-Alpha
+───────
+├─• Se ajustó el registro: RUN (8 dígitos) + DV, máscara visual de RUN/teléfono, fecha de nacimiento por día/mes/año.
+├─• Se reforzó la validación de RUN y la duplicidad RUN+DV en la capa local.
+├─• Se implementó el login con opción "Recordarme" y expiración de sesión al desactivarla (en flujo local de debugging).
+├─• Se incorporó un menú de ajustes con acceso mediante ícono de tuerca y secciones: Seguridad y verificación, Cuenta y Ubicación.
+├─• Se implementó la verificación de trabajador en ajustes mediante RUN y número de documento, definida temporalmente como activación automática diferida (3 minutos) en flujo local.
+├─• Se agregó la configuración de 3 preguntas de seguridad con modal, guardado local y opción de mostrar/ocultar respuestas.
+├─• Se rediseñó el detalle de servicio con scroll interno, botón flotante de contacto, barra superior alineada y gesto lateral tipo tarjetas.
+├─• Se agregó una nueva pantalla para seleccionar ubicación, obteniendo coordenadas y permitiendo también ingresar la dirección manualmente.
+├─• Se desacopló visualmente el rango, mapa y botón para evitar la distorsión del mapa al mover el slider.
+├─• Se rediseñó el bloque "Dirección" para edición mediante modal: Región Metropolitana bloqueada, comuna mediante combobox (comunas RM), calle/número/detalle editables.
+├─• Se integró OpenStreetMap embebido (OSMDroid) en ajustes y en detalle de servicio, con marcador y círculo de rango.
+├─• Se agregó el guardado explícito de ubicación y rango (0–100 km) en la base de datos local por usuario.
+├─• Se conectó la pantalla principal para leer el rango guardado desde la BD y mostrarlo en "Rango de búsqueda actual".
+├─• Se activó el refresco de la pantalla principal al volver (`ON_RESUME`) para reflejar cambios de ajustes sin reiniciar la app.
+├─• Se aplicó filtro local de publicaciones por rango cuando existen coordenadas del usuario.
+├─• Se estabilizó la persistencia de la foto del servicio copiando la URI al almacenamiento interno para evitar pérdida de imagen entre vistas.
+└─• Se movió el botón "Cerrar sesión" al menu de ajustes (blanco con borde y texto rojo).
+
+
+
+
 VERSION 0.2-Pre-Alpha
 ───────
 ├─• Ahora las publicaciones se muestran con foto y en forma de cuadricula en la pantalla de marketplace.

@@ -2,7 +2,6 @@ package com.movil.contrabajo.ui.screens.principal
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,21 +12,30 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.FilterAlt
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.movil.contrabajo.ui.components.CampoContrabajo
 import com.movil.contrabajo.ui.components.PantallaBase
-import com.movil.contrabajo.ui.components.TarjetaBase
 import com.movil.contrabajo.ui.components.TarjetaMarketplaceCompacta
 import com.movil.contrabajo.ui.viewmodel.PrincipalViewModel
 
@@ -36,9 +44,11 @@ import com.movil.contrabajo.ui.viewmodel.PrincipalViewModel
 fun PantallaPrincipal(
     viewModel: PrincipalViewModel,
     onAbrirServicio: (Long) -> Unit,
+    onAbrirAjustes: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState = viewModel.uiState
+    val lifecycleOwner = LocalLifecycleOwner.current
     val pullRefreshState = rememberPullRefreshState(
         refreshing = uiState.refrescando,
         onRefresh = viewModel::refrescarDesdeGesto,
@@ -49,6 +59,18 @@ fun PantallaPrincipal(
         24.dp
     } else {
         (pullRefreshState.progress.coerceIn(0f, 1.6f) * 34f).dp
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.recargar()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     PantallaBase(
@@ -65,36 +87,42 @@ fun PantallaPrincipal(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        text = "Marketplace",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Text(
-                        text = "Explora servicios disponibles",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+                IconButton(onClick = onAbrirAjustes) {
+                    Icon(
+                        imageVector = Icons.Outlined.Settings,
+                        contentDescription = "Ajustes",
+                        tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
-                Surface(
-                    color = Color.White.copy(alpha = 0.16f),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp)
-                ) {
-                    Text(
-                        text = "${uiState.ofertas.size}",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimary
+                IconButton(onClick = {}) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Buscar",
+                        tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
             }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Rango de busqueda actual: ${uiState.rangoBusquedaKm}km",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Icon(
+                imageVector = Icons.Outlined.FilterAlt,
+                contentDescription = "Filtro",
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
 
         CampoContrabajo(
@@ -123,24 +151,18 @@ fun PantallaPrincipal(
                     .offset(y = estiramientoContenido)
             ) {
                 if (uiState.ofertas.isEmpty()) {
-                    TarjetaBase {
-                        Text(
-                            "Aun no hay publicaciones disponibles.",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            "Publica o habilita tu servicio en perfil y luego actualiza con el gesto para recargar.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = "Aun no hay publicaciones disponibles.",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        contentPadding = PaddingValues(bottom = 96.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(bottom = 108.dp)
                     ) {
                         items(uiState.ofertas, key = { it.idOfertaServicio }) { oferta ->
                             TarjetaMarketplaceCompacta(

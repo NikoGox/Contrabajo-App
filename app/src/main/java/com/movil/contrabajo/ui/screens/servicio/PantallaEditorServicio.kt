@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -78,10 +79,11 @@ fun PantallaEditorServicio(
             } catch (_: SecurityException) {
             }
 
+            val foto = persistirFotoEnApp(context, uri)
             viewModel.actualizarFotoServicio(
-                uriLocal = uri.toString(),
-                nombreArchivo = obtenerNombreArchivo(context, uri.toString()),
-                mimeType = context.contentResolver.getType(uri).orEmpty()
+                uriLocal = foto.uriLocal,
+                nombreArchivo = foto.nombreArchivo,
+                mimeType = foto.mimeType
             )
         }
     }
@@ -92,10 +94,11 @@ fun PantallaEditorServicio(
         pendingCameraUriTexto = null
         if (guardado && !uriTexto.isNullOrBlank()) {
             val uri = Uri.parse(uriTexto)
+            val foto = persistirFotoEnApp(context, uri)
             viewModel.actualizarFotoServicio(
-                uriLocal = uri.toString(),
-                nombreArchivo = obtenerNombreArchivo(context, uri.toString()),
-                mimeType = context.contentResolver.getType(uri).orEmpty().ifBlank { "image/jpeg" }
+                uriLocal = foto.uriLocal,
+                nombreArchivo = foto.nombreArchivo,
+                mimeType = foto.mimeType
             )
         }
     }
@@ -308,4 +311,41 @@ private fun crearUriTemporalFoto(context: android.content.Context): Uri {
         "${context.packageName}.fileprovider",
         archivo
     )
+}
+
+private data class FotoPersistida(
+    val uriLocal: String,
+    val nombreArchivo: String,
+    val mimeType: String
+)
+
+private fun persistirFotoEnApp(context: android.content.Context, uriOrigen: Uri): FotoPersistida {
+    val contentResolver = context.contentResolver
+    val mime = contentResolver.getType(uriOrigen).orEmpty().ifBlank { "image/jpeg" }
+    val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mime).orEmpty().ifBlank { "jpg" }
+    val nombreBase = obtenerNombreArchivo(context, uriOrigen.toString())
+        .substringBeforeLast(".")
+        .ifBlank { "servicio_foto" }
+        .replace(Regex("[^A-Za-z0-9_-]"), "_")
+    val archivoDestino = File(
+        File(context.filesDir, "fotos_servicio").apply { if (!exists()) mkdirs() },
+        "${nombreBase}_${System.currentTimeMillis()}.$extension"
+    )
+
+    return runCatching {
+        contentResolver.openInputStream(uriOrigen)?.use { input ->
+            archivoDestino.outputStream().use { output -> input.copyTo(output) }
+        }
+        FotoPersistida(
+            uriLocal = Uri.fromFile(archivoDestino).toString(),
+            nombreArchivo = archivoDestino.name,
+            mimeType = mime
+        )
+    }.getOrElse {
+        FotoPersistida(
+            uriLocal = uriOrigen.toString(),
+            nombreArchivo = obtenerNombreArchivo(context, uriOrigen.toString()),
+            mimeType = mime
+        )
+    }
 }

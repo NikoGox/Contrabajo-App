@@ -10,10 +10,16 @@ data class Usuario(
     val apellidoMaterno: String,
     val telefono: String,
     val correo: String,
-    val contrasena: String,
+    val contrasenaHash: String,
     val fechaRegistro: String,
     val fechaNacimiento: String,
-    val verificado: Boolean
+    val verificado: Boolean,
+    val tipoPerfil: Int = TipoPerfil.USUARIO_BASE,
+    val numeroDocumentoIdentidad: String? = null,
+    val preguntaRecuperacion: String = "",
+    val respuestaRecuperacion: String = "",
+    val verificacionTrabajadorPendiente: Boolean = false,
+    val fechaSolicitudVerificacionMs: Long? = null
 )
 
 data class OfertaServicio(
@@ -30,7 +36,11 @@ data class OfertaServicio(
     val nombreTrabajador: String = "",
     val nombreCategoria: String = "",
     val puntuacionPromedio: Double = 0.0,
+    val trabajadorVerificado: Boolean = false,
     val ubicacionReferencia: String = "",
+    val rangoDisponibilidadKm: Int = 20,
+    val latitudReferencia: Double? = null,
+    val longitudReferencia: Double? = null,
     val fotoUrlReferencia: String = "",
     val fotoNombreArchivo: String = "",
     val fotoMimeType: String = "",
@@ -154,6 +164,34 @@ data class RegistroPendiente(
     val telefono: String = "",
     val username: String = "",
     val correo: String = "",
+    val fechaNacimiento: String = "",
+    val tipoPerfil: Int = TipoPerfil.USUARIO_BASE,
     val contrasena: String = "",
     val confirmarContrasena: String = ""
+)
+
+object TipoPerfil {
+    const val MODERADOR = 0
+    const val USUARIO_BASE = 1
+    const val TRABAJADOR = 2
+    const val PREMIUM = 3
+}
+
+data class PreguntaSeguridadConfig(
+    val indice: Int,
+    val pregunta: String = "",
+    val respuesta: String = ""
+) {
+    val configurada: Boolean get() = pregunta.isNotBlank() && respuesta.isNotBlank()
+}
+
+data class UbicacionAjustesConfig(
+    val region: String = "Region Metropolitana",
+    val comuna: String = "Santiago",
+    val calle: String = "Sin calle",
+    val numero: String = "Sin numero",
+    val detalle: String = "Sin detalle",
+    val latitud: Double? = null,
+    val longitud: Double? = null,
+    val rangoDisponibilidadKm: Int = 20
 )

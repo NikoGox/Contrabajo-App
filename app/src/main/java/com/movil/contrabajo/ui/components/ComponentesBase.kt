@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,11 +29,16 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -43,14 +49,21 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -269,6 +282,40 @@ fun CampoContrabajo(
 }
 
 @Composable
+fun CampoSecretoContrabajo(
+    valor: String,
+    onValueChange: (String) -> Unit,
+    etiqueta: String,
+    modifier: Modifier = Modifier
+) {
+    var visible by rememberSaveable { mutableStateOf(false) }
+
+    OutlinedTextField(
+        value = valor,
+        onValueChange = onValueChange,
+        label = { Text(etiqueta) },
+        modifier = modifier.fillMaxWidth(),
+        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+        trailingIcon = {
+            IconButton(onClick = { visible = !visible }) {
+                Icon(
+                    imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                    contentDescription = if (visible) "Ocultar" else "Mostrar"
+                )
+            }
+        },
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor = Color.White.copy(alpha = 0.92f),
+            focusedContainerColor = Color.White,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+            focusedBorderColor = MaterialTheme.colorScheme.primary
+        ),
+        singleLine = true
+    )
+}
+
+@Composable
 fun IndicadorPasos(pasoActual: Int, totalPasos: Int) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -414,7 +461,7 @@ fun TarjetaMarketplaceCompacta(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(178.dp)
+                    .height(184.dp)
                     .background(
                         Brush.linearGradient(
                             listOf(
@@ -457,25 +504,29 @@ fun TarjetaMarketplaceCompacta(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = oferta.descripcion,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
                     text = oferta.precioTexto,
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold
                 )
-                Text(
-                    text = oferta.nombreTrabajador,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilaValoracion(
+                        valor = oferta.puntuacionPromedio,
+                        tamanoEstrella = 16.dp
+                    )
+                    if (oferta.trabajadorVerificado) {
+                        Icon(
+                            imageVector = Icons.Filled.Verified,
+                            contentDescription = "Trabajador verificado",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -520,6 +571,58 @@ private fun VistaPreviaImagenServicio(
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
                 modifier = Modifier.size(42.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun FilaValoracion(
+    valor: Double,
+    tamanoEstrella: Dp
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = String.format("%.1f", valor),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold
+        )
+        repeat(5) { index ->
+            val relleno = (valor - index).coerceIn(0.0, 1.0).toFloat()
+            EstrellaFraccion(
+                fraccion = relleno,
+                tamano = tamanoEstrella
+            )
+        }
+    }
+}
+
+@Composable
+private fun EstrellaFraccion(
+    fraccion: Float,
+    tamano: Dp
+) {
+    Box(modifier = Modifier.size(tamano)) {
+        Icon(
+            imageVector = Icons.Rounded.Star,
+            contentDescription = null,
+            tint = Color(0xFFB0B7BF),
+            modifier = Modifier.matchParentSize()
+        )
+        if (fraccion > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(fraccion.coerceIn(0f, 1f))
+                    .clip(RectangleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Star,
+                    contentDescription = null,
+                    tint = Color(0xFFFFC93C),
+                    modifier = Modifier.matchParentSize()
+                )
+            }
         }
     }
 }

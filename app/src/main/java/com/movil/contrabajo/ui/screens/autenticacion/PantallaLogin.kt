@@ -12,11 +12,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.movil.contrabajo.ui.components.BotonPrimario
 import com.movil.contrabajo.ui.components.BotonSecundario
 import com.movil.contrabajo.ui.components.CampoContrabajo
+import com.movil.contrabajo.ui.components.CampoSecretoContrabajo
 import com.movil.contrabajo.ui.components.EncabezadoPantalla
 import com.movil.contrabajo.ui.components.LogoContrabajo
 import com.movil.contrabajo.ui.components.PantallaBase
@@ -51,11 +51,10 @@ fun PantallaLogin(
                 onValueChange = viewModel::actualizarIdentificador,
                 etiqueta = "Correo o usuario"
             )
-            CampoContrabajo(
+            CampoSecretoContrabajo(
                 valor = uiState.contrasena,
                 onValueChange = viewModel::actualizarContrasena,
-                etiqueta = "Contrasena",
-                visualTransformation = PasswordVisualTransformation()
+                etiqueta = "Contrasena"
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),

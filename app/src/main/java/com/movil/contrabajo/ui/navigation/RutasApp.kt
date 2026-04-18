@@ -9,6 +9,12 @@ sealed class RutasApp(val ruta: String) {
     data object Principal : RutasApp("principal")
     data object Chats : RutasApp("chats")
     data object Perfil : RutasApp("perfil")
+    data object Ajustes : RutasApp("ajustes")
+    data object AjustesSeguridad : RutasApp("ajustes/seguridad")
+    data object AjustesVerificacion : RutasApp("ajustes/seguridad/verificacion")
+    data object AjustesPreguntas : RutasApp("ajustes/seguridad/preguntas")
+    data object AjustesCuenta : RutasApp("ajustes/cuenta")
+    data object AjustesUbicacion : RutasApp("ajustes/ubicacion")
     data object ServicioEditor : RutasApp("servicio_editor/{modo}") {
         fun crearRuta(modo: String): String = "servicio_editor/$modo"
     }
@@ -18,9 +24,9 @@ sealed class RutasApp(val ruta: String) {
 
     companion object {
         private val rutasPrincipales = listOf(
-            Perfil.ruta,
             Principal.ruta,
-            Chats.ruta
+            Chats.ruta,
+            Perfil.ruta
         )
 
         fun esRutaPrincipal(ruta: String?): Boolean = indiceRutaPrincipal(ruta) >= 0

@@ -13,6 +13,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -20,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -36,6 +38,12 @@ import com.movil.contrabajo.ui.navigation.RutasApp
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaLogin
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoDos
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoUno
+import com.movil.contrabajo.ui.screens.ajustes.PantallaAjustes
+import com.movil.contrabajo.ui.screens.ajustes.PantallaAjustesSeguridad
+import com.movil.contrabajo.ui.screens.ajustes.PantallaCuenta
+import com.movil.contrabajo.ui.screens.ajustes.PantallaPreguntasSeguridad
+import com.movil.contrabajo.ui.screens.ajustes.PantallaUbicacion
+import com.movil.contrabajo.ui.screens.ajustes.PantallaVerificarCuentaTrabajador
 import com.movil.contrabajo.ui.screens.chats.PantallaChats
 import com.movil.contrabajo.ui.screens.inicio.PantallaInicial
 import com.movil.contrabajo.ui.screens.perfil.PantallaPerfil
@@ -50,6 +58,7 @@ import com.movil.contrabajo.ui.viewmodel.LoginViewModel
 import com.movil.contrabajo.ui.viewmodel.PerfilViewModel
 import com.movil.contrabajo.ui.viewmodel.PrincipalViewModel
 import com.movil.contrabajo.ui.viewmodel.RegistroViewModel
+import kotlin.math.abs
 
 @Composable
 fun ContrabajoApp() {
@@ -130,11 +139,94 @@ fun ContrabajoApp() {
                 onAbrirServicio = { idOferta ->
                     navController.navigate(RutasApp.Servicio.crearRuta(idOferta))
                 },
+                onAbrirAjustes = {
+                    navController.navigate(RutasApp.Ajustes.ruta)
+                },
                 onCerrarSesion = {
                     navController.navigate(RutasApp.Inicio.ruta) {
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
                 }
+            )
+        }
+        composable(RutasApp.Ajustes.ruta) { backStackEntry ->
+            val principalShellEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(RutasApp.PrincipalShell.ruta)
+            }
+            val perfilViewModel: PerfilViewModel = viewModel(
+                viewModelStoreOwner = principalShellEntry,
+                factory = factory
+            )
+            PantallaAjustes(
+                onVolver = { navController.popBackStack() },
+                onAbrirSeguridad = { navController.navigate(RutasApp.AjustesSeguridad.ruta) },
+                onAbrirCuenta = { navController.navigate(RutasApp.AjustesCuenta.ruta) },
+                onAbrirUbicacion = { navController.navigate(RutasApp.AjustesUbicacion.ruta) },
+                onCerrarSesion = {
+                    perfilViewModel.cerrarSesion()
+                    navController.navigate(RutasApp.Inicio.ruta) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(RutasApp.AjustesSeguridad.ruta) {
+            PantallaAjustesSeguridad(
+                onVolver = { navController.popBackStack() },
+                onAbrirVerificacion = { navController.navigate(RutasApp.AjustesVerificacion.ruta) },
+                onAbrirPreguntas = { navController.navigate(RutasApp.AjustesPreguntas.ruta) }
+            )
+        }
+        composable(RutasApp.AjustesVerificacion.ruta) { backStackEntry ->
+            val principalShellEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(RutasApp.PrincipalShell.ruta)
+            }
+            val perfilViewModel: PerfilViewModel = viewModel(
+                viewModelStoreOwner = principalShellEntry,
+                factory = factory
+            )
+            PantallaVerificarCuentaTrabajador(
+                viewModel = perfilViewModel,
+                onVolver = { navController.popBackStack() }
+            )
+        }
+        composable(RutasApp.AjustesPreguntas.ruta) { backStackEntry ->
+            val principalShellEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(RutasApp.PrincipalShell.ruta)
+            }
+            val perfilViewModel: PerfilViewModel = viewModel(
+                viewModelStoreOwner = principalShellEntry,
+                factory = factory
+            )
+            PantallaPreguntasSeguridad(
+                viewModel = perfilViewModel,
+                onVolver = { navController.popBackStack() }
+            )
+        }
+        composable(RutasApp.AjustesCuenta.ruta) { backStackEntry ->
+            val principalShellEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(RutasApp.PrincipalShell.ruta)
+            }
+            val perfilViewModel: PerfilViewModel = viewModel(
+                viewModelStoreOwner = principalShellEntry,
+                factory = factory
+            )
+            PantallaCuenta(
+                viewModel = perfilViewModel,
+                onVolver = { navController.popBackStack() }
+            )
+        }
+        composable(RutasApp.AjustesUbicacion.ruta) { backStackEntry ->
+            val principalShellEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(RutasApp.PrincipalShell.ruta)
+            }
+            val perfilViewModel: PerfilViewModel = viewModel(
+                viewModelStoreOwner = principalShellEntry,
+                factory = factory
+            )
+            PantallaUbicacion(
+                viewModel = perfilViewModel,
+                onVolver = { navController.popBackStack() }
             )
         }
         composable(
@@ -178,10 +270,13 @@ private fun ShellPrincipal(
     onAbrirCrearServicio: () -> Unit,
     onAbrirEditarServicio: () -> Unit,
     onAbrirServicio: (Long) -> Unit,
+    onAbrirAjustes: () -> Unit,
     onCerrarSesion: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var rutaActual by rememberSaveable { mutableStateOf(RutasApp.Principal.ruta) }
+    var desplazamientoHorizontal by remember { mutableStateOf(0f) }
+    val rutasSwipe = remember { listOf(RutasApp.Principal.ruta, RutasApp.Chats.ruta, RutasApp.Perfil.ruta) }
 
     LaunchedEffect(rutaActual) {
         when (rutaActual) {
@@ -199,7 +294,33 @@ private fun ShellPrincipal(
         },
         modifier = modifier
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(rutaActual) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { desplazamientoHorizontal = 0f },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            desplazamientoHorizontal += dragAmount
+                        },
+                        onDragEnd = {
+                            val umbral = 85f
+                            if (abs(desplazamientoHorizontal) >= umbral) {
+                                val indiceActual = rutasSwipe.indexOf(rutaActual).let { if (it < 0) 0 else it }
+                                val indiceDestino = if (desplazamientoHorizontal < 0f) {
+                                    (indiceActual + 1).coerceAtMost(rutasSwipe.lastIndex)
+                                } else {
+                                    (indiceActual - 1).coerceAtLeast(0)
+                                }
+                                rutaActual = rutasSwipe[indiceDestino]
+                            }
+                            desplazamientoHorizontal = 0f
+                        },
+                        onDragCancel = { desplazamientoHorizontal = 0f }
+                    )
+                }
+        ) {
             FondoContrabajo(modifier = Modifier.fillMaxSize())
             AnimatedContent(
                 targetState = rutaActual,
@@ -210,14 +331,14 @@ private fun ShellPrincipal(
 
                     (
                         slideInHorizontally(
-                            animationSpec = tween(durationMillis = 360),
-                            initialOffsetX = { ancho -> if (haciaIzquierda) ancho / 3 else -ancho / 3 }
-                        ) + fadeIn(animationSpec = tween(durationMillis = 240))
+                            animationSpec = tween(durationMillis = 280),
+                            initialOffsetX = { ancho -> if (haciaIzquierda) ancho else -ancho }
+                        ) + fadeIn(animationSpec = tween(durationMillis = 180))
                     ).togetherWith(
                         slideOutHorizontally(
-                            animationSpec = tween(durationMillis = 320),
-                            targetOffsetX = { ancho -> if (haciaIzquierda) -ancho / 4 else ancho / 4 }
-                        ) + fadeOut(animationSpec = tween(durationMillis = 180))
+                            animationSpec = tween(durationMillis = 260),
+                            targetOffsetX = { ancho -> if (haciaIzquierda) -ancho else ancho }
+                        ) + fadeOut(animationSpec = tween(durationMillis = 150))
                     )
                 },
                 label = "contenidoPrincipalAnimado"
@@ -226,6 +347,7 @@ private fun ShellPrincipal(
                     RutasApp.Principal.ruta -> PantallaPrincipal(
                         viewModel = principalViewModel,
                         onAbrirServicio = onAbrirServicio,
+                        onAbrirAjustes = onAbrirAjustes,
                         modifier = Modifier.padding(innerPadding)
                     )
 
@@ -245,6 +367,7 @@ private fun ShellPrincipal(
                     else -> PantallaPrincipal(
                         viewModel = principalViewModel,
                         onAbrirServicio = onAbrirServicio,
+                        onAbrirAjustes = onAbrirAjustes,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }

@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.movil.contrabajo.data.repository.RepositorioAutenticacion
 import com.movil.contrabajo.domain.model.RegistroPendiente
+import com.movil.contrabajo.domain.model.TipoPerfil
 
 data class InicioUiState(
     val revisandoSesion: Boolean = true,
@@ -98,15 +99,21 @@ class RegistroViewModel(
     }
 
     fun actualizarRun(valor: String) {
-        actualizarRegistro(uiState.registro.copy(run = valor))
+        val runDigitos = valor.filter { it.isDigit() }.take(8)
+        actualizarRegistro(uiState.registro.copy(run = runDigitos))
     }
 
     fun actualizarDv(valor: String) {
-        actualizarRegistro(uiState.registro.copy(dv = valor))
+        val dvNormalizado = valor
+            .uppercase()
+            .filter { it.isDigit() || it == 'K' }
+            .take(1)
+        actualizarRegistro(uiState.registro.copy(dv = dvNormalizado))
     }
 
     fun actualizarTelefono(valor: String) {
-        actualizarRegistro(uiState.registro.copy(telefono = valor))
+        val digitos = valor.filter { it.isDigit() }.take(9)
+        actualizarRegistro(uiState.registro.copy(telefono = digitos))
     }
 
     fun actualizarUsername(valor: String) {
@@ -115,6 +122,10 @@ class RegistroViewModel(
 
     fun actualizarCorreo(valor: String) {
         actualizarRegistro(uiState.registro.copy(correo = valor))
+    }
+
+    fun actualizarFechaNacimiento(valor: String) {
+        actualizarRegistro(uiState.registro.copy(fechaNacimiento = valor))
     }
 
     fun actualizarContrasena(valor: String) {
@@ -141,6 +152,9 @@ class RegistroViewModel(
     }
 
     private fun actualizarRegistro(registro: RegistroPendiente) {
-        uiState = uiState.copy(registro = registro, error = null)
+        uiState = uiState.copy(
+            registro = registro.copy(tipoPerfil = TipoPerfil.USUARIO_BASE),
+            error = null
+        )
     }
 }

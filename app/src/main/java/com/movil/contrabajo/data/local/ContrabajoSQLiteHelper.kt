@@ -11,6 +11,9 @@ import com.movil.contrabajo.domain.model.FotoServicioLocal
 import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
 import com.movil.contrabajo.domain.model.OfertaServicio
+import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
+import com.movil.contrabajo.domain.model.TipoPerfil
+import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
 import com.movil.contrabajo.domain.model.Usuario
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -30,10 +33,17 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "apellido_materno TEXT NOT NULL," +
                 "telefono TEXT NOT NULL," +
                 "correo TEXT NOT NULL UNIQUE," +
-                "contrasena TEXT NOT NULL," +
+                "contrasena_hash TEXT NOT NULL," +
                 "fecha_registro TEXT NOT NULL," +
                 "fecha_nacimiento TEXT NOT NULL," +
-                "verificado INTEGER NOT NULL DEFAULT 0)"
+                "verificado INTEGER NOT NULL DEFAULT 0," +
+                "tipo_perfil INTEGER NOT NULL DEFAULT 1," +
+                "numero_documento_identidad TEXT," +
+                "pregunta_recuperacion TEXT NOT NULL DEFAULT ''," +
+                "respuesta_recuperacion TEXT NOT NULL DEFAULT ''," +
+                "verificacion_trabajador_pendiente INTEGER NOT NULL DEFAULT 0," +
+                "fecha_solicitud_verificacion_ms INTEGER," +
+                "UNIQUE(run, dv))"
         )
         db.execSQL(
             "CREATE TABLE categorias_servicio (" +
@@ -123,6 +133,8 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "token_local TEXT NOT NULL," +
                 "fecha_inicio TEXT NOT NULL," +
                 "fecha_ultimo_acceso TEXT NOT NULL," +
+                "fecha_inicio_ms INTEGER NOT NULL," +
+                "fecha_ultimo_acceso_ms INTEGER NOT NULL," +
                 "recordarme INTEGER NOT NULL DEFAULT 0," +
                 "activa INTEGER NOT NULL DEFAULT 1)"
         )
@@ -136,12 +148,36 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "ultima_pantalla TEXT NOT NULL," +
                 "fecha_actualizacion TEXT NOT NULL)"
         )
+        db.execSQL(
+            "CREATE TABLE preguntas_seguridad (" +
+                "id_pregunta_seguridad INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "id_usuario INTEGER NOT NULL," +
+                "indice INTEGER NOT NULL," +
+                "pregunta TEXT NOT NULL," +
+                "respuesta TEXT NOT NULL," +
+                "fecha_actualizacion TEXT NOT NULL," +
+                "UNIQUE(id_usuario, indice))"
+        )
+        db.execSQL(
+            "CREATE TABLE ubicaciones_usuario (" +
+                "id_ubicacion_usuario INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "id_usuario INTEGER NOT NULL UNIQUE," +
+                "region TEXT NOT NULL DEFAULT 'Region Metropolitana'," +
+                "comuna TEXT NOT NULL DEFAULT 'Santiago'," +
+                "calle TEXT NOT NULL DEFAULT 'Sin calle'," +
+                "numero TEXT NOT NULL DEFAULT 'Sin numero'," +
+                "detalle TEXT NOT NULL DEFAULT 'Sin detalle'," +
+                "latitud REAL," +
+                "longitud REAL," +
+                "rango_km INTEGER NOT NULL DEFAULT 20," +
+                "fecha_actualizacion TEXT NOT NULL)"
+        )
         sembrarDatosIniciales(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         listOf(
-            "configuraciones_app", "sesiones_locales", "valoraciones", "mensajes_chat",
+            "ubicaciones_usuario", "preguntas_seguridad", "configuraciones_app", "sesiones_locales", "valoraciones", "mensajes_chat",
             "chats_cita", "ofertas_servicio", "fotos", "direcciones", "coordenadas",
             "estados", "categorias_servicio", "usuarios"
         ).forEach { db.execSQL("DROP TABLE IF EXISTS $it") }
@@ -150,7 +186,7 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     fun obtenerUsuarioPorCorreoOCuenta(identificador: String, contrasena: String): Usuario? {
         readableDatabase.rawQuery(
-            "SELECT * FROM usuarios WHERE (correo = ? OR username = ?) AND contrasena = ? LIMIT 1",
+            "SELECT * FROM usuarios WHERE (correo = ? OR username = ?) AND contrasena_hash = ? LIMIT 1",
             arrayOf(identificador, identificador, contrasena)
         ).use { cursor ->
             return if (cursor.moveToFirst()) cursor.toUsuario() else null
@@ -167,10 +203,16 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("apellido_materno", usuario.apellidoMaterno)
             put("telefono", usuario.telefono)
             put("correo", usuario.correo)
-            put("contrasena", usuario.contrasena)
+            put("contrasena_hash", usuario.contrasenaHash)
             put("fecha_registro", usuario.fechaRegistro)
             put("fecha_nacimiento", usuario.fechaNacimiento)
             put("verificado", usuario.verificado.toInt())
+            put("tipo_perfil", usuario.tipoPerfil)
+            put("numero_documento_identidad", usuario.numeroDocumentoIdentidad)
+            put("pregunta_recuperacion", usuario.preguntaRecuperacion)
+            put("respuesta_recuperacion", usuario.respuestaRecuperacion)
+            put("verificacion_trabajador_pendiente", usuario.verificacionTrabajadorPendiente.toInt())
+            put("fecha_solicitud_verificacion_ms", usuario.fechaSolicitudVerificacionMs)
         })
     }
 
@@ -178,6 +220,15 @@ class ContrabajoSQLiteHelper(context: Context) :
         readableDatabase.rawQuery(
             "SELECT id_usuario FROM usuarios WHERE correo = ? OR username = ? LIMIT 1",
             arrayOf(correo, username)
+        ).use { cursor ->
+            return cursor.moveToFirst()
+        }
+    }
+
+    fun existeRun(run: String, dv: String): Boolean {
+        readableDatabase.rawQuery(
+            "SELECT id_usuario FROM usuarios WHERE run = ? AND dv = ? LIMIT 1",
+            arrayOf(run, dv)
         ).use { cursor ->
             return cursor.moveToFirst()
         }
@@ -194,11 +245,14 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     fun guardarSesion(idUsuario: Long, recordarme: Boolean) {
         writableDatabase.execSQL("UPDATE sesiones_locales SET activa = 0")
+        val ahoraMs = System.currentTimeMillis()
         writableDatabase.insert("sesiones_locales", null, ContentValues().apply {
             put("id_usuario", idUsuario)
             put("token_local", "sesion-$idUsuario-${System.currentTimeMillis()}")
             put("fecha_inicio", ahora())
             put("fecha_ultimo_acceso", ahora())
+            put("fecha_inicio_ms", ahoraMs)
+            put("fecha_ultimo_acceso_ms", ahoraMs)
             put("recordarme", recordarme.toInt())
             put("activa", 1)
         })
@@ -210,12 +264,100 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     fun obtenerUsuarioSesionActiva(): Usuario? {
         readableDatabase.rawQuery(
-            "SELECT u.* FROM sesiones_locales s " +
+            "SELECT u.*, s.id_sesion_local, s.recordarme, s.fecha_ultimo_acceso_ms FROM sesiones_locales s " +
                 "INNER JOIN usuarios u ON u.id_usuario = s.id_usuario " +
                 "WHERE s.activa = 1 ORDER BY s.id_sesion_local DESC LIMIT 1",
             emptyArray()
         ).use { cursor ->
-            return if (cursor.moveToFirst()) cursor.toUsuario() else null
+            if (!cursor.moveToFirst()) return null
+
+            val idSesion = cursor.getLong(cursor.getColumnIndexOrThrow("id_sesion_local"))
+            val idUsuario = cursor.getLong(cursor.getColumnIndexOrThrow("id_usuario"))
+            val recordarme = cursor.getInt(cursor.getColumnIndexOrThrow("recordarme")) == 1
+            val ultimoAcceso = cursor.getLong(cursor.getColumnIndexOrThrow("fecha_ultimo_acceso_ms"))
+
+            if (!recordarme && System.currentTimeMillis() - ultimoAcceso > SESION_EXPIRACION_MS) {
+                writableDatabase.update(
+                    "sesiones_locales",
+                    ContentValues().apply { put("activa", 0) },
+                    "id_sesion_local = ?",
+                    arrayOf(idSesion.toString())
+                )
+                return null
+            }
+
+            writableDatabase.update(
+                "sesiones_locales",
+                ContentValues().apply {
+                    put("fecha_ultimo_acceso", ahora())
+                    put("fecha_ultimo_acceso_ms", System.currentTimeMillis())
+                },
+                "id_sesion_local = ?",
+                arrayOf(idSesion.toString())
+            )
+
+            procesarVerificacionTrabajadorPendiente(idUsuario)
+            return obtenerUsuarioPorId(idUsuario)
+        }
+    }
+
+    fun solicitarVerificacionTrabajador(
+        idUsuario: Long,
+        run: String,
+        dv: String,
+        numeroDocumento: String
+    ): Result<Unit> {
+        val usuario = obtenerUsuarioPorId(idUsuario)
+            ?: return Result.failure(IllegalStateException("No existe el usuario activo"))
+        if (usuario.run != run || usuario.dv.lowercase() != dv.lowercase()) {
+            return Result.failure(IllegalArgumentException("El RUN ingresado no coincide con tu registro"))
+        }
+        if (numeroDocumento.isBlank()) {
+            return Result.failure(IllegalArgumentException("Ingresa el numero de documento"))
+        }
+
+        val actualizado = writableDatabase.update(
+            "usuarios",
+            ContentValues().apply {
+                put("numero_documento_identidad", numeroDocumento.trim())
+                put("verificacion_trabajador_pendiente", 1)
+                put("fecha_solicitud_verificacion_ms", System.currentTimeMillis())
+            },
+            "id_usuario = ?",
+            arrayOf(idUsuario.toString())
+        )
+        return if (actualizado > 0) {
+            Result.success(Unit)
+        } else {
+            Result.failure(IllegalStateException("No se pudo iniciar la verificacion"))
+        }
+    }
+
+    private fun procesarVerificacionTrabajadorPendiente(idUsuario: Long) {
+        readableDatabase.rawQuery(
+            "SELECT verificacion_trabajador_pendiente, fecha_solicitud_verificacion_ms FROM usuarios WHERE id_usuario = ? LIMIT 1",
+            arrayOf(idUsuario.toString())
+        ).use { cursor ->
+            if (!cursor.moveToFirst()) return
+            val pendiente = cursor.getInt(cursor.getColumnIndexOrThrow("verificacion_trabajador_pendiente")) == 1
+            if (!pendiente) return
+
+            val indexMs = cursor.getColumnIndex("fecha_solicitud_verificacion_ms")
+            val solicitudMs = if (indexMs >= 0 && !cursor.isNull(indexMs)) cursor.getLong(indexMs) else 0L
+            if (solicitudMs <= 0L) return
+
+            if (System.currentTimeMillis() - solicitudMs >= VERIFICACION_TRABAJADOR_MS) {
+                writableDatabase.update(
+                    "usuarios",
+                    ContentValues().apply {
+                        put("tipo_perfil", TipoPerfil.TRABAJADOR)
+                        put("verificado", 1)
+                        put("verificacion_trabajador_pendiente", 0)
+                    },
+                    "id_usuario = ?",
+                    arrayOf(idUsuario.toString())
+                )
+            }
         }
     }
 
@@ -266,6 +408,102 @@ class ContrabajoSQLiteHelper(context: Context) :
             arrayOf(idTrabajador.toString())
         ).use { cursor ->
             return if (cursor.moveToFirst()) cursor.toOfertaServicio() else null
+        }
+    }
+
+    fun contarOfertasActivasPorTrabajador(idTrabajador: Long): Int {
+        readableDatabase.rawQuery(
+            "SELECT COUNT(*) AS total FROM ofertas_servicio WHERE id_trabajador = ? AND disponible = 1",
+            arrayOf(idTrabajador.toString())
+        ).use { cursor ->
+            if (!cursor.moveToFirst()) return 0
+            return cursor.getInt(cursor.getColumnIndexOrThrow("total"))
+        }
+    }
+
+    fun obtenerPreguntasSeguridad(idUsuario: Long): List<PreguntaSeguridadConfig> {
+        val configuradas = mutableMapOf<Int, PreguntaSeguridadConfig>()
+        readableDatabase.rawQuery(
+            "SELECT indice, pregunta, respuesta FROM preguntas_seguridad WHERE id_usuario = ? ORDER BY indice ASC",
+            arrayOf(idUsuario.toString())
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                val indice = cursor.getInt(cursor.getColumnIndexOrThrow("indice"))
+                configuradas[indice] = PreguntaSeguridadConfig(
+                    indice = indice,
+                    pregunta = cursor.getString(cursor.getColumnIndexOrThrow("pregunta")),
+                    respuesta = cursor.getString(cursor.getColumnIndexOrThrow("respuesta"))
+                )
+            }
+        }
+
+        return (1..3).map { indice ->
+            configuradas[indice] ?: PreguntaSeguridadConfig(indice = indice)
+        }
+    }
+
+    fun guardarPreguntaSeguridad(idUsuario: Long, indice: Int, pregunta: String, respuesta: String) {
+        val values = ContentValues().apply {
+            put("id_usuario", idUsuario)
+            put("indice", indice)
+            put("pregunta", pregunta)
+            put("respuesta", respuesta)
+            put("fecha_actualizacion", ahora())
+        }
+
+        val actualizadas = writableDatabase.update(
+            "preguntas_seguridad",
+            values,
+            "id_usuario = ? AND indice = ?",
+            arrayOf(idUsuario.toString(), indice.toString())
+        )
+        if (actualizadas == 0) {
+            writableDatabase.insert("preguntas_seguridad", null, values)
+        }
+    }
+
+    fun obtenerUbicacionUsuario(idUsuario: Long): UbicacionAjustesConfig {
+        readableDatabase.rawQuery(
+            "SELECT region, comuna, calle, numero, detalle, latitud, longitud, rango_km FROM ubicaciones_usuario WHERE id_usuario = ? LIMIT 1",
+            arrayOf(idUsuario.toString())
+        ).use { cursor ->
+            if (!cursor.moveToFirst()) {
+                return UbicacionAjustesConfig()
+            }
+            return UbicacionAjustesConfig(
+                region = cursor.getString(cursor.getColumnIndexOrThrow("region")),
+                comuna = cursor.getString(cursor.getColumnIndexOrThrow("comuna")),
+                calle = cursor.getString(cursor.getColumnIndexOrThrow("calle")),
+                numero = cursor.getString(cursor.getColumnIndexOrThrow("numero")),
+                detalle = cursor.getString(cursor.getColumnIndexOrThrow("detalle")),
+                latitud = cursor.getDoubleNullable("latitud"),
+                longitud = cursor.getDoubleNullable("longitud"),
+                rangoDisponibilidadKm = cursor.getInt(cursor.getColumnIndexOrThrow("rango_km")).coerceIn(0, 100)
+            )
+        }
+    }
+
+    fun guardarUbicacionUsuario(idUsuario: Long, config: UbicacionAjustesConfig) {
+        val values = ContentValues().apply {
+            put("id_usuario", idUsuario)
+            put("region", config.region)
+            put("comuna", config.comuna)
+            put("calle", config.calle)
+            put("numero", config.numero)
+            put("detalle", config.detalle)
+            put("latitud", config.latitud)
+            put("longitud", config.longitud)
+            put("rango_km", config.rangoDisponibilidadKm.coerceIn(0, 100))
+            put("fecha_actualizacion", ahora())
+        }
+        val actualizadas = writableDatabase.update(
+            "ubicaciones_usuario",
+            values,
+            "id_usuario = ?",
+            arrayOf(idUsuario.toString())
+        )
+        if (actualizadas == 0) {
+            writableDatabase.insert("ubicaciones_usuario", null, values)
         }
     }
 
@@ -447,6 +685,39 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("url_remota", "https://backend.contrabajo.dev/fotos/jose-perez-demo.jpg")
         })
 
+        val moderadorId = db.insert("usuarios", null, ContentValues().apply {
+            put("run", "11111111")
+            put("dv", "1")
+            put("username", "moderador_ct")
+            put("nombre", "Moderador")
+            put("apellido_paterno", "Contrabajo")
+            put("apellido_materno", "Sistema")
+            put("telefono", "+56900000000")
+            put("correo", "moderador@contrabajo.cl")
+            put("contrasena_hash", "123456")
+            put("fecha_registro", ahora())
+            put("fecha_nacimiento", "1990-01-01")
+            put("verificado", 1)
+            put("tipo_perfil", TipoPerfil.MODERADOR)
+            put("numero_documento_identidad", "MOD-CT-0001")
+            put("pregunta_recuperacion", "Color favorito")
+            put("respuesta_recuperacion", "turquesa")
+            put("verificacion_trabajador_pendiente", 0)
+            putNull("fecha_solicitud_verificacion_ms")
+        })
+        db.insert("ubicaciones_usuario", null, ContentValues().apply {
+            put("id_usuario", moderadorId)
+            put("region", "Region Metropolitana")
+            put("comuna", "Santiago")
+            put("calle", "Alameda")
+            put("numero", "100")
+            put("detalle", "Centro")
+            put("latitud", -33.4468)
+            put("longitud", -70.6693)
+            put("rango_km", 12)
+            put("fecha_actualizacion", ahora())
+        })
+
         val trabajadorId = db.insert("usuarios", null, ContentValues().apply {
             put("run", "12345678")
             put("dv", "9")
@@ -456,10 +727,28 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("apellido_materno", "Soto")
             put("telefono", "+56911112222")
             put("correo", "jose@contrabajo.cl")
-            put("contrasena", "123456")
+            put("contrasena_hash", "123456")
             put("fecha_registro", ahora())
             put("fecha_nacimiento", "1994-06-14")
             put("verificado", 1)
+            put("tipo_perfil", TipoPerfil.TRABAJADOR)
+            put("numero_documento_identidad", "44556677")
+            put("pregunta_recuperacion", "Mascota")
+            put("respuesta_recuperacion", "firulais")
+            put("verificacion_trabajador_pendiente", 0)
+            putNull("fecha_solicitud_verificacion_ms")
+        })
+        db.insert("ubicaciones_usuario", null, ContentValues().apply {
+            put("id_usuario", trabajadorId)
+            put("region", "Region Metropolitana")
+            put("comuna", "Providencia")
+            put("calle", "Av. Providencia")
+            put("numero", "1200")
+            put("detalle", "Cobertura urbana")
+            put("latitud", -33.4302)
+            put("longitud", -70.6188)
+            put("rango_km", 26)
+            put("fecha_actualizacion", ahora())
         })
 
         val clienteId = db.insert("usuarios", null, ContentValues().apply {
@@ -471,10 +760,28 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("apellido_materno", "Diaz")
             put("telefono", "+56933334444")
             put("correo", "vale@contrabajo.cl")
-            put("contrasena", "123456")
+            put("contrasena_hash", "123456")
             put("fecha_registro", ahora())
             put("fecha_nacimiento", "1998-03-20")
-            put("verificado", 1)
+            put("verificado", 0)
+            put("tipo_perfil", TipoPerfil.USUARIO_BASE)
+            putNull("numero_documento_identidad")
+            put("pregunta_recuperacion", "Comida favorita")
+            put("respuesta_recuperacion", "lasagna")
+            put("verificacion_trabajador_pendiente", 0)
+            putNull("fecha_solicitud_verificacion_ms")
+        })
+        db.insert("ubicaciones_usuario", null, ContentValues().apply {
+            put("id_usuario", clienteId)
+            put("region", "Region Metropolitana")
+            put("comuna", "Santiago")
+            put("calle", "Sin calle")
+            put("numero", "Sin numero")
+            put("detalle", "Sin detalle")
+            putNull("latitud")
+            putNull("longitud")
+            put("rango_km", 20)
+            put("fecha_actualizacion", ahora())
         })
 
         db.insert("ofertas_servicio", null, ContentValues().apply {
@@ -521,10 +828,28 @@ class ContrabajoSQLiteHelper(context: Context) :
                 put("apellido_materno", trabajador[2])
                 put("telefono", trabajador[6])
                 put("correo", trabajador[7])
-                put("contrasena", "123456")
+                put("contrasena_hash", "123456")
                 put("fecha_registro", ahora(index.toLong()))
                 put("fecha_nacimiento", "1992-01-15")
                 put("verificado", 1)
+                put("tipo_perfil", if (index == 0) TipoPerfil.PREMIUM else TipoPerfil.TRABAJADOR)
+                put("numero_documento_identidad", "DOC-${index + 1000}")
+                put("pregunta_recuperacion", "Ciudad natal")
+                put("respuesta_recuperacion", "santiago")
+                put("verificacion_trabajador_pendiente", 0)
+                putNull("fecha_solicitud_verificacion_ms")
+            })
+            db.insert("ubicaciones_usuario", null, ContentValues().apply {
+                put("id_usuario", trabajadorDemoId)
+                put("region", "Region Metropolitana")
+                put("comuna", comunasRegionMetropolitana[index % comunasRegionMetropolitana.size])
+                put("calle", "Sin calle")
+                put("numero", "Sin numero")
+                put("detalle", "Cobertura local")
+                put("latitud", -33.45 + (index * 0.01))
+                put("longitud", -70.67 + (index * 0.008))
+                put("rango_km", 10 + (index * 3 % 40))
+                put("fecha_actualizacion", ahora(index.toLong()))
             })
 
             val publicacion = publicacionesDemo[index]
@@ -591,10 +916,16 @@ class ContrabajoSQLiteHelper(context: Context) :
         apellidoMaterno = getString(getColumnIndexOrThrow("apellido_materno")),
         telefono = getString(getColumnIndexOrThrow("telefono")),
         correo = getString(getColumnIndexOrThrow("correo")),
-        contrasena = getString(getColumnIndexOrThrow("contrasena")),
+        contrasenaHash = getString(getColumnIndexOrThrow("contrasena_hash")),
         fechaRegistro = getString(getColumnIndexOrThrow("fecha_registro")),
         fechaNacimiento = getString(getColumnIndexOrThrow("fecha_nacimiento")),
-        verificado = getInt(getColumnIndexOrThrow("verificado")) == 1
+        verificado = getInt(getColumnIndexOrThrow("verificado")) == 1,
+        tipoPerfil = getInt(getColumnIndexOrThrow("tipo_perfil")),
+        numeroDocumentoIdentidad = getStringNullable("numero_documento_identidad"),
+        preguntaRecuperacion = getStringNullable("pregunta_recuperacion").orEmpty(),
+        respuestaRecuperacion = getStringNullable("respuesta_recuperacion").orEmpty(),
+        verificacionTrabajadorPendiente = getInt(getColumnIndexOrThrow("verificacion_trabajador_pendiente")) == 1,
+        fechaSolicitudVerificacionMs = getLongNullable("fecha_solicitud_verificacion_ms")
     )
 
     private fun Cursor.toOfertaServicio(): OfertaServicio = OfertaServicio(
@@ -611,7 +942,11 @@ class ContrabajoSQLiteHelper(context: Context) :
         nombreTrabajador = getStringNullable("nombre_trabajador").orEmpty(),
         nombreCategoria = getStringNullable("nombre_categoria").orEmpty(),
         puntuacionPromedio = getDoubleNullable("puntuacion_promedio") ?: 0.0,
+        trabajadorVerificado = getIntNullable("trabajador_verificado") == 1,
         ubicacionReferencia = getStringNullable("ubicacion_referencia").orEmpty(),
+        rangoDisponibilidadKm = getIntNullable("rango_disponibilidad_km") ?: 20,
+        latitudReferencia = getDoubleNullable("latitud_referencia"),
+        longitudReferencia = getDoubleNullable("longitud_referencia"),
         fotoUrlReferencia = getStringNullable("foto_url_referencia").orEmpty(),
         fotoNombreArchivo = getStringNullable("foto_nombre_archivo").orEmpty(),
         fotoMimeType = getStringNullable("foto_mime_type").orEmpty(),
@@ -656,13 +991,35 @@ class ContrabajoSQLiteHelper(context: Context) :
         return if (index >= 0 && !isNull(index)) getLong(index) else null
     }
 
+    private fun Cursor.getIntNullable(column: String): Int? {
+        val index = getColumnIndex(column)
+        return if (index >= 0 && !isNull(index)) getInt(index) else null
+    }
+
     companion object {
         private const val DATABASE_NAME = "contrabajo_local.db"
-        private const val DATABASE_VERSION = 6
+        private const val DATABASE_VERSION = 9
+        private const val SESION_EXPIRACION_MS = 30 * 60 * 1000L
+        private const val VERIFICACION_TRABAJADOR_MS = 3 * 60 * 1000L
         private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+        private val comunasRegionMetropolitana = listOf(
+            "Alhue", "Buin", "Calera de Tango", "Cerrillos", "Cerro Navia", "Colina",
+            "Conchali", "Curacavi", "El Bosque", "El Monte", "Estacion Central", "Huechuraba",
+            "Independencia", "Isla de Maipo", "La Cisterna", "La Florida", "La Granja", "La Pintana",
+            "La Reina", "Lampa", "Las Condes", "Lo Barnechea", "Lo Espejo", "Lo Prado",
+            "Macul", "Maipu", "Maria Pinto", "Melipilla", "Nunoa", "Padre Hurtado",
+            "Paine", "Pedro Aguirre Cerda", "Penaflor", "Penalolen", "Pirque", "Providencia",
+            "Pudahuel", "Puente Alto", "Quilicura", "Quinta Normal", "Recoleta", "Renca",
+            "San Bernardo", "San Joaquin", "San Jose de Maipo", "San Miguel", "San Pedro",
+            "San Ramon", "Santiago", "Talagante", "Tiltil", "Vitacura"
+        )
         private val consultaOfertaSelect =
             "SELECT o.*, u.nombre || ' ' || u.apellido_paterno AS nombre_trabajador, " +
-                "cat.nombre AS nombre_categoria, c.detalle AS ubicacion_referencia, " +
+                "cat.nombre AS nombre_categoria, " +
+                "(COALESCE(uu.comuna, 'Santiago') || ', ' || COALESCE(uu.region, 'Region Metropolitana')) AS ubicacion_referencia, " +
+                "u.verificado AS trabajador_verificado, " +
+                "uu.latitud AS latitud_referencia, uu.longitud AS longitud_referencia, " +
+                "COALESCE(uu.rango_km, 20) AS rango_disponibilidad_km, " +
                 "COALESCE(f.enlace, '') AS foto_url_referencia, " +
                 "COALESCE(f.nombre_archivo, '') AS foto_nombre_archivo, " +
                 "COALESCE(f.mime_type, '') AS foto_mime_type, " +
@@ -672,9 +1029,8 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "FROM ofertas_servicio o " +
                 "INNER JOIN usuarios u ON u.id_usuario = o.id_trabajador " +
                 "INNER JOIN categorias_servicio cat ON cat.id_categoria_servicio = o.id_categoria_servicio " +
+                "LEFT JOIN ubicaciones_usuario uu ON uu.id_usuario = u.id_usuario " +
                 "LEFT JOIN fotos f ON f.id_foto = o.id_foto_portada " +
-                "LEFT JOIN direcciones d ON d.id_direccion = 1 " +
-                "LEFT JOIN coordenadas c ON c.id_coordenadas = d.id_coordenadas " +
                 "LEFT JOIN valoraciones v ON v.id_trabajador = o.id_trabajador "
         private val consultaOfertaGroupBy = " GROUP BY o.id_oferta_servicio"
 

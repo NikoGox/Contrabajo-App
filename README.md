@@ -15,31 +15,31 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.2-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.3-Pre-Alpha
 
 
 
-> <br>• Ahora las publicaciones se muestran con foto y en forma de cuadricula en la pantalla de marketplace.
-> <br>• Se agregaron animaciones a el navbar.
-> <br>• Se agregaron nuevas animaciones en general para toda la la aplicación.
-> <br>• Se modificó el navbar para acercarlo al diseño esperado en el prototipo.
-> <br>• Se rehizo la direccion visual de la app para acercarla al mockup actual de Contrabajo.
-> <br>• Se reemplazaron componentes base por componentes de producto reutilizables para botones, inputs, indicadores, tarjetas y navbar.
-> <br>• Se rediseño la pantalla principal con una publicacion destacada mas cercana a la propuesta del proyecto.
-> <br>• Se mejoro la experiencia visual de chats, perfil y detalle de servicio para dar continuidad al resto de la app.
-> <br>• Se mantuvieron sin ruptura las rutas de navegacion, los repositorios locales y el modelo de datos SQLite.
-> <br>• Se ajusto la paleta y el sistema base para acercar mas la app al prototipo original, con una lectura mas limpia, directa y cercana al mockup.
-> <br>• Se retocaron `PantallaInicial`, `PantallaLogin` y el registro en dos pasos para alinearlos mejor con la composicion del prototipo.• 
-> <br>• Se consolidó la base MVVM con navegación principal persistente y shell estable para perfil, marketplace y mensajes.• 
-> <br>• Se implementó el flujo RF-02 en local con SQLite: creación/edición de servicio, disponibilidad visible/oculta y consulta de publicaciones en grilla.• 
-> <br>• Se separó la edición/creación de servicio en una pantalla dedicada (sin navbar), reduciendo carga visual y lógica en perfil.• 
-> <br>• Se simplificó el modelo de servicio para esta etapa (precio texto libre y una sola descripción principal), alineando mejor la UX real.• 
-> <br>• Se reforzó el dataset demo con múltiples usuarios/publicaciones y más categorías para validar scroll, filtros visuales y comportamiento de tarjetas.• 
-> <br>• Se integró recarga por gesto en el marketplace y se afinó la experiencia de desplazamiento para refrescar resultados.
-> <br>• Se corrigieron insets y solapes con barra de estado, mejorando legibilidad y jerarquía visual en todas las pantallas.
-> <br>• Se recuperó el acabado visual del navbar flotante con bordes/transparencia sutil sin reintroducir el artefacto de fondo.
-> <br>• Se añadió captura de foto desde cámara para servicios (permiso, FileProvider, URI temporal segura) junto al selector de galería.
-> <br>• Se refinaron componentes clave como `LogoContrabajo`, `CampoContrabajo`, `TarjetaOfertaServicio`, `ChipAccion` y `BarraInferior`.
+> <br>• Se ajustó el registro: RUN (8 dígitos) + DV, máscara visual de RUN/teléfono, fecha de nacimiento por día/mes/año.
+> <br>• Se reforzó la validación de RUN y la duplicidad RUN+DV en la capa local.
+> <br>• Se implementó el login con opción "Recordarme" y expiración de sesión al desactivarla (en flujo local de debugging).
+> <br>• Se incorporó un menú de ajustes con acceso mediante ícono de tuerca y secciones: Seguridad y verificación, Cuenta y Ubicación.
+> <br>• Se implementó la verificación de trabajador en ajustes mediante RUN y número de documento, definida temporalmente como activación automática diferida (3 minutos) en flujo local.
+> <br>• Se agregó la configuración de 3 preguntas de seguridad con modal, guardado local y opción de mostrar/ocultar respuestas.
+> <br>• Se rediseñó el detalle de servicio con scroll interno, botón flotante de contacto, barra superior alineada y gesto lateral tipo tarjetas.
+> <br>• Se agregó una nueva pantalla para seleccionar ubicación, obteniendo coordenadas y permitiendo también ingresar la dirección manualmente.
+> <br>• Se desacopló visualmente el rango, mapa y botón para evitar la distorsión del mapa al mover el slider.
+> <br>• Se rediseñó el bloque "Dirección" para edición mediante modal: Región Metropolitana bloqueada, comuna mediante combobox (comunas RM), calle/número/detalle editables.
+> <br>• Se integró OpenStreetMap embebido (OSMDroid) en ajustes y en detalle de servicio, con marcador y círculo de rango.
+> <br>• Se agregó el guardado explícito de ubicación y rango (0–100 km) en la base de datos local por usuario.
+> <br>• Se conectó la pantalla principal para leer el rango guardado desde la BD y mostrarlo en "Rango de búsqueda actual".
+> <br>• Se activó el refresco de la pantalla principal al volver (`ON_RESUME`) para reflejar cambios de ajustes sin reiniciar la app.
+> <br>• Se aplicó filtro local de publicaciones por rango cuando existen coordenadas del usuario.
+> <br>• Se estabilizó la persistencia de la foto del servicio copiando la URI al almacenamiento interno para evitar pérdida de imagen entre vistas.
+> <br>• Se movió el botón "Cerrar sesión" al menu de ajustes (blanco con borde y texto rojo).
+
+
+
+
 
 ---
 

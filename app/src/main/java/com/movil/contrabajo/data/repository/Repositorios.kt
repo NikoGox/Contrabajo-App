@@ -6,10 +6,14 @@ import com.movil.contrabajo.domain.model.ChatCita
 import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
 import com.movil.contrabajo.domain.model.OfertaServicio
+import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
 import com.movil.contrabajo.domain.model.RegistroPendiente
+import com.movil.contrabajo.domain.model.TipoPerfil
+import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
 import com.movil.contrabajo.domain.model.Usuario
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.format.DateTimeParseException
 import java.time.format.DateTimeFormatter
 
 interface RepositorioAutenticacion {
@@ -21,6 +25,11 @@ interface RepositorioAutenticacion {
 
 interface RepositorioPerfil {
     fun obtenerPerfilActual(): Usuario?
+    fun solicitarVerificacionTrabajador(run: String, dv: String, numeroDocumento: String): Result<Usuario>
+    fun obtenerPreguntasSeguridad(): List<PreguntaSeguridadConfig>
+    fun guardarPreguntaSeguridad(indice: Int, pregunta: String, respuesta: String): Result<List<PreguntaSeguridadConfig>>
+    fun obtenerUbicacionAjustes(): UbicacionAjustesConfig
+    fun guardarUbicacionAjustes(config: UbicacionAjustesConfig): Result<UbicacionAjustesConfig>
 }
 
 interface RepositorioOfertas {
@@ -62,20 +71,29 @@ class RepositorioAutenticacionLocal(
         if (db.existeUsuario(registro.correo.trim(), registro.username.trim())) {
             return Result.failure(IllegalArgumentException("El correo o nombre de usuario ya esta registrado"))
         }
+        if (db.existeRun(limpiarRun(registro.run), registro.dv.trim().uppercase())) {
+            return Result.failure(IllegalArgumentException("El RUN ya esta registrado"))
+        }
 
         val usuario = Usuario(
-            run = registro.run.trim(),
-            dv = registro.dv.trim(),
+            run = limpiarRun(registro.run),
+            dv = registro.dv.trim().uppercase(),
             username = registro.username.trim(),
             nombre = registro.nombre.trim(),
             apellidoPaterno = registro.apellidoPaterno.trim(),
             apellidoMaterno = registro.apellidoMaterno.trim(),
             telefono = registro.telefono.trim(),
             correo = registro.correo.trim(),
-            contrasena = registro.contrasena,
+            contrasenaHash = registro.contrasena,
             fechaRegistro = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
-            fechaNacimiento = LocalDate.now().minusYears(20).toString(),
-            verificado = false
+            fechaNacimiento = registro.fechaNacimiento,
+            verificado = false,
+            tipoPerfil = TipoPerfil.USUARIO_BASE,
+            numeroDocumentoIdentidad = null,
+            preguntaRecuperacion = "",
+            respuestaRecuperacion = "",
+            verificacionTrabajadorPendiente = false,
+            fechaSolicitudVerificacionMs = null
         )
 
         val id = db.insertarUsuario(usuario)
@@ -92,12 +110,51 @@ class RepositorioAutenticacionLocal(
         registro.nombre.isBlank() -> "Ingresa tu nombre"
         registro.apellidoPaterno.isBlank() -> "Ingresa tu apellido paterno"
         registro.run.isBlank() || registro.dv.isBlank() -> "Ingresa un RUN valido"
-        registro.telefono.isBlank() -> "Ingresa tu telefono"
+        limpiarRun(registro.run).length != 8 -> "El RUN debe tener exactamente 8 digitos"
+        !validarRut(registro.run, registro.dv) -> "El RUN no es valido"
+        digitosTelefono(registro.telefono).length != 9 -> "Ingresa un telefono valido de 9 digitos"
         registro.username.isBlank() -> "Ingresa un nombre de usuario"
         registro.correo.isBlank() || !registro.correo.contains("@") -> "Ingresa un correo valido"
+        registro.fechaNacimiento.isBlank() -> "Ingresa tu fecha de nacimiento"
+        !esFechaValida(registro.fechaNacimiento) -> "La fecha de nacimiento debe tener formato yyyy-MM-dd"
         registro.contrasena.length < 6 -> "La contrasena debe tener al menos 6 caracteres"
         registro.contrasena != registro.confirmarContrasena -> "Las contrasenas no coinciden"
         else -> null
+    }
+
+    private fun limpiarRun(run: String): String = run.filter { it.isDigit() }
+    private fun digitosTelefono(telefono: String): String {
+        var digitos = telefono.filter { it.isDigit() }
+        if (digitos.startsWith("56")) digitos = digitos.drop(2)
+        return digitos
+    }
+
+    private fun validarRut(runRaw: String, dvRaw: String): Boolean {
+        val run = limpiarRun(runRaw)
+        if (run.length != 8) return false
+        val dv = dvRaw.trim().uppercase()
+        if (dv.isBlank()) return false
+
+        var suma = 0
+        var multiplicador = 2
+        for (i in run.length - 1 downTo 0) {
+            suma += (run[i] - '0') * multiplicador
+            multiplicador = if (multiplicador == 7) 2 else multiplicador + 1
+        }
+        val resto = 11 - (suma % 11)
+        val dvEsperado = when (resto) {
+            11 -> "0"
+            10 -> "K"
+            else -> resto.toString()
+        }
+        return dv == dvEsperado
+    }
+
+    private fun esFechaValida(fecha: String): Boolean = try {
+        LocalDate.parse(fecha.trim())
+        true
+    } catch (_: DateTimeParseException) {
+        false
     }
 }
 
@@ -105,6 +162,68 @@ class RepositorioPerfilLocal(
     private val db: ContrabajoSQLiteHelper
 ) : RepositorioPerfil {
     override fun obtenerPerfilActual(): Usuario? = db.obtenerUsuarioSesionActiva()
+
+    override fun solicitarVerificacionTrabajador(
+        run: String,
+        dv: String,
+        numeroDocumento: String
+    ): Result<Usuario> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        if (usuario.tipoPerfil != TipoPerfil.USUARIO_BASE) {
+            return Result.failure(IllegalStateException("Solo un usuario base puede solicitar verificacion"))
+        }
+        return db.solicitarVerificacionTrabajador(
+            idUsuario = usuario.idUsuario,
+            run = limpiarRun(run),
+            dv = dv.trim().uppercase(),
+            numeroDocumento = numeroDocumento
+        ).mapCatching { db.obtenerUsuarioPorId(usuario.idUsuario) ?: usuario }
+    }
+
+    override fun obtenerPreguntasSeguridad(): List<PreguntaSeguridadConfig> {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return emptyList()
+        return db.obtenerPreguntasSeguridad(usuario.idUsuario)
+    }
+
+    override fun guardarPreguntaSeguridad(
+        indice: Int,
+        pregunta: String,
+        respuesta: String
+    ): Result<List<PreguntaSeguridadConfig>> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        if (indice !in 1..3) {
+            return Result.failure(IllegalArgumentException("Indice de pregunta invalido"))
+        }
+        if (pregunta.trim().isBlank()) {
+            return Result.failure(IllegalArgumentException("Ingresa la pregunta de seguridad"))
+        }
+        if (respuesta.trim().isBlank()) {
+            return Result.failure(IllegalArgumentException("Ingresa la respuesta de seguridad"))
+        }
+        db.guardarPreguntaSeguridad(
+            idUsuario = usuario.idUsuario,
+            indice = indice,
+            pregunta = pregunta.trim(),
+            respuesta = respuesta.trim()
+        )
+        return Result.success(db.obtenerPreguntasSeguridad(usuario.idUsuario))
+    }
+
+    override fun obtenerUbicacionAjustes(): UbicacionAjustesConfig {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return UbicacionAjustesConfig()
+        return db.obtenerUbicacionUsuario(usuario.idUsuario)
+    }
+
+    override fun guardarUbicacionAjustes(config: UbicacionAjustesConfig): Result<UbicacionAjustesConfig> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        db.guardarUbicacionUsuario(usuario.idUsuario, config)
+        return Result.success(db.obtenerUbicacionUsuario(usuario.idUsuario))
+    }
+
+    private fun limpiarRun(run: String): String = run.filter { it.isDigit() }
 }
 
 class RepositorioOfertasLocal(
@@ -123,11 +242,20 @@ class RepositorioOfertasLocal(
     override fun guardarOfertaPropia(formulario: FormularioServicio): Result<OfertaServicio> {
         val usuario = db.obtenerUsuarioSesionActiva()
             ?: return Result.failure(IllegalStateException("No hay una sesion activa para guardar el servicio"))
+        if (usuario.tipoPerfil !in listOf(TipoPerfil.TRABAJADOR, TipoPerfil.PREMIUM)) {
+            return Result.failure(IllegalStateException("Debes verificarte como trabajador para publicar servicios"))
+        }
 
         val error = validarFormularioServicio(formulario)
         if (error != null) return Result.failure(IllegalArgumentException(error))
 
         val ofertaExistente = db.obtenerOfertaPorTrabajador(usuario.idUsuario)
+        val maximoServicios = if (usuario.tipoPerfil == TipoPerfil.PREMIUM) 3 else 1
+        if (ofertaExistente == null && db.contarOfertasActivasPorTrabajador(usuario.idUsuario) >= maximoServicios) {
+            return Result.failure(
+                IllegalStateException("Tu perfil permite hasta $maximoServicios servicio(s) activo(s)")
+            )
+        }
         val idFotoPortada = when {
             formulario.foto == null -> ofertaExistente?.idFotoPortada
             formulario.foto.idFoto != null -> {
