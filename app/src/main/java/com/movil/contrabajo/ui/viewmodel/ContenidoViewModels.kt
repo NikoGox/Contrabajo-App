@@ -14,7 +14,10 @@ import com.movil.contrabajo.domain.model.ChatCita
 import com.movil.contrabajo.domain.model.FotoServicioLocal
 import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.OfertaServicio
+import com.movil.contrabajo.domain.model.PrecioUtils
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
+import com.movil.contrabajo.domain.model.EscalaRango
+import com.movil.contrabajo.domain.model.TipoPrecio
 import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
 import com.movil.contrabajo.domain.model.Usuario
@@ -30,10 +33,22 @@ import kotlin.math.sqrt
 data class PrincipalUiState(
     val busqueda: String = "",
     val ofertas: List<OfertaServicio> = emptyList(),
+    val categoriasDisponibles: List<CategoriaServicio> = emptyList(),
     val refrescando: Boolean = false,
-    val rangoBusquedaKm: Int = 20,
-    val filtroPorCoordenadasActivo: Boolean = false
+    val rangoBusquedaM: Int = 20_000,
+    val filtroPorCoordenadasActivo: Boolean = false,
+    val filtroCategoriaId: Long? = null,
+    val filtroTipoPrecio: Int? = null,
+    val soloTrabajadorVerificado: Boolean = false,
+    val ordenMarketplace: OrdenMarketplace = OrdenMarketplace.FECHA_RECIENTES,
+    val mensajePrincipal: String? = null
 )
+
+enum class OrdenMarketplace {
+    ALFABETICO_A_Z,
+    FECHA_RECIENTES,
+    FECHA_ANTIGUAS
+}
 
 class PrincipalViewModel(
     private val repositorioOfertas: RepositorioOfertas,
@@ -49,17 +64,21 @@ class PrincipalViewModel(
     fun recargar() {
         val ubicacionActual = repositorioPerfil.obtenerUbicacionAjustes()
         val ofertas = repositorioOfertas.obtenerOfertasMarketplace(uiState.busqueda)
+        val categorias = repositorioOfertas.obtenerCategoriasServicio()
         val filtroActivo = ubicacionActual.latitud != null && ubicacionActual.longitud != null
-        val ofertasFiltradas = filtrarPorRango(
+        val rangoBusqueda = EscalaRango.normalizar(ubicacionActual.rangoBusquedaM)
+        val ofertasFiltradas = filtrarPorMatchRangos(
             ofertas = ofertas,
             latitudBase = ubicacionActual.latitud,
             longitudBase = ubicacionActual.longitud,
-            rangoKm = ubicacionActual.rangoDisponibilidadKm
+            rangoBusquedaM = rangoBusqueda
         )
+        val ofertasFinales = aplicarFiltrosYOrden(ofertasFiltradas)
 
         uiState = uiState.copy(
-            ofertas = ofertasFiltradas,
-            rangoBusquedaKm = ubicacionActual.rangoDisponibilidadKm,
+            ofertas = ofertasFinales,
+            categoriasDisponibles = categorias,
+            rangoBusquedaM = rangoBusqueda,
             filtroPorCoordenadasActivo = filtroActivo
         )
     }
@@ -79,38 +98,99 @@ class PrincipalViewModel(
         recargar()
     }
 
-    private fun filtrarPorRango(
+    fun guardarRangoBusqueda(valorMetros: Int) {
+        val ubicacionActual = repositorioPerfil.obtenerUbicacionAjustes()
+        val rangoNormalizado = EscalaRango.normalizar(valorMetros)
+        repositorioPerfil.guardarUbicacionAjustes(
+            ubicacionActual.copy(rangoBusquedaM = rangoNormalizado)
+        ).onSuccess {
+            recargar()
+            uiState = uiState.copy(mensajePrincipal = "Rango de busqueda actualizado a ${EscalaRango.formatear(rangoNormalizado)}.")
+        }.onFailure {
+            uiState = uiState.copy(mensajePrincipal = it.message ?: "No se pudo guardar el rango de busqueda")
+        }
+    }
+
+    fun consumirMensajePrincipal() {
+        uiState = uiState.copy(mensajePrincipal = null)
+    }
+
+    fun aplicarFiltros(
+        categoriaId: Long?,
+        tipoPrecio: Int?,
+        soloVerificados: Boolean,
+        orden: OrdenMarketplace
+    ) {
+        uiState = uiState.copy(
+            filtroCategoriaId = categoriaId,
+            filtroTipoPrecio = tipoPrecio,
+            soloTrabajadorVerificado = soloVerificados,
+            ordenMarketplace = orden
+        )
+        recargar()
+    }
+
+    fun limpiarFiltros() {
+        uiState = uiState.copy(
+            filtroCategoriaId = null,
+            filtroTipoPrecio = null,
+            soloTrabajadorVerificado = false,
+            ordenMarketplace = OrdenMarketplace.FECHA_RECIENTES
+        )
+        recargar()
+    }
+
+    private fun filtrarPorMatchRangos(
         ofertas: List<OfertaServicio>,
         latitudBase: Double?,
         longitudBase: Double?,
-        rangoKm: Int
+        rangoBusquedaM: Int
     ): List<OfertaServicio> {
-        if (latitudBase == null || longitudBase == null) return ofertas
-        val rangoNormalizado = rangoKm.coerceIn(0, 100)
+        if (latitudBase == null || longitudBase == null) return emptyList()
 
         return ofertas.filter { oferta ->
             val latitudOferta = oferta.latitudReferencia
             val longitudOferta = oferta.longitudReferencia
-            if (latitudOferta == null || longitudOferta == null) {
-                true
-            } else {
-                calcularDistanciaKm(
-                    lat1 = latitudBase,
-                    lon1 = longitudBase,
-                    lat2 = latitudOferta,
-                    lon2 = longitudOferta
-                ) <= rangoNormalizado
-            }
+            if (latitudOferta == null || longitudOferta == null) return@filter false
+
+            val distanciaM = calcularDistanciaM(
+                lat1 = latitudBase,
+                lon1 = longitudBase,
+                lat2 = latitudOferta,
+                lon2 = longitudOferta
+            )
+            distanciaM <= (rangoBusquedaM + MARGEN_TOLERANCIA_BORDE_M)
         }
     }
 
-    private fun calcularDistanciaKm(
+    private fun aplicarFiltrosYOrden(ofertas: List<OfertaServicio>): List<OfertaServicio> {
+        val filtradas = ofertas
+            .asSequence()
+            .filter { oferta ->
+                uiState.filtroCategoriaId?.let { oferta.idCategoriaServicio == it } ?: true
+            }
+            .filter { oferta ->
+                uiState.filtroTipoPrecio?.let { oferta.tipoPrecio == it } ?: true
+            }
+            .filter { oferta ->
+                if (uiState.soloTrabajadorVerificado) oferta.trabajadorVerificado else true
+            }
+            .toList()
+
+        return when (uiState.ordenMarketplace) {
+            OrdenMarketplace.ALFABETICO_A_Z -> filtradas.sortedBy { it.titulo.lowercase() }
+            OrdenMarketplace.FECHA_ANTIGUAS -> filtradas.sortedBy { it.fechaPublicacion }
+            OrdenMarketplace.FECHA_RECIENTES -> filtradas.sortedByDescending { it.fechaPublicacion }
+        }
+    }
+
+    private fun calcularDistanciaM(
         lat1: Double,
         lon1: Double,
         lat2: Double,
         lon2: Double
     ): Int {
-        val radioTierraKm = 6371.0
+        val radioTierraM = 6_371_000.0
         val dLat = (lat2 - lat1) * PI / 180.0
         val dLon = (lon2 - lon1) * PI / 180.0
         val a =
@@ -118,7 +198,11 @@ class PrincipalViewModel(
                 cos(lat1 * PI / 180.0) * cos(lat2 * PI / 180.0) *
                 sin(dLon / 2) * sin(dLon / 2)
         val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return (radioTierraKm * c).roundToInt()
+        return (radioTierraM * c).roundToInt()
+    }
+
+    private companion object {
+        const val MARGEN_TOLERANCIA_BORDE_M = 500
     }
 }
 
@@ -159,7 +243,8 @@ data class PerfilUiState(
     val errorPreguntasSeguridad: String? = null,
     val mensajePreguntasSeguridad: String? = null,
     val errorVerificacion: String? = null,
-    val mensajeVerificacion: String? = null
+    val mensajeVerificacion: String? = null,
+    val cargandoPantalla: Boolean = false
 )
 
 class PerfilViewModel(
@@ -245,8 +330,31 @@ class PerfilViewModel(
     }
 
     fun actualizarPrecioServicio(valor: String) {
+        val monto = valor.filter { it.isDigit() }.toIntOrNull() ?: 0
         uiState = uiState.copy(
-            formularioServicio = uiState.formularioServicio.copy(precioTexto = valor),
+            formularioServicio = uiState.formularioServicio.copy(
+                montoBase = monto,
+                precioTexto = PrecioUtils.construirPrecioTexto(
+                    uiState.formularioServicio.tipoPrecio,
+                    monto
+                )
+            ),
+            errorServicio = null
+        )
+    }
+
+    fun actualizarTipoPrecioServicio(tipoPrecio: Int) {
+        val montoAjustado = if (tipoPrecio == TipoPrecio.CONTACTAR) {
+            0
+        } else {
+            uiState.formularioServicio.montoBase.coerceIn(PrecioUtils.MIN_MONTO, PrecioUtils.MAX_MONTO)
+        }
+        uiState = uiState.copy(
+            formularioServicio = uiState.formularioServicio.copy(
+                tipoPrecio = tipoPrecio,
+                montoBase = montoAjustado,
+                precioTexto = PrecioUtils.construirPrecioTexto(tipoPrecio, montoAjustado)
+            ),
             errorServicio = null
         )
     }
@@ -301,45 +409,79 @@ class PerfilViewModel(
     }
 
     fun guardarServicio() {
-        repositorioOfertas.guardarOfertaPropia(uiState.formularioServicio)
-            .onSuccess { oferta ->
-                uiState = uiState.copy(
-                    ofertaPropia = oferta,
-                    formularioServicio = oferta.toFormularioServicio(),
-                    mostrandoFormularioServicio = false,
-                    errorServicio = null
-                )
-            }
-            .onFailure {
-                uiState = uiState.copy(errorServicio = it.message ?: "No se pudo guardar el servicio")
-            }
+        viewModelScope.launch {
+            uiState = uiState.copy(cargandoPantalla = true)
+            delay(220)
+            repositorioOfertas.guardarOfertaPropia(uiState.formularioServicio)
+                .onSuccess { oferta ->
+                    uiState = uiState.copy(
+                        ofertaPropia = oferta,
+                        formularioServicio = oferta.toFormularioServicio(),
+                        mostrandoFormularioServicio = false,
+                        errorServicio = null
+                    )
+                }
+                .onFailure {
+                    uiState = uiState.copy(errorServicio = it.message ?: "No se pudo guardar el servicio")
+                }
+            uiState = uiState.copy(cargandoPantalla = false)
+        }
+    }
+
+    fun actualizarFotoPerfil(uriLocal: String) {
+        viewModelScope.launch {
+            uiState = uiState.copy(cargandoPantalla = true)
+            delay(180)
+            repositorioPerfil.actualizarFotoPerfil(uriLocal)
+                .onSuccess { usuarioActualizado ->
+                    uiState = uiState.copy(usuario = usuarioActualizado, errorServicio = null)
+                }
+                .onFailure {
+                    uiState = uiState.copy(errorServicio = it.message ?: "No se pudo actualizar la foto de perfil")
+                }
+            uiState = uiState.copy(cargandoPantalla = false)
+        }
     }
 
     fun eliminarServicio() {
-        repositorioOfertas.eliminarOfertaPropia()
-            .onSuccess {
-                uiState = uiState.copy(
-                    ofertaPropia = null,
-                    formularioServicio = FormularioServicio(),
-                    mostrandoFormularioServicio = false,
-                    errorServicio = null
-                )
-            }
-            .onFailure {
-                uiState = uiState.copy(errorServicio = it.message ?: "No se pudo eliminar el servicio")
-            }
+        viewModelScope.launch {
+            uiState = uiState.copy(cargandoPantalla = true)
+            delay(220)
+            repositorioOfertas.eliminarOfertaPropia()
+                .onSuccess {
+                    uiState = uiState.copy(
+                        ofertaPropia = null,
+                        formularioServicio = FormularioServicio(),
+                        mostrandoFormularioServicio = false,
+                        errorServicio = null
+                    )
+                }
+                .onFailure {
+                    uiState = uiState.copy(errorServicio = it.message ?: "No se pudo eliminar el servicio")
+                }
+            uiState = uiState.copy(cargandoPantalla = false)
+        }
     }
 
     fun actualizarRunVerificacion(valor: String) {
-        uiState = uiState.copy(runVerificacion = valor, errorVerificacion = null, mensajeVerificacion = null)
+        uiState = uiState.copy(
+            runVerificacion = valor.filter { it.isDigit() }.take(8),
+            errorVerificacion = null,
+            mensajeVerificacion = null
+        )
     }
 
     fun actualizarDvVerificacion(valor: String) {
-        uiState = uiState.copy(dvVerificacion = valor, errorVerificacion = null, mensajeVerificacion = null)
+        val dvNormalizado = valor.uppercase().filter { it.isDigit() || it == 'K' }.take(1)
+        uiState = uiState.copy(dvVerificacion = dvNormalizado, errorVerificacion = null, mensajeVerificacion = null)
     }
 
     fun actualizarNumeroDocumentoVerificacion(valor: String) {
-        uiState = uiState.copy(numeroDocumentoVerificacion = valor, errorVerificacion = null, mensajeVerificacion = null)
+        uiState = uiState.copy(
+            numeroDocumentoVerificacion = valor.filter { it.isDigit() }.take(9),
+            errorVerificacion = null,
+            mensajeVerificacion = null
+        )
     }
 
     fun actualizarRegionUbicacion(valor: String) {
@@ -383,26 +525,52 @@ class PerfilViewModel(
     }
 
     fun actualizarRangoUbicacion(valor: Float) {
-        val rangoNormalizado = valor.roundToInt().coerceIn(0, 100)
+        val rangoNormalizado = EscalaRango.valorPorPosicionSlider(valor)
         uiState = uiState.copy(
-            ubicacionAjustes = uiState.ubicacionAjustes.copy(rangoDisponibilidadKm = rangoNormalizado),
+            ubicacionAjustes = uiState.ubicacionAjustes.copy(rangoDisponibilidadM = rangoNormalizado),
             errorUbicacion = null,
             mensajeUbicacion = null
         )
     }
 
-    fun obtenerUbicacionActual() {
-        val usuarioId = uiState.usuario?.idUsuario ?: 0L
-        val baseLat = -33.4489
-        val baseLon = -70.6693
-        val ajuste = ((usuarioId % 19).toDouble() * 0.0015)
+    fun guardarCoordenadasGps(latitud: Double, longitud: Double) {
+        val baseActual = uiState.ubicacionAjustes
+        val normalizada = baseActual.copy(
+            latitud = latitud,
+            longitud = longitud,
+            region = "Region Metropolitana",
+            comuna = baseActual.comuna.valorUbicacionPorDefecto("Santiago"),
+            calle = baseActual.calle.valorUbicacionPorDefecto("Sin calle"),
+            numero = baseActual.numero.valorUbicacionPorDefecto("Sin numero"),
+            detalle = baseActual.detalle.valorUbicacionPorDefecto("Sin detalle"),
+            rangoDisponibilidadM = EscalaRango.normalizar(baseActual.rangoDisponibilidadM),
+            rangoBusquedaM = EscalaRango.normalizar(baseActual.rangoBusquedaM)
+        )
+        viewModelScope.launch {
+            uiState = uiState.copy(cargandoPantalla = true)
+            delay(180)
+            repositorioPerfil.guardarUbicacionAjustes(normalizada)
+                .onSuccess { guardada ->
+                    uiState = uiState.copy(
+                        ubicacionAjustes = guardada,
+                        errorUbicacion = null,
+                        mensajeUbicacion = "Ubicacion actualizada correctamente."
+                    )
+                }
+                .onFailure {
+                    uiState = uiState.copy(
+                        errorUbicacion = it.message ?: "No se pudo actualizar la ubicacion",
+                        mensajeUbicacion = null
+                    )
+                }
+            uiState = uiState.copy(cargandoPantalla = false)
+        }
+    }
+
+    fun reportarErrorUbicacion(mensaje: String) {
         uiState = uiState.copy(
-            ubicacionAjustes = uiState.ubicacionAjustes.copy(
-                latitud = baseLat + ajuste,
-                longitud = baseLon - ajuste
-            ),
             errorUbicacion = null,
-            mensajeUbicacion = "Ubicacion recalculada con OpenStreetMap."
+            mensajeUbicacion = mensaje
         )
     }
 
@@ -414,23 +582,33 @@ class PerfilViewModel(
             calle = actual.calle.valorUbicacionPorDefecto("Sin calle"),
             numero = actual.numero.valorUbicacionPorDefecto("Sin numero"),
             detalle = actual.detalle.valorUbicacionPorDefecto("Sin detalle"),
-            rangoDisponibilidadKm = actual.rangoDisponibilidadKm.coerceIn(0, 100)
+            rangoDisponibilidadM = EscalaRango.normalizar(actual.rangoDisponibilidadM),
+            rangoBusquedaM = EscalaRango.normalizar(actual.rangoBusquedaM)
         )
 
-        repositorioPerfil.guardarUbicacionAjustes(normalizada)
-            .onSuccess { guardada ->
-                uiState = uiState.copy(
-                    ubicacionAjustes = guardada,
-                    errorUbicacion = null,
-                    mensajeUbicacion = "Direccion y rango guardados."
-                )
-            }
-            .onFailure {
-                uiState = uiState.copy(
-                    errorUbicacion = it.message ?: "No se pudo guardar la ubicacion",
-                    mensajeUbicacion = null
-                )
-            }
+        viewModelScope.launch {
+            uiState = uiState.copy(cargandoPantalla = true)
+            delay(180)
+            repositorioPerfil.guardarUbicacionAjustes(normalizada)
+                .onSuccess { guardada ->
+                    uiState = uiState.copy(
+                        ubicacionAjustes = guardada,
+                        errorUbicacion = null,
+                        mensajeUbicacion = "Direccion y rango guardados."
+                    )
+                }
+                .onFailure {
+                    uiState = uiState.copy(
+                        errorUbicacion = it.message ?: "No se pudo guardar la ubicacion",
+                        mensajeUbicacion = null
+                    )
+                }
+            uiState = uiState.copy(cargandoPantalla = false)
+        }
+    }
+
+    fun consumirMensajeUbicacion() {
+        uiState = uiState.copy(mensajeUbicacion = null)
     }
 
     fun guardarPreguntaSeguridad(indice: Int, pregunta: String, respuesta: String) {
@@ -458,6 +636,18 @@ class PerfilViewModel(
     }
 
     fun solicitarVerificacionTrabajador() {
+        if (uiState.runVerificacion.length != 8) {
+            uiState = uiState.copy(errorVerificacion = "El RUN debe tener 8 digitos")
+            return
+        }
+        if (uiState.dvVerificacion.isBlank()) {
+            uiState = uiState.copy(errorVerificacion = "Ingresa el DV del RUN")
+            return
+        }
+        if (uiState.numeroDocumentoVerificacion.length != 9) {
+            uiState = uiState.copy(errorVerificacion = "El numero de documento debe tener 9 digitos")
+            return
+        }
         repositorioPerfil.solicitarVerificacionTrabajador(
             run = uiState.runVerificacion,
             dv = uiState.dvVerificacion,
@@ -486,12 +676,18 @@ class PerfilViewModel(
     }
 
     private fun OfertaServicio?.toFormularioServicio(): FormularioServicio = if (this == null) {
-        FormularioServicio()
+        FormularioServicio(
+            tipoPrecio = TipoPrecio.FIJO,
+            montoBase = 20_000,
+            precioTexto = PrecioUtils.construirPrecioTexto(TipoPrecio.FIJO, 20_000)
+        )
     } else {
         FormularioServicio(
             titulo = titulo,
             descripcion = descripcion,
             precioTexto = precioTexto,
+            tipoPrecio = tipoPrecio,
+            montoBase = montoBase,
             idCategoriaServicio = idCategoriaServicio,
             disponible = disponible,
             foto = if (fotoUrlReferencia.isBlank()) {
@@ -515,30 +711,38 @@ class PerfilViewModel(
 
 data class DetalleServicioUiState(
     val ofertas: List<OfertaServicio> = emptyList(),
-    val indiceActual: Int = 0
+    val indiceActual: Int = 0,
+    val idUsuarioActual: Long? = null
 ) {
     val ofertaActual: OfertaServicio? get() = ofertas.getOrNull(indiceActual)
 }
 
 class DetalleServicioViewModel(
-    private val repositorioOfertas: RepositorioOfertas
+    private val repositorioOfertas: RepositorioOfertas,
+    private val repositorioPerfil: RepositorioPerfil
 ) : ViewModel() {
     var uiState by mutableStateOf(DetalleServicioUiState())
         private set
 
     private var ofertaActualId: Long? = null
 
-    fun cargarOferta(idOfertaServicio: Long) {
-        if (ofertaActualId == idOfertaServicio && uiState.ofertaActual != null) return
+    fun cargarOferta(idOfertaServicio: Long, forzarRecarga: Boolean = false) {
+        if (!forzarRecarga && ofertaActualId == idOfertaServicio && uiState.ofertaActual != null) return
         ofertaActualId = idOfertaServicio
+        val idUsuarioActual = repositorioPerfil.obtenerPerfilActual()?.idUsuario
         val ofertas = repositorioOfertas.obtenerOfertasMarketplace()
         if (ofertas.isEmpty()) {
             val oferta = repositorioOfertas.obtenerOfertaPorId(idOfertaServicio)
-            uiState = uiState.copy(ofertas = listOfNotNull(oferta), indiceActual = 0)
+            uiState = uiState.copy(ofertas = listOfNotNull(oferta), indiceActual = 0, idUsuarioActual = idUsuarioActual)
             return
         }
         val indice = ofertas.indexOfFirst { it.idOfertaServicio == idOfertaServicio }.takeIf { it >= 0 } ?: 0
-        uiState = uiState.copy(ofertas = ofertas, indiceActual = indice)
+        uiState = uiState.copy(ofertas = ofertas, indiceActual = indice, idUsuarioActual = idUsuarioActual)
+    }
+
+    fun recargarOfertaActual() {
+        val id = ofertaActualId ?: uiState.ofertaActual?.idOfertaServicio ?: return
+        cargarOferta(idOfertaServicio = id, forzarRecarga = true)
     }
 
     fun avanzarTarjeta() {

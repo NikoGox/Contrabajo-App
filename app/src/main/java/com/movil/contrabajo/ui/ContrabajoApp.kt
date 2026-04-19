@@ -9,7 +9,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -19,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.pointer.pointerInput
@@ -58,6 +61,8 @@ import com.movil.contrabajo.ui.viewmodel.LoginViewModel
 import com.movil.contrabajo.ui.viewmodel.PerfilViewModel
 import com.movil.contrabajo.ui.viewmodel.PrincipalViewModel
 import com.movil.contrabajo.ui.viewmodel.RegistroViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 @Composable
@@ -141,11 +146,6 @@ fun ContrabajoApp() {
                 },
                 onAbrirAjustes = {
                     navController.navigate(RutasApp.Ajustes.ruta)
-                },
-                onCerrarSesion = {
-                    navController.navigate(RutasApp.Inicio.ruta) {
-                        popUpTo(navController.graph.id) { inclusive = true }
-                    }
                 }
             )
         }
@@ -256,6 +256,9 @@ fun ContrabajoApp() {
             PantallaDetalleServicio(
                 idOfertaServicio = idOferta,
                 viewModel = detalleServicioViewModel,
+                onEditarServicio = {
+                    navController.navigate(RutasApp.ServicioEditor.crearRuta("editar"))
+                },
                 onVolver = { navController.popBackStack() }
             )
         }
@@ -271,25 +274,30 @@ private fun ShellPrincipal(
     onAbrirEditarServicio: () -> Unit,
     onAbrirServicio: (Long) -> Unit,
     onAbrirAjustes: () -> Unit,
-    onCerrarSesion: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var rutaActual by rememberSaveable { mutableStateOf(RutasApp.Principal.ruta) }
+    var rutaContenido by rememberSaveable { mutableStateOf(RutasApp.Principal.ruta) }
+    var rutaNavbar by rememberSaveable { mutableStateOf(RutasApp.Principal.ruta) }
     var desplazamientoHorizontal by remember { mutableStateOf(0f) }
-    val rutasSwipe = remember { listOf(RutasApp.Principal.ruta, RutasApp.Chats.ruta, RutasApp.Perfil.ruta) }
+    val scope = rememberCoroutineScope()
+    val rutasSwipe = remember { listOf(RutasApp.Perfil.ruta, RutasApp.Principal.ruta, RutasApp.Chats.ruta) }
 
-    LaunchedEffect(rutaActual) {
-        when (rutaActual) {
+    LaunchedEffect(rutaContenido) {
+        when (rutaContenido) {
             RutasApp.Chats.ruta -> chatsViewModel.recargar()
             RutasApp.Perfil.ruta -> perfilViewModel.recargar()
         }
     }
 
     ContenedorConNavbarFlotante(
-        actual = rutaActual,
+        actual = rutaNavbar,
         alNavegar = { nuevaRuta ->
-            if (rutaActual != nuevaRuta) {
-                rutaActual = nuevaRuta
+            if (rutaContenido != nuevaRuta) {
+                rutaContenido = nuevaRuta
+                scope.launch {
+                    delay(220)
+                    rutaNavbar = nuevaRuta
+                }
             }
         },
         modifier = modifier
@@ -297,7 +305,7 @@ private fun ShellPrincipal(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(rutaActual) {
+                .pointerInput(rutaContenido) {
                     detectHorizontalDragGestures(
                         onDragStart = { desplazamientoHorizontal = 0f },
                         onHorizontalDrag = { change, dragAmount ->
@@ -307,13 +315,18 @@ private fun ShellPrincipal(
                         onDragEnd = {
                             val umbral = 85f
                             if (abs(desplazamientoHorizontal) >= umbral) {
-                                val indiceActual = rutasSwipe.indexOf(rutaActual).let { if (it < 0) 0 else it }
+                                val indiceActual = rutasSwipe.indexOf(rutaContenido).let { if (it < 0) 0 else it }
                                 val indiceDestino = if (desplazamientoHorizontal < 0f) {
                                     (indiceActual + 1).coerceAtMost(rutasSwipe.lastIndex)
                                 } else {
                                     (indiceActual - 1).coerceAtLeast(0)
                                 }
-                                rutaActual = rutasSwipe[indiceDestino]
+                                val destino = rutasSwipe[indiceDestino]
+                                rutaContenido = destino
+                                scope.launch {
+                                    delay(220)
+                                    rutaNavbar = destino
+                                }
                             }
                             desplazamientoHorizontal = 0f
                         },
@@ -323,7 +336,7 @@ private fun ShellPrincipal(
         ) {
             FondoContrabajo(modifier = Modifier.fillMaxSize())
             AnimatedContent(
-                targetState = rutaActual,
+                targetState = rutaContenido,
                 transitionSpec = {
                     val indiceInicial = RutasApp.indiceRutaPrincipal(initialState)
                     val indiceDestino = RutasApp.indiceRutaPrincipal(targetState)
@@ -360,7 +373,6 @@ private fun ShellPrincipal(
                         viewModel = perfilViewModel,
                         onAbrirCrearServicio = onAbrirCrearServicio,
                         onAbrirEditarServicio = onAbrirEditarServicio,
-                        onCerrarSesion = onCerrarSesion,
                         modifier = Modifier.padding(innerPadding)
                     )
 
@@ -378,44 +390,56 @@ private fun ShellPrincipal(
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionEntrada(): EnterTransition {
     return when {
-        targetState.destination.route == RutasApp.Servicio.ruta ->
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(durationMillis = 260)
+        routeEsServicio(targetState.destination.route) ->
+            slideInVertically(
+                animationSpec = tween(durationMillis = 320),
+                initialOffsetY = { it }
             ) + fadeIn(animationSpec = tween(durationMillis = 180))
-        else -> fadeIn(animationSpec = tween(durationMillis = 180))
+        routeEsAjustes(targetState.destination.route) ->
+            fadeIn(animationSpec = tween(durationMillis = 120))
+        else -> fadeIn(animationSpec = tween(durationMillis = 140))
     }
 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionSalida(): ExitTransition {
     return when {
-        targetState.destination.route == RutasApp.Servicio.ruta ->
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(durationMillis = 220)
-            ) + fadeOut(animationSpec = tween(durationMillis = 140))
-        else -> fadeOut(animationSpec = tween(durationMillis = 120))
+        routeEsServicio(targetState.destination.route) ->
+            fadeOut(animationSpec = tween(durationMillis = 120))
+        routeEsAjustes(targetState.destination.route) ->
+            fadeOut(animationSpec = tween(durationMillis = 90))
+        else -> fadeOut(animationSpec = tween(durationMillis = 110))
     }
 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionPopEntrada(): EnterTransition {
     return when {
-        initialState.destination.route == RutasApp.Servicio.ruta ->
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(durationMillis = 260)
-            ) + fadeIn(animationSpec = tween(durationMillis = 180))
-        else -> fadeIn(animationSpec = tween(durationMillis = 160))
+        routeEsServicio(initialState.destination.route) ->
+            fadeIn(animationSpec = tween(durationMillis = 120))
+        routeEsAjustes(initialState.destination.route) ->
+            fadeIn(animationSpec = tween(durationMillis = 90))
+        else -> fadeIn(animationSpec = tween(durationMillis = 120))
     }
 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionPopSalida(): ExitTransition {
     return when {
-        initialState.destination.route == RutasApp.Servicio.ruta ->
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(durationMillis = 220)
+        routeEsServicio(initialState.destination.route) ->
+            slideOutVertically(
+                animationSpec = tween(durationMillis = 220),
+                targetOffsetY = { -it }
             ) + fadeOut(animationSpec = tween(durationMillis = 140))
-        else -> fadeOut(animationSpec = tween(durationMillis = 120))
+        routeEsAjustes(initialState.destination.route) ->
+            fadeOut(animationSpec = tween(durationMillis = 90))
+        else -> fadeOut(animationSpec = tween(durationMillis = 110))
     }
+}
+
+private fun routeEsAjustes(route: String?): Boolean {
+    val base = route?.substringBefore("/")
+    return base == RutasApp.Ajustes.ruta
+}
+
+private fun routeEsServicio(route: String?): Boolean {
+    val base = route?.substringBefore("/")
+    return base == RutasApp.Servicio.ruta.substringBefore("/")
 }

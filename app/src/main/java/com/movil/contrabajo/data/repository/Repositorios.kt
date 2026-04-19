@@ -6,9 +6,11 @@ import com.movil.contrabajo.domain.model.ChatCita
 import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
 import com.movil.contrabajo.domain.model.OfertaServicio
+import com.movil.contrabajo.domain.model.PrecioUtils
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
 import com.movil.contrabajo.domain.model.RegistroPendiente
 import com.movil.contrabajo.domain.model.TipoPerfil
+import com.movil.contrabajo.domain.model.TipoPrecio
 import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
 import com.movil.contrabajo.domain.model.Usuario
 import java.time.LocalDate
@@ -30,6 +32,7 @@ interface RepositorioPerfil {
     fun guardarPreguntaSeguridad(indice: Int, pregunta: String, respuesta: String): Result<List<PreguntaSeguridadConfig>>
     fun obtenerUbicacionAjustes(): UbicacionAjustesConfig
     fun guardarUbicacionAjustes(config: UbicacionAjustesConfig): Result<UbicacionAjustesConfig>
+    fun actualizarFotoPerfil(uriLocal: String): Result<Usuario>
 }
 
 interface RepositorioOfertas {
@@ -173,11 +176,15 @@ class RepositorioPerfilLocal(
         if (usuario.tipoPerfil != TipoPerfil.USUARIO_BASE) {
             return Result.failure(IllegalStateException("Solo un usuario base puede solicitar verificacion"))
         }
+        val documentoNormalizado = numeroDocumento.filter { it.isDigit() }.take(9)
+        if (documentoNormalizado.length != 9) {
+            return Result.failure(IllegalArgumentException("El numero de documento debe tener 9 digitos"))
+        }
         return db.solicitarVerificacionTrabajador(
             idUsuario = usuario.idUsuario,
             run = limpiarRun(run),
             dv = dv.trim().uppercase(),
-            numeroDocumento = numeroDocumento
+            numeroDocumento = documentoNormalizado
         ).mapCatching { db.obtenerUsuarioPorId(usuario.idUsuario) ?: usuario }
     }
 
@@ -221,6 +228,16 @@ class RepositorioPerfilLocal(
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         db.guardarUbicacionUsuario(usuario.idUsuario, config)
         return Result.success(db.obtenerUbicacionUsuario(usuario.idUsuario))
+    }
+
+    override fun actualizarFotoPerfil(uriLocal: String): Result<Usuario> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        if (uriLocal.isBlank()) {
+            return Result.failure(IllegalArgumentException("Selecciona una foto valida"))
+        }
+        db.actualizarFotoPerfilUsuario(usuario.idUsuario, uriLocal)
+        return Result.success(db.obtenerUsuarioPorId(usuario.idUsuario) ?: usuario)
     }
 
     private fun limpiarRun(run: String): String = run.filter { it.isDigit() }
@@ -310,7 +327,14 @@ class RepositorioOfertasLocal(
         formulario.titulo.trim().length > 80 -> "El titulo permite hasta 80 caracteres"
         formulario.descripcion.isBlank() -> "Ingresa la descripcion del servicio"
         formulario.descripcion.trim().length > 500 -> "La descripcion permite hasta 500 caracteres"
-        formulario.precioTexto.isBlank() -> "Ingresa una referencia de precio"
+        formulario.tipoPrecio !in listOf(
+            TipoPrecio.FIJO,
+            TipoPrecio.POR_HORA,
+            TipoPrecio.DESDE,
+            TipoPrecio.CONTACTAR
+        ) -> "Selecciona un tipo de precio valido"
+        !PrecioUtils.esMontoValido(formulario.tipoPrecio, formulario.montoBase) ->
+            "El monto debe estar entre ${PrecioUtils.MIN_MONTO} y ${PrecioUtils.MAX_MONTO}"
         formulario.idCategoriaServicio == null -> "Selecciona una categoria"
         formulario.foto == null || formulario.foto.uriLocal.isBlank() -> "Selecciona una foto para tu servicio"
         else -> null

@@ -19,7 +19,8 @@ data class Usuario(
     val preguntaRecuperacion: String = "",
     val respuestaRecuperacion: String = "",
     val verificacionTrabajadorPendiente: Boolean = false,
-    val fechaSolicitudVerificacionMs: Long? = null
+    val fechaSolicitudVerificacionMs: Long? = null,
+    val fotoPerfilUrl: String? = null
 )
 
 data class OfertaServicio(
@@ -27,6 +28,8 @@ data class OfertaServicio(
     val titulo: String,
     val descripcion: String,
     val precioTexto: String,
+    val tipoPrecio: Int = TipoPrecio.FIJO,
+    val montoBase: Int = 0,
     val disponible: Boolean,
     val fechaPublicacion: String,
     val idCategoriaServicio: Long,
@@ -34,17 +37,19 @@ data class OfertaServicio(
     val idCliente: Long? = null,
     val idFotoPortada: Long? = null,
     val nombreTrabajador: String = "",
+    val usernameTrabajador: String = "",
     val nombreCategoria: String = "",
     val puntuacionPromedio: Double = 0.0,
     val trabajadorVerificado: Boolean = false,
     val ubicacionReferencia: String = "",
-    val rangoDisponibilidadKm: Int = 20,
+    val rangoDisponibilidadM: Int = 20_000,
     val latitudReferencia: Double? = null,
     val longitudReferencia: Double? = null,
     val fotoUrlReferencia: String = "",
     val fotoNombreArchivo: String = "",
     val fotoMimeType: String = "",
-    val fotoPendienteSincronizacion: Boolean = false
+    val fotoPendienteSincronizacion: Boolean = false,
+    val fotoPerfilTrabajador: String = ""
 )
 
 data class ChatCita(
@@ -106,6 +111,8 @@ data class FormularioServicio(
     val titulo: String = "",
     val descripcion: String = "",
     val precioTexto: String = "",
+    val tipoPrecio: Int = TipoPrecio.FIJO,
+    val montoBase: Int = 0,
     val idCategoriaServicio: Long? = null,
     val disponible: Boolean = true,
     val foto: FotoServicioLocal? = null
@@ -177,6 +184,13 @@ object TipoPerfil {
     const val PREMIUM = 3
 }
 
+object TipoPrecio {
+    const val FIJO = 0
+    const val POR_HORA = 1
+    const val DESDE = 2
+    const val CONTACTAR = 3
+}
+
 data class PreguntaSeguridadConfig(
     val indice: Int,
     val pregunta: String = "",
@@ -193,5 +207,6 @@ data class UbicacionAjustesConfig(
     val detalle: String = "Sin detalle",
     val latitud: Double? = null,
     val longitud: Double? = null,
-    val rangoDisponibilidadKm: Int = 20
+    val rangoDisponibilidadM: Int = 20_000,
+    val rangoBusquedaM: Int = 20_000
 )

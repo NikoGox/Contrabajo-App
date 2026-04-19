@@ -11,12 +11,15 @@ import com.movil.contrabajo.domain.model.FotoServicioLocal
 import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
 import com.movil.contrabajo.domain.model.OfertaServicio
+import com.movil.contrabajo.domain.model.PrecioUtils
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
 import com.movil.contrabajo.domain.model.TipoPerfil
+import com.movil.contrabajo.domain.model.TipoPrecio
 import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
 import com.movil.contrabajo.domain.model.Usuario
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import kotlin.random.Random
 
 class ContrabajoSQLiteHelper(context: Context) :
     SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
@@ -43,6 +46,7 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "respuesta_recuperacion TEXT NOT NULL DEFAULT ''," +
                 "verificacion_trabajador_pendiente INTEGER NOT NULL DEFAULT 0," +
                 "fecha_solicitud_verificacion_ms INTEGER," +
+                "foto_perfil TEXT," +
                 "UNIQUE(run, dv))"
         )
         db.execSQL(
@@ -90,6 +94,8 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "descripcion TEXT NOT NULL," +
                 "detalle TEXT NOT NULL," +
                 "precio_texto TEXT NOT NULL," +
+                "tipo_precio INTEGER NOT NULL DEFAULT 0," +
+                "monto_base INTEGER NOT NULL DEFAULT 0," +
                 "disponible INTEGER NOT NULL DEFAULT 1," +
                 "fecha_publicacion TEXT NOT NULL," +
                 "id_categoria_servicio INTEGER NOT NULL," +
@@ -169,7 +175,8 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "detalle TEXT NOT NULL DEFAULT 'Sin detalle'," +
                 "latitud REAL," +
                 "longitud REAL," +
-                "rango_km INTEGER NOT NULL DEFAULT 20," +
+                "rango_disponibilidad_m INTEGER NOT NULL DEFAULT 20000," +
+                "rango_busqueda_m INTEGER NOT NULL DEFAULT 20000," +
                 "fecha_actualizacion TEXT NOT NULL)"
         )
         sembrarDatosIniciales(db)
@@ -213,7 +220,19 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("respuesta_recuperacion", usuario.respuestaRecuperacion)
             put("verificacion_trabajador_pendiente", usuario.verificacionTrabajadorPendiente.toInt())
             put("fecha_solicitud_verificacion_ms", usuario.fechaSolicitudVerificacionMs)
+            put("foto_perfil", usuario.fotoPerfilUrl)
         })
+    }
+
+    fun actualizarFotoPerfilUsuario(idUsuario: Long, fotoPerfil: String) {
+        writableDatabase.update(
+            "usuarios",
+            ContentValues().apply {
+                put("foto_perfil", fotoPerfil.trim())
+            },
+            "id_usuario = ?",
+            arrayOf(idUsuario.toString())
+        )
     }
 
     fun existeUsuario(correo: String, username: String): Boolean {
@@ -312,14 +331,15 @@ class ContrabajoSQLiteHelper(context: Context) :
         if (usuario.run != run || usuario.dv.lowercase() != dv.lowercase()) {
             return Result.failure(IllegalArgumentException("El RUN ingresado no coincide con tu registro"))
         }
-        if (numeroDocumento.isBlank()) {
-            return Result.failure(IllegalArgumentException("Ingresa el numero de documento"))
+        val documentoNormalizado = numeroDocumento.filter { it.isDigit() }.take(9)
+        if (documentoNormalizado.length != 9) {
+            return Result.failure(IllegalArgumentException("El numero de documento debe tener 9 digitos"))
         }
 
         val actualizado = writableDatabase.update(
             "usuarios",
             ContentValues().apply {
-                put("numero_documento_identidad", numeroDocumento.trim())
+                put("numero_documento_identidad", documentoNormalizado)
                 put("verificacion_trabajador_pendiente", 1)
                 put("fecha_solicitud_verificacion_ms", System.currentTimeMillis())
             },
@@ -464,7 +484,8 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     fun obtenerUbicacionUsuario(idUsuario: Long): UbicacionAjustesConfig {
         readableDatabase.rawQuery(
-            "SELECT region, comuna, calle, numero, detalle, latitud, longitud, rango_km FROM ubicaciones_usuario WHERE id_usuario = ? LIMIT 1",
+            "SELECT region, comuna, calle, numero, detalle, latitud, longitud, rango_disponibilidad_m, rango_busqueda_m " +
+                "FROM ubicaciones_usuario WHERE id_usuario = ? LIMIT 1",
             arrayOf(idUsuario.toString())
         ).use { cursor ->
             if (!cursor.moveToFirst()) {
@@ -478,7 +499,8 @@ class ContrabajoSQLiteHelper(context: Context) :
                 detalle = cursor.getString(cursor.getColumnIndexOrThrow("detalle")),
                 latitud = cursor.getDoubleNullable("latitud"),
                 longitud = cursor.getDoubleNullable("longitud"),
-                rangoDisponibilidadKm = cursor.getInt(cursor.getColumnIndexOrThrow("rango_km")).coerceIn(0, 100)
+                rangoDisponibilidadM = cursor.getInt(cursor.getColumnIndexOrThrow("rango_disponibilidad_m")).coerceAtLeast(20),
+                rangoBusquedaM = cursor.getInt(cursor.getColumnIndexOrThrow("rango_busqueda_m")).coerceAtLeast(20)
             )
         }
     }
@@ -493,7 +515,8 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("detalle", config.detalle)
             put("latitud", config.latitud)
             put("longitud", config.longitud)
-            put("rango_km", config.rangoDisponibilidadKm.coerceIn(0, 100))
+            put("rango_disponibilidad_m", config.rangoDisponibilidadM.coerceAtLeast(20))
+            put("rango_busqueda_m", config.rangoBusquedaM.coerceAtLeast(20))
             put("fecha_actualizacion", ahora())
         }
         val actualizadas = writableDatabase.update(
@@ -552,11 +575,15 @@ class ContrabajoSQLiteHelper(context: Context) :
     }
 
     fun insertarOfertaServicio(idTrabajador: Long, formulario: FormularioServicio, idFotoPortada: Long?): Long {
+        val tipoPrecio = formulario.tipoPrecio
+        val montoNormalizado = PrecioUtils.normalizarMonto(tipoPrecio, formulario.montoBase)
         return writableDatabase.insert("ofertas_servicio", null, ContentValues().apply {
             put("titulo", formulario.titulo.trim())
             put("descripcion", formulario.descripcion.trim())
             put("detalle", formulario.descripcion.trim())
-            put("precio_texto", formulario.precioTexto.trim())
+            put("precio_texto", PrecioUtils.construirPrecioTexto(tipoPrecio, montoNormalizado))
+            put("tipo_precio", tipoPrecio)
+            put("monto_base", montoNormalizado)
             put("disponible", formulario.disponible.toInt())
             put("fecha_publicacion", ahora())
             put("id_categoria_servicio", formulario.idCategoriaServicio)
@@ -566,13 +593,17 @@ class ContrabajoSQLiteHelper(context: Context) :
     }
 
     fun actualizarOfertaServicio(idOfertaServicio: Long, formulario: FormularioServicio, idFotoPortada: Long?) {
+        val tipoPrecio = formulario.tipoPrecio
+        val montoNormalizado = PrecioUtils.normalizarMonto(tipoPrecio, formulario.montoBase)
         writableDatabase.update(
             "ofertas_servicio",
             ContentValues().apply {
                 put("titulo", formulario.titulo.trim())
                 put("descripcion", formulario.descripcion.trim())
                 put("detalle", formulario.descripcion.trim())
-                put("precio_texto", formulario.precioTexto.trim())
+                put("precio_texto", PrecioUtils.construirPrecioTexto(tipoPrecio, montoNormalizado))
+                put("tipo_precio", tipoPrecio)
+                put("monto_base", montoNormalizado)
                 put("disponible", formulario.disponible.toInt())
                 put("id_categoria_servicio", formulario.idCategoriaServicio)
                 put("id_foto_portada", idFotoPortada)
@@ -714,7 +745,8 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("detalle", "Centro")
             put("latitud", -33.4468)
             put("longitud", -70.6693)
-            put("rango_km", 12)
+            put("rango_disponibilidad_m", 12_000)
+            put("rango_busqueda_m", 20_000)
             put("fecha_actualizacion", ahora())
         })
 
@@ -747,7 +779,8 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("detalle", "Cobertura urbana")
             put("latitud", -33.4302)
             put("longitud", -70.6188)
-            put("rango_km", 26)
+            put("rango_disponibilidad_m", 26_000)
+            put("rango_busqueda_m", 20_000)
             put("fecha_actualizacion", ahora())
         })
 
@@ -780,7 +813,8 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("detalle", "Sin detalle")
             putNull("latitud")
             putNull("longitud")
-            put("rango_km", 20)
+            put("rango_disponibilidad_m", 20_000)
+            put("rango_busqueda_m", 20_000)
             put("fecha_actualizacion", ahora())
         })
 
@@ -788,7 +822,9 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("titulo", "Mecanico a domicilio")
             put("descripcion", "Diagnostico y mantencion ligera en terreno")
             put("detalle", "Ofrezco servicio de mecanica automotriz a domicilio en la region metropolitana, con visita rapida, diagnostico inicial y presupuesto transparente.")
-            put("precio_texto", "Desde 25.000 CLP segun diagnostico")
+            put("precio_texto", PrecioUtils.construirPrecioTexto(TipoPrecio.DESDE, 25_000))
+            put("tipo_precio", TipoPrecio.DESDE)
+            put("monto_base", 25_000)
             put("disponible", 1)
             put("fecha_publicacion", ahora())
             put("id_categoria_servicio", 1)
@@ -818,6 +854,18 @@ class ContrabajoSQLiteHelper(context: Context) :
             listOf("Tecnico en redes wifi", "Mejoro cobertura y estabilidad en hogar u oficina.", "Desde 25.000 por instalacion"),
             listOf("Jardinero por mantencion", "Poda, limpieza y mantencion semanal de jardines.", "Desde 16.000 por visita")
         )
+        val fotosDemoRemotas = listOf(
+            "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1555963966-b7ae5404b6ed?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1581093458791-9d09f5c0b651?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=1000&q=80",
+            "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=1000&q=80"
+        )
+        val random = Random(20260418)
         trabajadoresDemo.forEachIndexed { index, trabajador ->
             val trabajadorDemoId = db.insert("usuarios", null, ContentValues().apply {
                 put("run", trabajador[4])
@@ -846,23 +894,54 @@ class ContrabajoSQLiteHelper(context: Context) :
                 put("calle", "Sin calle")
                 put("numero", "Sin numero")
                 put("detalle", "Cobertura local")
-                put("latitud", -33.45 + (index * 0.01))
-                put("longitud", -70.67 + (index * 0.008))
-                put("rango_km", 10 + (index * 3 % 40))
+                put("latitud", -33.65 + random.nextDouble() * 0.35)
+                put("longitud", -70.90 + random.nextDouble() * 0.45)
+                put("rango_disponibilidad_m", (10 + (index * 3 % 40)) * 1_000)
+                put("rango_busqueda_m", 20_000)
                 put("fecha_actualizacion", ahora(index.toLong()))
             })
 
             val publicacion = publicacionesDemo[index]
+            val fotoDemoId = db.insert("fotos", null, ContentValues().apply {
+                put("fecha_subida", ahora(index.toLong()))
+                put("enlace", fotosDemoRemotas[index % fotosDemoRemotas.size])
+                put("detalle", "Foto remota demo para tarjetas de exploracion")
+                put("nombre_archivo", "demo_${index + 1}.jpg")
+                put("mime_type", "image/jpeg")
+                put("estado_sincronizacion", "sincronizada")
+                putNull("url_remota")
+            })
             db.insert("ofertas_servicio", null, ContentValues().apply {
                 put("titulo", publicacion[0])
                 put("descripcion", publicacion[1])
                 put("detalle", publicacion[1])
-                put("precio_texto", publicacion[2])
+                val montoDemo = when (index % 4) {
+                    0 -> 18_000
+                    1 -> 120_000
+                    2 -> 22_000
+                    else -> 0
+                }
+                val tipoPrecioDemo = when (index % 4) {
+                    0 -> TipoPrecio.FIJO
+                    1 -> TipoPrecio.DESDE
+                    2 -> TipoPrecio.POR_HORA
+                    else -> TipoPrecio.CONTACTAR
+                }
+                put("precio_texto", PrecioUtils.construirPrecioTexto(tipoPrecioDemo, montoDemo))
+                put("tipo_precio", tipoPrecioDemo)
+                put("monto_base", montoDemo)
                 put("disponible", 1)
                 put("fecha_publicacion", ahora(index.toLong()))
                 put("id_categoria_servicio", (index % categoriasBase.size) + 1)
                 put("id_trabajador", trabajadorDemoId)
-                putNull("id_foto_portada")
+                put("id_foto_portada", fotoDemoId)
+            })
+            db.insert("valoraciones", null, ContentValues().apply {
+                put("voto", random.nextInt(2, 6))
+                put("fecha_voto", ahora(index.toLong()))
+                put("comentario", "Servicio demo valorado para pruebas UI.")
+                put("id_trabajador", trabajadorDemoId)
+                put("id_cliente", clienteId)
             })
         }
 
@@ -925,7 +1004,8 @@ class ContrabajoSQLiteHelper(context: Context) :
         preguntaRecuperacion = getStringNullable("pregunta_recuperacion").orEmpty(),
         respuestaRecuperacion = getStringNullable("respuesta_recuperacion").orEmpty(),
         verificacionTrabajadorPendiente = getInt(getColumnIndexOrThrow("verificacion_trabajador_pendiente")) == 1,
-        fechaSolicitudVerificacionMs = getLongNullable("fecha_solicitud_verificacion_ms")
+        fechaSolicitudVerificacionMs = getLongNullable("fecha_solicitud_verificacion_ms"),
+        fotoPerfilUrl = getStringNullable("foto_perfil")
     )
 
     private fun Cursor.toOfertaServicio(): OfertaServicio = OfertaServicio(
@@ -933,6 +1013,8 @@ class ContrabajoSQLiteHelper(context: Context) :
         titulo = getString(getColumnIndexOrThrow("titulo")),
         descripcion = getString(getColumnIndexOrThrow("descripcion")),
         precioTexto = getString(getColumnIndexOrThrow("precio_texto")),
+        tipoPrecio = getIntNullable("tipo_precio") ?: TipoPrecio.FIJO,
+        montoBase = getIntNullable("monto_base") ?: 0,
         disponible = getInt(getColumnIndexOrThrow("disponible")) == 1,
         fechaPublicacion = getString(getColumnIndexOrThrow("fecha_publicacion")),
         idCategoriaServicio = getLong(getColumnIndexOrThrow("id_categoria_servicio")),
@@ -940,17 +1022,19 @@ class ContrabajoSQLiteHelper(context: Context) :
         idCliente = getLongNullable("id_cliente"),
         idFotoPortada = getLongNullable("id_foto_portada"),
         nombreTrabajador = getStringNullable("nombre_trabajador").orEmpty(),
+        usernameTrabajador = getStringNullable("username_trabajador").orEmpty(),
         nombreCategoria = getStringNullable("nombre_categoria").orEmpty(),
         puntuacionPromedio = getDoubleNullable("puntuacion_promedio") ?: 0.0,
         trabajadorVerificado = getIntNullable("trabajador_verificado") == 1,
         ubicacionReferencia = getStringNullable("ubicacion_referencia").orEmpty(),
-        rangoDisponibilidadKm = getIntNullable("rango_disponibilidad_km") ?: 20,
+        rangoDisponibilidadM = getIntNullable("rango_disponibilidad_m") ?: 20_000,
         latitudReferencia = getDoubleNullable("latitud_referencia"),
         longitudReferencia = getDoubleNullable("longitud_referencia"),
         fotoUrlReferencia = getStringNullable("foto_url_referencia").orEmpty(),
         fotoNombreArchivo = getStringNullable("foto_nombre_archivo").orEmpty(),
         fotoMimeType = getStringNullable("foto_mime_type").orEmpty(),
-        fotoPendienteSincronizacion = getStringNullable("foto_estado_sincronizacion") == "pendiente"
+        fotoPendienteSincronizacion = getStringNullable("foto_estado_sincronizacion") == "pendiente",
+        fotoPerfilTrabajador = getStringNullable("foto_perfil_trabajador").orEmpty()
     )
 
     private fun Cursor.toChatCita(): ChatCita = ChatCita(
@@ -998,7 +1082,7 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     companion object {
         private const val DATABASE_NAME = "contrabajo_local.db"
-        private const val DATABASE_VERSION = 9
+        private const val DATABASE_VERSION = 12
         private const val SESION_EXPIRACION_MS = 30 * 60 * 1000L
         private const val VERIFICACION_TRABAJADOR_MS = 3 * 60 * 1000L
         private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
@@ -1015,15 +1099,17 @@ class ContrabajoSQLiteHelper(context: Context) :
         )
         private val consultaOfertaSelect =
             "SELECT o.*, u.nombre || ' ' || u.apellido_paterno AS nombre_trabajador, " +
+                "u.username AS username_trabajador, " +
                 "cat.nombre AS nombre_categoria, " +
                 "(COALESCE(uu.comuna, 'Santiago') || ', ' || COALESCE(uu.region, 'Region Metropolitana')) AS ubicacion_referencia, " +
                 "u.verificado AS trabajador_verificado, " +
                 "uu.latitud AS latitud_referencia, uu.longitud AS longitud_referencia, " +
-                "COALESCE(uu.rango_km, 20) AS rango_disponibilidad_km, " +
+                "COALESCE(uu.rango_disponibilidad_m, 20000) AS rango_disponibilidad_m, " +
                 "COALESCE(f.enlace, '') AS foto_url_referencia, " +
                 "COALESCE(f.nombre_archivo, '') AS foto_nombre_archivo, " +
                 "COALESCE(f.mime_type, '') AS foto_mime_type, " +
                 "COALESCE(f.estado_sincronizacion, '') AS foto_estado_sincronizacion, " +
+                "COALESCE(u.foto_perfil, '') AS foto_perfil_trabajador, " +
                 "COALESCE(AVG(v.voto), 0) AS puntuacion_promedio "
         private val consultaOfertaJoins =
                 "FROM ofertas_servicio o " +

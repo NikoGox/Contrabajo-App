@@ -1,8 +1,15 @@
 package com.movil.contrabajo.ui.screens.ajustes
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +19,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -43,12 +54,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import com.movil.contrabajo.R
+import com.movil.contrabajo.domain.model.EscalaRango
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
 import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.ui.components.BotonPrimario
@@ -56,6 +80,7 @@ import com.movil.contrabajo.ui.components.CampoContrabajo
 import com.movil.contrabajo.ui.components.CampoSecretoContrabajo
 import com.movil.contrabajo.ui.components.EncabezadoPantalla
 import com.movil.contrabajo.ui.components.EtiquetaEstado
+import com.movil.contrabajo.ui.components.OverlayPantallaCarga
 import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.ResumenPerfilLinea
 import com.movil.contrabajo.ui.components.TarjetaBase
@@ -66,6 +91,11 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 
 @Composable
 fun PantallaAjustes(
@@ -77,7 +107,7 @@ fun PantallaAjustes(
     modifier: Modifier = Modifier
 ) {
     PantallaBase(modifier = modifier, mostrarFondo = false) {
-        BarraSuperiorAjustes(titulo = "Ajustes", onVolver = onVolver)
+        BarraSuperiorAjustes(titulo = "Ajustes", onVolver = onVolver, iconoDerecha = Icons.Filled.Settings)
 
         TarjetaBase {
             EncabezadoPantalla(
@@ -131,7 +161,7 @@ fun PantallaAjustesSeguridad(
     modifier: Modifier = Modifier
 ) {
     PantallaBase(modifier = modifier, mostrarFondo = false) {
-        BarraSuperiorAjustes(titulo = "Seguridad y verificacion", onVolver = onVolver)
+        BarraSuperiorAjustes(titulo = "Seguridad y verificacion", onVolver = onVolver, iconoDerecha = Icons.Filled.Security)
 
         TarjetaBase {
             ItemAjuste(
@@ -158,7 +188,7 @@ fun PantallaVerificarCuentaTrabajador(
     LaunchedEffect(Unit) { viewModel.recargar() }
 
     PantallaBase(modifier = modifier, mostrarFondo = false) {
-        BarraSuperiorAjustes(titulo = "Verificar cuenta trabajador", onVolver = onVolver)
+        BarraSuperiorAjustes(titulo = "Verificar cuenta trabajador", onVolver = onVolver, iconoDerecha = Icons.Filled.Security)
 
         TarjetaBase {
             Text(
@@ -166,20 +196,36 @@ fun PantallaVerificarCuentaTrabajador(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            CampoContrabajo(
-                valor = uiState.runVerificacion,
-                onValueChange = viewModel::actualizarRunVerificacion,
-                etiqueta = "RUN (sin puntos)"
-            )
-            CampoContrabajo(
-                valor = uiState.dvVerificacion,
-                onValueChange = viewModel::actualizarDvVerificacion,
-                etiqueta = "DV"
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CampoContrabajo(
+                    valor = uiState.runVerificacion,
+                    onValueChange = viewModel::actualizarRunVerificacion,
+                    etiqueta = "RUN",
+                    modifier = Modifier.weight(1f),
+                    visualTransformation = FormatoRunVisualTransformation
+                )
+                Text(
+                    text = "-",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(0.08f)
+                )
+                CampoContrabajo(
+                    valor = uiState.dvVerificacion,
+                    onValueChange = viewModel::actualizarDvVerificacion,
+                    etiqueta = "DV",
+                    modifier = Modifier.weight(0.35f)
+                )
+            }
             CampoContrabajo(
                 valor = uiState.numeroDocumentoVerificacion,
                 onValueChange = viewModel::actualizarNumeroDocumentoVerificacion,
-                etiqueta = "Numero de documento"
+                etiqueta = "Numero de documento",
+                visualTransformation = FormatoDocumentoVisualTransformation
             )
 
             if (uiState.usuario?.verificacionTrabajadorPendiente == true) {
@@ -237,7 +283,7 @@ fun PantallaPreguntasSeguridad(
     var respuestasVisibles by rememberSaveable { mutableStateOf(setOf<Int>()) }
 
     PantallaBase(modifier = modifier, mostrarFondo = false) {
-        BarraSuperiorAjustes(titulo = "Preguntas de seguridad", onVolver = onVolver)
+        BarraSuperiorAjustes(titulo = "Preguntas de seguridad", onVolver = onVolver, iconoDerecha = Icons.Filled.Tune)
 
         TarjetaBase {
             Text(
@@ -385,7 +431,7 @@ fun PantallaCuenta(
     val usuario = viewModel.uiState.usuario
 
     PantallaBase(modifier = modifier, mostrarFondo = false) {
-        BarraSuperiorAjustes(titulo = "Cuenta", onVolver = onVolver)
+        BarraSuperiorAjustes(titulo = "Cuenta", onVolver = onVolver, iconoDerecha = Icons.Filled.Person)
 
         TarjetaBase {
             if (usuario == null) {
@@ -418,6 +464,8 @@ fun PantallaUbicacion(
     modifier: Modifier = Modifier
 ) {
     LaunchedEffect(Unit) { viewModel.recargar() }
+    val context = LocalContext.current
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     val uiState = viewModel.uiState
     val ubicacion = uiState.ubicacionAjustes
     var mostrarModalDireccion by rememberSaveable { mutableStateOf(false) }
@@ -425,40 +473,128 @@ fun PantallaUbicacion(
     var calleInput by rememberSaveable { mutableStateOf("") }
     var numeroInput by rememberSaveable { mutableStateOf("") }
     var detalleInput by rememberSaveable { mutableStateOf("") }
+    var posicionSliderDisponibilidad by rememberSaveable { mutableStateOf(0f) }
+    val reportarSinUbicacion = {
+        viewModel.reportarErrorUbicacion(
+            "No se pudo obtener la ubicacion actual. Mantuvimos tu ultima coordenada."
+        )
+    }
+    val actualizarUbicacionReal: () -> Unit = {
+        val tieneFine = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val prioridad = if (tieneFine) {
+            Priority.PRIORITY_HIGH_ACCURACY
+        } else {
+            Priority.PRIORITY_BALANCED_POWER_ACCURACY
+        }
+        val token = CancellationTokenSource()
+
+        fusedLocationClient.getCurrentLocation(prioridad, token.token)
+            .addOnSuccessListener { location: android.location.Location? ->
+                if (location != null) {
+                    viewModel.guardarCoordenadasGps(
+                        latitud = location.latitude,
+                        longitud = location.longitude
+                    )
+                } else {
+                    fusedLocationClient.lastLocation
+                        .addOnSuccessListener { ultima: android.location.Location? ->
+                            if (ultima != null) {
+                                viewModel.guardarCoordenadasGps(
+                                    latitud = ultima.latitude,
+                                    longitud = ultima.longitude
+                                )
+                            } else {
+                                reportarSinUbicacion()
+                            }
+                        }
+                        .addOnFailureListener { reportarSinUbicacion() }
+                }
+            }
+            .addOnFailureListener {
+                fusedLocationClient.lastLocation
+                    .addOnSuccessListener { ultima: android.location.Location? ->
+                        if (ultima != null) {
+                            viewModel.guardarCoordenadasGps(
+                                latitud = ultima.latitude,
+                                longitud = ultima.longitude
+                            )
+                        } else {
+                            reportarSinUbicacion()
+                        }
+                    }
+                    .addOnFailureListener { reportarSinUbicacion() }
+            }
+    }
+    val solicitudPermisosLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permisos ->
+        val concedido = permisos[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permisos[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (concedido) {
+            actualizarUbicacionReal()
+        } else {
+            viewModel.reportarErrorUbicacion("Debes conceder permiso de ubicacion para recalcular coordenadas.")
+        }
+    }
+
+    LaunchedEffect(ubicacion.rangoDisponibilidadM) {
+        posicionSliderDisponibilidad = EscalaRango.posicionSliderPorValor(ubicacion.rangoDisponibilidadM)
+    }
+
+    LaunchedEffect(uiState.mensajeUbicacion) {
+        val mensaje = uiState.mensajeUbicacion ?: return@LaunchedEffect
+        Toast.makeText(context, mensaje, Toast.LENGTH_SHORT).show()
+        viewModel.consumirMensajeUbicacion()
+    }
 
     PantallaBase(modifier = modifier, mostrarFondo = false, scrollable = false) {
-        BarraSuperiorAjustes(titulo = "Ubicacion", onVolver = onVolver)
+        BarraSuperiorAjustes(titulo = "Ubicacion", onVolver = onVolver, iconoDerecha = Icons.Filled.Tune)
 
-        TarjetaBase {
+        TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
             Text(
                 text = "Direccion",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-            Text("Region: ${ubicacion.region}", style = MaterialTheme.typography.bodySmall)
-            Text("Comuna: ${ubicacion.comuna}", style = MaterialTheme.typography.bodySmall)
-            Text("Calle: ${ubicacion.calle}", style = MaterialTheme.typography.bodySmall)
-            Text("Numero: ${ubicacion.numero}", style = MaterialTheme.typography.bodySmall)
-            Text("Detalle: ${ubicacion.detalle}", style = MaterialTheme.typography.bodySmall)
-            BotonPrimario(
-                texto = "Editar ubicacion",
+            Text(
+                text = "${ubicacion.calle} ${ubicacion.numero}, ${ubicacion.comuna}, ${ubicacion.region}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "Detalle: ${ubicacion.detalle}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            OutlinedButton(
                 onClick = {
                     comunaInput = ubicacion.comuna
                     calleInput = ubicacion.calle
                     numeroInput = ubicacion.numero
                     detalleInput = ubicacion.detalle
                     mostrarModalDireccion = true
-                }
-            )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Editar ubicacion") }
         }
 
         TarjetaBase {
-            Text(text = "Rango de disponibilidad: ${ubicacion.rangoDisponibilidadKm} km")
+            Text(
+                text = "Rango de disponibilidad: ${EscalaRango.formatear(ubicacion.rangoDisponibilidadM)}",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
             Slider(
-                value = ubicacion.rangoDisponibilidadKm.toFloat(),
-                onValueChange = viewModel::actualizarRangoUbicacion,
-                valueRange = 0f..100f,
-                steps = 99
+                value = posicionSliderDisponibilidad,
+                onValueChange = {
+                    posicionSliderDisponibilidad = it
+                    viewModel.actualizarRangoUbicacion(it)
+                },
+                valueRange = 0f..EscalaRango.valoresMetros.lastIndex.toFloat(),
+                steps = EscalaRango.valoresMetros.size - 2
             )
         }
 
@@ -466,27 +602,51 @@ fun PantallaUbicacion(
             MapaUbicacionOpenStreetMap(
                 latitud = ubicacion.latitud ?: -33.4489,
                 longitud = ubicacion.longitud ?: -70.6693,
-                rangoKm = ubicacion.rangoDisponibilidadKm,
+                rangoM = ubicacion.rangoDisponibilidadM,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(170.dp)
+                    .height(138.dp)
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
             )
         }
 
-        TarjetaBase {
-            BotonPrimario(
-                texto = "Obtener ubicacion",
-                onClick = viewModel::obtenerUbicacionActual
-            )
-            BotonPrimario(
-                texto = "Guardar ubicacion y rango",
-                onClick = viewModel::guardarUbicacionAjustes
-            )
-
+        TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        val tieneFine = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                        val tieneCoarse = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (tieneFine || tieneCoarse) {
+                            actualizarUbicacionReal()
+                        } else {
+                            solicitudPermisosLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Obtener ubicacion") }
+                BotonPrimario(
+                    texto = "Guardar",
+                    onClick = viewModel::guardarUbicacionAjustes,
+                    modifier = Modifier.weight(1f)
+                )
+            }
             Text(
                 text = if (ubicacion.latitud == null || ubicacion.longitud == null) {
-                    "Coordenadas opcionales: aun no definidas."
+                    "Coordenadas: sin definir"
                 } else {
                     "Coordenadas: ${"%.5f".format(ubicacion.latitud)}, ${"%.5f".format(ubicacion.longitud)}"
                 },
@@ -499,14 +659,6 @@ fun PantallaUbicacion(
             Text(
                 text = uiState.errorUbicacion,
                 color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
-        }
-        if (uiState.mensajeUbicacion != null) {
-            Text(
-                text = uiState.mensajeUbicacion,
-                color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium
             )
@@ -561,6 +713,11 @@ fun PantallaUbicacion(
             }
         )
     }
+
+    OverlayPantallaCarga(
+        visible = uiState.cargandoPantalla,
+        mensaje = "Actualizando datos..."
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -620,12 +777,13 @@ private fun ComboComunaRM(
 private fun MapaUbicacionOpenStreetMap(
     latitud: Double,
     longitud: Double,
-    rangoKm: Int,
+    rangoM: Int,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val zoom = calcularZoomPorRango(rangoKm).toDouble()
-    val radioMetros = rangoKm.coerceIn(0, 100) * 1000.0
+    val rangoNormalizadoM = EscalaRango.normalizar(rangoM)
+    val zoom = calcularZoomPorRangoM(rangoNormalizadoM).toDouble()
+    val radioMetros = rangoNormalizadoM.toDouble()
 
     LaunchedEffect(Unit) {
         Configuration.getInstance().load(
@@ -660,8 +818,9 @@ private fun MapaUbicacionOpenStreetMap(
 
             val marcador = Marker(map).apply {
                 position = centro
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                 title = "Mi ubicacion"
+                icon = ContextCompat.getDrawable(context, R.drawable.ic_pin_marcador_azul)
             }
 
             val circulo = Polygon(map).apply {
@@ -678,46 +837,99 @@ private fun MapaUbicacionOpenStreetMap(
     )
 }
 
-private fun calcularZoomPorRango(rangoKm: Int): Int = when {
-    rangoKm <= 1 -> 15
-    rangoKm <= 3 -> 14
-    rangoKm <= 7 -> 13
-    rangoKm <= 15 -> 12
-    rangoKm <= 30 -> 11
-    rangoKm <= 55 -> 10
+private fun calcularZoomPorRangoM(rangoM: Int): Int = when {
+    rangoM <= 400 -> 15
+    rangoM <= 900 -> 14
+    rangoM <= 2_000 -> 13
+    rangoM <= 5_000 -> 12
+    rangoM <= 10_000 -> 11
+    rangoM <= 20_000 -> 10
+    rangoM <= 35_000 -> 9
     else -> 9
 }
 
 @Composable
 private fun BarraSuperiorAjustes(
     titulo: String,
-    onVolver: () -> Unit
+    onVolver: () -> Unit,
+    iconoDerecha: ImageVector
 ) {
+    val honda = rememberInfiniteTransition(label = "hondaAjustes")
+    val fase by honda.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.24f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1650, easing = LinearEasing)
+        ),
+        label = "hondaEscala"
+    )
+    val alpha by honda.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1650, easing = LinearEasing)
+        ),
+        label = "hondaAlpha"
+    )
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.primary,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+        shadowElevation = 8.dp
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onVolver) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer {
+                        scaleX = fase
+                        scaleY = fase
+                        this.alpha = alpha
+                    }
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF7C4DFF).copy(alpha = 0.36f),
+                                Color(0xFF00BCD4).copy(alpha = 0.3f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onVolver) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    Text(
+                        text = titulo,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Volver",
-                    tint = MaterialTheme.colorScheme.onPrimary
+                    imageVector = iconoDerecha,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.padding(end = 12.dp)
                 )
             }
-            Text(
-                text = titulo,
-                color = MaterialTheme.colorScheme.onPrimary,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
         }
     }
 }
@@ -774,4 +986,57 @@ private fun etiquetaPerfil(tipoPerfil: Int): String = when (tipoPerfil) {
     TipoPerfil.TRABAJADOR -> "Trabajador"
     TipoPerfil.PREMIUM -> "Premium"
     else -> "Usuario base"
+}
+
+private object FormatoRunVisualTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val digitos = text.text.filter { it.isDigit() }.take(8)
+        val formateado = formatearConPuntos(digitos, intArrayOf(2, 5))
+        val mapping = crearOffsetMapping(digitos, formateado)
+        return TransformedText(AnnotatedString(formateado), mapping)
+    }
+}
+
+private object FormatoDocumentoVisualTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val digitos = text.text.filter { it.isDigit() }.take(9)
+        val formateado = formatearConPuntos(digitos, intArrayOf(3, 6))
+        val mapping = crearOffsetMapping(digitos, formateado)
+        return TransformedText(AnnotatedString(formateado), mapping)
+    }
+}
+
+private fun formatearConPuntos(digitos: String, cortes: IntArray): String {
+    if (digitos.isBlank()) return ""
+    val ordenados = cortes.sorted().distinct()
+    return buildString {
+        digitos.forEachIndexed { index, c ->
+            if (index in ordenados) append('.')
+            append(c)
+        }
+    }
+}
+
+private fun crearOffsetMapping(originalDigits: String, transformed: String): OffsetMapping {
+    return object : OffsetMapping {
+        override fun originalToTransformed(offset: Int): Int {
+            if (offset <= 0) return 0
+            var consumidos = 0
+            for (i in transformed.indices) {
+                if (transformed[i].isDigit()) consumidos++
+                if (consumidos == offset) return i + 1
+            }
+            return transformed.length
+        }
+
+        override fun transformedToOriginal(offset: Int): Int {
+            if (offset <= 0) return 0
+            val limite = offset.coerceAtMost(transformed.length)
+            var consumidos = 0
+            for (i in 0 until limite) {
+                if (transformed[i].isDigit()) consumidos++
+            }
+            return consumidos.coerceIn(0, originalDigits.length)
+        }
+    }
 }

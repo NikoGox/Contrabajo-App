@@ -1,8 +1,21 @@
 package com.movil.contrabajo.ui.components
 
+import android.net.Uri
+import android.widget.ImageView
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +50,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,16 +63,22 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -67,6 +87,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import coil.compose.AsyncImage
 import com.movil.contrabajo.domain.model.ChatCita
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.ui.navigation.RutasApp
@@ -77,8 +98,9 @@ import com.movil.contrabajo.ui.theme.CoralSuave
 import com.movil.contrabajo.ui.theme.GrisLinea
 import com.movil.contrabajo.ui.theme.SombraPetroleo
 import com.movil.contrabajo.ui.theme.TurquesaBrillante
-import android.widget.ImageView
-import android.net.Uri
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.drawWithContent
+import kotlinx.coroutines.delay
 
 @Composable
 fun FondoContrabajo(modifier: Modifier = Modifier) {
@@ -443,16 +465,116 @@ fun TarjetaOfertaServicio(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TarjetaMarketplaceCompacta(
     oferta: OfertaServicio,
     onAbrirServicio: () -> Unit,
+    onMantenerPresionCambio: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val interaccionTarjeta = remember { MutableInteractionSource() }
+    val presionada by interaccionTarjeta.collectIsPressedAsState()
+    var mantenerActiva by rememberSaveable(oferta.idOfertaServicio) { mutableStateOf(false) }
+    val glow = rememberInfiniteTransition(label = "glowTarjetaPresionada")
+    val glowRotacion by glow.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 20_000, easing = LinearEasing)
+        ),
+        label = "glowRotacionTarjeta"
+    )
+    val glowPulso by glow.animateFloat(
+        initialValue = 0.88f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 20_000, easing = LinearEasing)
+        ),
+        label = "glowPulsoTarjeta"
+    )
+    val escalaTarjeta by animateFloatAsState(
+        targetValue = if (mantenerActiva) 1.02f else 1f,
+        animationSpec = tween(durationMillis = if (mantenerActiva) 180 else 130),
+        label = "escalaTarjetaCompacta"
+    )
+
+    LaunchedEffect(presionada) {
+        if (presionada) {
+            delay(380)
+            if (presionada) {
+                mantenerActiva = true
+            }
+        } else {
+            mantenerActiva = false
+        }
+    }
+
+    LaunchedEffect(mantenerActiva) {
+        onMantenerPresionCambio(mantenerActiva)
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onAbrirServicio() },
+            .graphicsLayer {
+                scaleX = escalaTarjeta
+                scaleY = escalaTarjeta
+            }
+            .drawWithContent {
+                drawContent()
+                if (mantenerActiva) {
+                    val strokePrincipal = Stroke(width = 4.5f)
+                    val strokeSuave = Stroke(width = 10f)
+                    val corner = androidx.compose.ui.geometry.CornerRadius(20.dp.toPx(), 20.dp.toPx())
+                    val coloresLoop = listOf(
+                        Color(0xFF7C4DFF).copy(alpha = 0.92f),
+                        Color(0xFF00BCD4).copy(alpha = 0.96f),
+                        Color(0xFF2196F3).copy(alpha = 0.92f),
+                        Color(0xFF7C4DFF).copy(alpha = 0.92f)
+                    )
+
+                    rotate(
+                        degrees = glowRotacion,
+                        pivot = Offset(size.width / 2f, size.height / 2f)
+                    ) {
+                        drawRoundRect(
+                            brush = Brush.sweepGradient(
+                                colors = coloresLoop,
+                                center = Offset(size.width / 2f, size.height / 2f)
+                            ),
+                            size = size,
+                            cornerRadius = corner,
+                            style = strokePrincipal
+                        )
+                    }
+                    rotate(
+                        degrees = -glowRotacion,
+                        pivot = Offset(size.width / 2f, size.height / 2f)
+                    ) {
+                        drawRoundRect(
+                            brush = Brush.sweepGradient(
+                                colors = listOf(
+                                    Color(0xFF7C4DFF).copy(alpha = (0.16f * glowPulso).coerceIn(0f, 0.3f)),
+                                    Color(0xFF00BCD4).copy(alpha = (0.18f * glowPulso).coerceIn(0f, 0.3f)),
+                                    Color(0xFF2196F3).copy(alpha = (0.16f * glowPulso).coerceIn(0f, 0.3f)),
+                                    Color(0xFF7C4DFF).copy(alpha = (0.16f * glowPulso).coerceIn(0f, 0.3f))
+                                ),
+                                center = Offset(size.width / 2f, size.height / 2f)
+                            ),
+                            size = size,
+                            cornerRadius = corner,
+                            style = strokeSuave
+                        )
+                    }
+                }
+            }
+            .combinedClickable(
+                interactionSource = interaccionTarjeta,
+                indication = null,
+                onClick = onAbrirServicio,
+                onLongClick = {}
+            ),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -470,16 +592,16 @@ fun TarjetaMarketplaceCompacta(
                             )
                         )
                     )
-                    .padding(14.dp)
             ) {
                 VistaPreviaImagenServicio(
                     referencia = oferta.fotoUrlReferencia,
                     modifier = Modifier
                         .matchParentSize()
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                 )
 
                 Surface(
+                    modifier = Modifier.padding(10.dp),
                     shape = CircleShape,
                     color = Color.White.copy(alpha = 0.92f)
                 ) {
@@ -498,16 +620,28 @@ fun TarjetaMarketplaceCompacta(
             ) {
                 Text(
                     text = oferta.titulo,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = if (mantenerActiva) TextOverflow.Clip else TextOverflow.Ellipsis,
+                    modifier = if (mantenerActiva) {
+                        Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                    } else {
+                        Modifier
+                    }
                 )
                 Text(
                     text = oferta.precioTexto,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = if (mantenerActiva) TextOverflow.Clip else TextOverflow.Ellipsis,
+                    modifier = if (mantenerActiva) {
+                        Modifier.basicMarquee(iterations = Int.MAX_VALUE)
+                    } else {
+                        Modifier
+                    }
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -527,6 +661,12 @@ fun TarjetaMarketplaceCompacta(
                         )
                     }
                 }
+                Text(
+                    text = formatearFechaPublicacionCompacta(oferta.fechaPublicacion),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
             }
         }
     }
@@ -537,7 +677,16 @@ private fun VistaPreviaImagenServicio(
     referencia: String,
     modifier: Modifier = Modifier
 ) {
-    if (referencia.startsWith("content://") || referencia.startsWith("file://") || referencia.startsWith("android.resource://")) {
+    var errorRemoto by remember(referencia) { mutableStateOf(false) }
+    if ((referencia.startsWith("http://") || referencia.startsWith("https://")) && !errorRemoto) {
+        AsyncImage(
+            model = referencia,
+            contentDescription = null,
+            modifier = modifier,
+            contentScale = ContentScale.Crop,
+            onError = { errorRemoto = true }
+        )
+    } else if (referencia.startsWith("content://") || referencia.startsWith("file://") || referencia.startsWith("android.resource://")) {
         AndroidView(
             modifier = modifier,
             factory = { context ->
@@ -673,13 +822,13 @@ fun TarjetaChat(chat: ChatCita, onClick: (() -> Unit)? = null) {
 @Composable
 fun BarraInferior(actual: String, alNavegar: (String) -> Unit) {
     NavigationBar(
-        containerColor = TurquesaBrillante,
+        containerColor = TurquesaBrillante.copy(alpha = 0.9f),
         tonalElevation = 0.dp
     ) {
         listOf(
+            Triple(RutasApp.Perfil.ruta, "Perfil", Icons.Default.Person),
             Triple(RutasApp.Principal.ruta, "Inicio", Icons.Default.Home),
-            Triple(RutasApp.Chats.ruta, "Chats", Icons.Default.ChatBubbleOutline),
-            Triple(RutasApp.Perfil.ruta, "Perfil", Icons.Default.Person)
+            Triple(RutasApp.Chats.ruta, "Chats", Icons.Default.ChatBubbleOutline)
         ).forEach { (ruta, titulo, icono) ->
             val seleccionado = actual == ruta
             NavigationBarItem(
@@ -724,6 +873,42 @@ fun ResumenPerfilLinea(etiqueta: String, valor: String) {
 }
 
 @Composable
+fun OverlayPantallaCarga(
+    visible: Boolean,
+    mensaje: String = "Cargando..."
+) {
+    if (!visible) return
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+            shadowElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 3.dp
+                )
+                Text(
+                    text = mensaje,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun ChipAccion(texto: String) {
     Surface(
         shape = RoundedCornerShape(999.dp),
@@ -738,4 +923,14 @@ fun ChipAccion(texto: String) {
             textAlign = TextAlign.Center
         )
     }
+}
+
+private fun formatearFechaPublicacionCompacta(fecha: String): String {
+    if (fecha.length >= 16 && fecha[4] == '-' && fecha[7] == '-') {
+        val dia = fecha.substring(8, 10)
+        val mes = fecha.substring(5, 7)
+        val hora = fecha.substring(11, 16)
+        return "$dia/$mes $hora"
+    }
+    return fecha.take(16)
 }

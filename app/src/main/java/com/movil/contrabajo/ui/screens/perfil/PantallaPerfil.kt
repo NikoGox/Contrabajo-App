@@ -1,5 +1,9 @@
 package com.movil.contrabajo.ui.screens.perfil
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,10 +15,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -23,13 +30,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.ui.components.BotonPrimario
-import com.movil.contrabajo.ui.components.BotonSecundario
 import com.movil.contrabajo.ui.components.EtiquetaEstado
 import com.movil.contrabajo.ui.components.LogoContrabajo
+import com.movil.contrabajo.ui.components.OverlayPantallaCarga
 import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaBase
 import com.movil.contrabajo.ui.viewmodel.PerfilViewModel
@@ -39,20 +49,26 @@ fun PantallaPerfil(
     viewModel: PerfilViewModel,
     onAbrirCrearServicio: () -> Unit,
     onAbrirEditarServicio: () -> Unit,
-    onCerrarSesion: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState = viewModel.uiState
+    val context = LocalContext.current
+    val selectorFotoPerfilLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            viewModel.actualizarFotoPerfil(uri.toString())
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.recargar()
-    }
-
-    LaunchedEffect(uiState.sesionCerrada) {
-        if (uiState.sesionCerrada) {
-            onCerrarSesion()
-            viewModel.consumirCierreSesion()
-        }
     }
 
     PantallaBase(
@@ -65,7 +81,42 @@ fun PantallaPerfil(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                LogoContrabajo(compacto = true)
+                Box {
+                    Surface(
+                        modifier = Modifier.size(68.dp),
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                    ) {
+                        val fotoPerfil = uiState.usuario?.fotoPerfilUrl.orEmpty()
+                        if (fotoPerfil.isBlank()) {
+                            LogoContrabajo(compacto = true)
+                        } else {
+                            AsyncImage(
+                                model = fotoPerfil,
+                                contentDescription = "Foto de perfil",
+                                modifier = Modifier.fillMaxWidth(),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(26.dp)
+                            .clickable { selectorFotoPerfilLauncher.launch(arrayOf("image/*")) },
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = MaterialTheme.colorScheme.primary
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Filled.PhotoCamera,
+                                contentDescription = "Cambiar foto de perfil",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -150,18 +201,30 @@ fun PantallaPerfil(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
+                                Surface(
                                     modifier = Modifier
-                                        .size(58.dp)
-                                        .height(58.dp),
-                                    contentAlignment = Alignment.Center
+                                        .size(72.dp)
+                                        .height(72.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surface
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Build,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(34.dp)
-                                    )
+                                    if (oferta.fotoUrlReferencia.isBlank()) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Build,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(34.dp)
+                                            )
+                                        }
+                                    } else {
+                                        AsyncImage(
+                                            model = oferta.fotoUrlReferencia,
+                                            contentDescription = oferta.titulo,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    }
                                 }
                                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                     Text(
@@ -193,8 +256,18 @@ fun PantallaPerfil(
                         )
                     }
                 }
-                BotonPrimario(texto = "Editar servicio", onClick = onAbrirEditarServicio)
-                BotonSecundario(texto = "Eliminar servicio", onClick = viewModel::eliminarServicio)
+                OutlinedButton(
+                    onClick = onAbrirEditarServicio,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(8.dp))
+                    Text("Editar servicio")
+                }
             }
 
             if (uiState.errorServicio != null) {
@@ -210,9 +283,12 @@ fun PantallaPerfil(
                 EtiquetaEstado("Para verificarte ve a Ajustes > Seguridad y verificacion")
             }
         }
-
-        BotonSecundario(texto = "Cerrar sesion", onClick = viewModel::cerrarSesion)
     }
+
+    OverlayPantallaCarga(
+        visible = uiState.cargandoPantalla,
+        mensaje = "Actualizando perfil..."
+    )
 }
 
 @Composable

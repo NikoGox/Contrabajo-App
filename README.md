@@ -15,27 +15,38 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.3-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.4-Pre-Alpha
 
 
 
-> <br>• Se ajustó el registro: RUN (8 dígitos) + DV, máscara visual de RUN/teléfono, fecha de nacimiento por día/mes/año.
-> <br>• Se reforzó la validación de RUN y la duplicidad RUN+DV en la capa local.
-> <br>• Se implementó el login con opción "Recordarme" y expiración de sesión al desactivarla (en flujo local de debugging).
-> <br>• Se incorporó un menú de ajustes con acceso mediante ícono de tuerca y secciones: Seguridad y verificación, Cuenta y Ubicación.
-> <br>• Se implementó la verificación de trabajador en ajustes mediante RUN y número de documento, definida temporalmente como activación automática diferida (3 minutos) en flujo local.
-> <br>• Se agregó la configuración de 3 preguntas de seguridad con modal, guardado local y opción de mostrar/ocultar respuestas.
-> <br>• Se rediseñó el detalle de servicio con scroll interno, botón flotante de contacto, barra superior alineada y gesto lateral tipo tarjetas.
-> <br>• Se agregó una nueva pantalla para seleccionar ubicación, obteniendo coordenadas y permitiendo también ingresar la dirección manualmente.
-> <br>• Se desacopló visualmente el rango, mapa y botón para evitar la distorsión del mapa al mover el slider.
-> <br>• Se rediseñó el bloque "Dirección" para edición mediante modal: Región Metropolitana bloqueada, comuna mediante combobox (comunas RM), calle/número/detalle editables.
-> <br>• Se integró OpenStreetMap embebido (OSMDroid) en ajustes y en detalle de servicio, con marcador y círculo de rango.
-> <br>• Se agregó el guardado explícito de ubicación y rango (0–100 km) en la base de datos local por usuario.
-> <br>• Se conectó la pantalla principal para leer el rango guardado desde la BD y mostrarlo en "Rango de búsqueda actual".
-> <br>• Se activó el refresco de la pantalla principal al volver (`ON_RESUME`) para reflejar cambios de ajustes sin reiniciar la app.
-> <br>• Se aplicó filtro local de publicaciones por rango cuando existen coordenadas del usuario.
-> <br>• Se estabilizó la persistencia de la foto del servicio copiando la URI al almacenamiento interno para evitar pérdida de imagen entre vistas.
-> <br>• Se movió el botón "Cerrar sesión" al menu de ajustes (blanco con borde y texto rojo).
+> <br>• Se corrigió navegación lateral principal entre Perfil <-> Principal <-> Chats, eliminando desincronización de dirección y saltos en extremos.
+> <br>• Se mantuvo arquitectura por pantallas y se suavizaron transiciones en Ajustes para evitar animaciones agresivas al entrar/salir de subpantallas.
+> <br>• Se rediseñó gesto lateral en detalle para navegación tipo cartas (browsing izquierda/derecha), con stack visible y animaciones más fluidas.
+> <br>• Se agregó precarga de imágenes adyacentes para reducir tirones visuales en cambio de tarjetas.
+> <br>• Se ajustó comportamiento de back en detalle: si hay scroll interno, vuelve primero arriba; luego permite salir de la pantalla.
+> <br>• Se ajustó CTA flotante (contactar/editar) para ocultarse al bajar en lectura y reaparecer al subir, mejorando lectura de contenido.
+> <br>• En detalle, para publicación propia se muestra acción de editar; para publicaciones de terceros se mantiene acción de contactar.
+> <br>• Se incorporó resumen de trabajador en detalle con foto de perfil, verificado y `@username`, quitando estrellas en ese bloque según definición UX.
+> <br>• Se reforzó HU-01 en verificación trabajador: RUN + DV en línea, RUN con formato visual `xx.xxx.xxx`, documento con formato `xxx.xxx.xxx` y validación exacta de 9 dígitos.
+> <br>• Se mejoró validación por capas (UI + ViewModel + repositorio + DB) para evitar envío de verificación inválida.
+> <br>• Se separó modelo de rangos por usuario: `rango_busqueda_m` y `rango_disponibilidad_m`, ambos persistidos en SQLite (metros).
+> <br>• Se acotó rango máximo operacional a 50 km en sliders de búsqueda/disponibilidad.
+> <br>• Se dejó filtro de match por distancia real del buscador, con tolerancia de borde para casos límite cercanos al umbral.
+> <br>• Se incorporó estado vacío guiado: "Obtén tu ubicación en Ajustes > Ubicación > Obtener ubicación" para cuentas sin coordenadas útiles.
+> <br>• Se ajustó pull-to-refresh para que funcione también en estado vacío (sin depender del grid con ítems).
+> <br>• Se integró captura y guardado de ubicación del dispositivo para pruebas reales/FakeGPS, con feedback visual por toast en acciones clave.
+> <br>• Se mejoró OpenStreetMap embebido en ajustes/detalle, con pin azul centrado y visual de rango consistente.
+> <br>• Se incorporó modal de filtros/orden para marketplace: categoría, tipo de precio, solo verificados y orden por A->Z / fecha.
+> <br>• Se agregó soporte de fecha de publicación en tarjetas y detalle para ordenar y dar contexto temporal.
+> <br>• Se implementó HU-03 con precio estructurado en datos: `tipo_precio` + `monto_base`, generando `precio_texto` derivado y uniforme.
+> <br>• Tipos de precio soportados: Fijo, Por hora, Desde, Contactar para saber precio; con validación de monto entre 1 y 10.000.000 cuando aplica.
+> <br>• Se mejoró campo de monto para mostrar `$` dentro del input (visual), manteniendo guardado numérico limpio.
+> <br>• Se cargaron fotos remotas estables para publicaciones demo y se mantuvo fallback local ante error de imagen.
+> <br>• Se reforzó tarjeta compacta de exploración: título/precio en una línea, marquee por long-press y bloqueo de scroll vertical durante lectura extendida.
+> <br>• Se rediseñó resplandor de borde en long-press con loop largo continuo (20s) para transición suave sin corte visual.
+> <br>• Se ajustó buscador en topbar para mantener mismo contenedor y tamaño, transicionando a estado input blanco con borde glow (morado/cyan/azul).
+> <br>• Se incorporó overlay de carga reutilizable (fondo oscurecido + spinner) para acciones críticas y preparación de integración backend.
+> <br>• Se mantuvo persistencia local frontend-first con migración SQLite y reset controlado de demo data cuando corresponde.
 
 
 

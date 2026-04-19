@@ -24,9 +24,9 @@ sealed class RutasApp(val ruta: String) {
 
     companion object {
         private val rutasPrincipales = listOf(
+            Perfil.ruta,
             Principal.ruta,
-            Chats.ruta,
-            Perfil.ruta
+            Chats.ruta
         )
 
         fun esRutaPrincipal(ruta: String?): Boolean = indiceRutaPrincipal(ruta) >= 0

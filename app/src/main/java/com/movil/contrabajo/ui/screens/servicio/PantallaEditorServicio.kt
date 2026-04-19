@@ -12,13 +12,21 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -28,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,9 +53,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import com.movil.contrabajo.domain.model.PrecioUtils
+import com.movil.contrabajo.domain.model.TipoPrecio
 import com.movil.contrabajo.ui.components.BotonPrimario
 import com.movil.contrabajo.ui.components.BotonSecundario
 import com.movil.contrabajo.ui.components.CampoContrabajo
+import com.movil.contrabajo.ui.components.OverlayPantallaCarga
 import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaBase
 import com.movil.contrabajo.ui.viewmodel.PerfilViewModel
@@ -66,6 +78,7 @@ fun PantallaEditorServicio(
     var formularioActivoVisto by rememberSaveable { mutableStateOf(false) }
     var categoriasDesplegadas by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUriTexto by rememberSaveable { mutableStateOf<String?>(null) }
+    var mostrarConfirmacionEliminar by rememberSaveable { mutableStateOf(false) }
 
     val selectorFotoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -168,10 +181,14 @@ fun PantallaEditorServicio(
                 label = { Text("Descripcion del servicio") },
                 minLines = 4
             )
-            CampoContrabajo(
-                valor = uiState.formularioServicio.precioTexto,
-                onValueChange = viewModel::actualizarPrecioServicio,
-                etiqueta = "Precio (texto libre)"
+            SelectorTipoPrecio(
+                tipoPrecio = uiState.formularioServicio.tipoPrecio,
+                onSeleccionar = viewModel::actualizarTipoPrecioServicio
+            )
+            EntradaPrecio(
+                tipoPrecio = uiState.formularioServicio.tipoPrecio,
+                montoBase = uiState.formularioServicio.montoBase,
+                onMontoChange = viewModel::actualizarPrecioServicio
             )
 
             val categoriaSeleccionada = uiState.categorias
@@ -282,8 +299,191 @@ fun PantallaEditorServicio(
                 texto = "Cancelar",
                 onClick = { viewModel.cancelarFormularioServicio() }
             )
+            if (modo == "editar") {
+                Button(
+                    onClick = { mostrarConfirmacionEliminar = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Eliminar servicio")
+                }
+            }
         }
     }
+
+    if (mostrarConfirmacionEliminar) {
+        AlertDialog(
+            onDismissRequest = { mostrarConfirmacionEliminar = false },
+            title = { Text("Eliminar servicio") },
+            text = { Text("Esta accion eliminara tu publicacion. ¿Deseas continuar?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    mostrarConfirmacionEliminar = false
+                    viewModel.eliminarServicio()
+                }) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarConfirmacionEliminar = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    OverlayPantallaCarga(
+        visible = uiState.cargandoPantalla,
+        mensaje = if (modo == "editar") "Guardando cambios..." else "Guardando servicio..."
+    )
+}
+
+@Composable
+private fun SelectorTipoPrecio(
+    tipoPrecio: Int,
+    onSeleccionar: (Int) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Tipo de precio",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OpcionTipoPrecio("Fijo", tipoPrecio == TipoPrecio.FIJO) { onSeleccionar(TipoPrecio.FIJO) }
+            OpcionTipoPrecio("/hora", tipoPrecio == TipoPrecio.POR_HORA) { onSeleccionar(TipoPrecio.POR_HORA) }
+            OpcionTipoPrecio("Desde", tipoPrecio == TipoPrecio.DESDE) { onSeleccionar(TipoPrecio.DESDE) }
+            OpcionTipoPrecio("Contactar", tipoPrecio == TipoPrecio.CONTACTAR) { onSeleccionar(TipoPrecio.CONTACTAR) }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.OpcionTipoPrecio(
+    texto: String,
+    activa: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .weight(1f)
+            .clickable(onClick = onClick),
+        shape = MaterialTheme.shapes.small,
+        color = if (activa) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        tonalElevation = if (activa) 4.dp else 0.dp
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = texto,
+                color = if (activa) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun EntradaPrecio(
+    tipoPrecio: Int,
+    montoBase: Int,
+    onMontoChange: (String) -> Unit
+) {
+    val textoMonto = if (montoBase <= 0) "" else PrecioUtils.formatearMonto(montoBase)
+    when (tipoPrecio) {
+        TipoPrecio.CONTACTAR -> {
+            OutlinedTextField(
+                value = "Contactar para saber precio",
+                onValueChange = {},
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Precio") },
+                readOnly = true,
+                enabled = false
+            )
+        }
+
+        TipoPrecio.DESDE -> {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Desde",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                CampoMontoConMoneda(
+                    valor = textoMonto,
+                    onValueChange = onMontoChange,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        TipoPrecio.POR_HORA -> {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CampoMontoConMoneda(
+                    valor = textoMonto,
+                    onValueChange = onMontoChange,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "/hora",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        else -> {
+            CampoMontoConMoneda(
+                valor = textoMonto,
+                onValueChange = onMontoChange
+            )
+        }
+    }
+}
+
+@Composable
+private fun CampoMontoConMoneda(
+    valor: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = valor,
+        onValueChange = { onValueChange(it.filter { c -> c.isDigit() }) },
+        modifier = modifier.fillMaxWidth(),
+        label = { Text("Monto") },
+        leadingIcon = {
+            Text(
+                text = "$",
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        singleLine = true
+    )
 }
 
 private fun obtenerNombreArchivo(context: android.content.Context, uriTexto: String): String {
