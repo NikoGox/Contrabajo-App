@@ -2,4 +2,10 @@
 <resources>
 
     <style name="Theme.Contrabajo" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.Contrabajo.Splash" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#0D7F88</item>
+        <item name="android:navigationBarColor">#0A5F8A</item>
+        <item name="android:windowBackground">#E8F8F8</item>
+    </style>
 </resources>

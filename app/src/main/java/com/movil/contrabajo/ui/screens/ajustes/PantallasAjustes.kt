@@ -7,7 +7,6 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,9 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.AnnotatedString
@@ -91,11 +88,6 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 
 @Composable
 fun PantallaAjustes(
@@ -854,82 +846,44 @@ private fun BarraSuperiorAjustes(
     onVolver: () -> Unit,
     iconoDerecha: ImageVector
 ) {
-    val honda = rememberInfiniteTransition(label = "hondaAjustes")
-    val fase by honda.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.24f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1650, easing = LinearEasing)
-        ),
-        label = "hondaEscala"
-    )
-    val alpha by honda.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1650, easing = LinearEasing)
-        ),
-        label = "hondaAlpha"
-    )
-
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.primary,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
         shadowElevation = 8.dp
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .graphicsLayer {
-                        scaleX = fase
-                        scaleY = fase
-                        this.alpha = alpha
-                    }
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF7C4DFF).copy(alpha = 0.36f),
-                                Color(0xFF00BCD4).copy(alpha = 0.3f),
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
-
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .padding(horizontal = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onVolver) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                    Text(
-                        text = titulo,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                IconButton(onClick = onVolver) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = MaterialTheme.colorScheme.onPrimary
                     )
                 }
-                Icon(
-                    imageVector = iconoDerecha,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.padding(end = 12.dp)
+                Text(
+                    text = titulo,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
+            Icon(
+                imageVector = iconoDerecha,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.padding(end = 12.dp)
+            )
         }
     }
 }

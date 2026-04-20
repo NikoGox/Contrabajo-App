@@ -725,19 +725,32 @@ class DetalleServicioViewModel(
         private set
 
     private var ofertaActualId: Long? = null
+    private var ofertasContextoMarketplace: List<OfertaServicio>? = null
+
+    fun prepararContextoMarketplace(ofertasVisibles: List<OfertaServicio>) {
+        ofertasContextoMarketplace = ofertasVisibles
+    }
 
     fun cargarOferta(idOfertaServicio: Long, forzarRecarga: Boolean = false) {
         if (!forzarRecarga && ofertaActualId == idOfertaServicio && uiState.ofertaActual != null) return
         ofertaActualId = idOfertaServicio
         val idUsuarioActual = repositorioPerfil.obtenerPerfilActual()?.idUsuario
-        val ofertas = repositorioOfertas.obtenerOfertasMarketplace()
+        val ofertas = ofertasContextoMarketplace
+            ?.takeIf { it.isNotEmpty() }
+            ?: repositorioOfertas.obtenerOfertasMarketplace()
         if (ofertas.isEmpty()) {
             val oferta = repositorioOfertas.obtenerOfertaPorId(idOfertaServicio)
             uiState = uiState.copy(ofertas = listOfNotNull(oferta), indiceActual = 0, idUsuarioActual = idUsuarioActual)
             return
         }
-        val indice = ofertas.indexOfFirst { it.idOfertaServicio == idOfertaServicio }.takeIf { it >= 0 } ?: 0
-        uiState = uiState.copy(ofertas = ofertas, indiceActual = indice, idUsuarioActual = idUsuarioActual)
+        val indice = ofertas.indexOfFirst { it.idOfertaServicio == idOfertaServicio }
+        if (indice < 0) {
+            val fallback = repositorioOfertas.obtenerOfertasMarketplace()
+            val indiceFallback = fallback.indexOfFirst { it.idOfertaServicio == idOfertaServicio }.takeIf { it >= 0 } ?: 0
+            uiState = uiState.copy(ofertas = fallback, indiceActual = indiceFallback, idUsuarioActual = idUsuarioActual)
+        } else {
+            uiState = uiState.copy(ofertas = ofertas, indiceActual = indice, idUsuarioActual = idUsuarioActual)
+        }
     }
 
     fun recargarOfertaActual() {
@@ -753,5 +766,13 @@ class DetalleServicioViewModel(
     fun retrocederTarjeta() {
         val nuevoIndice = (uiState.indiceActual - 1).coerceAtLeast(0)
         uiState = uiState.copy(indiceActual = nuevoIndice)
+    }
+
+    fun establecerIndiceActual(indice: Int) {
+        if (uiState.ofertas.isEmpty()) return
+        val indiceNormalizado = indice.coerceIn(0, uiState.ofertas.lastIndex)
+        if (indiceNormalizado != uiState.indiceActual) {
+            uiState = uiState.copy(indiceActual = indiceNormalizado)
+        }
     }
 }

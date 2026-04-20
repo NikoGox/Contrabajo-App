@@ -1,3 +1,54 @@
+VERSION 0.4.1-Pre-Alpha
+───────
+├─• Iteración de ajuste fino UX/UI sobre `0.4-Pre-Alpha`, enfocada en estabilidad de navegación y fluidez visual en dispositivo real.
+├─• Se agregó `SplashActivity` personalizada con `ct_icon`, barra de progreso y transición inicial para mejorar la entrada a la app.
+├─• Se actualizó inicio de sesión automático (recordarme) con carga controlada para evitar saltos bruscos al entrar al shell principal.
+├─• Se rehízo topbar de búsqueda en Principal con un solo contenedor estable (sin doble borde), glow azul/cyan/verde y cierre por toque fuera.
+├─• Se normalizó cancelación de búsqueda al tocar tarjeta/rango/filtros, manteniendo el texto escrito para continuidad de uso.
+├─• Se corrigió long-press en tarjetas de exploración para evitar solapes/deformaciones y mantener el grid estable.
+├─• Se estabilizó swipe horizontal en detalle con enfoque de 3 tarjetas vivas (anterior/actual/siguiente) y menor tirón visual.
+├─• Se mantuvo vinculación entre Exploración y Detalle (mismo orden/dataset/filtros al abrir publicaciones).
+├─• Se optimizó render del mapa en detalle para reducir parpadeo e invalidaciones innecesarias durante gestos.
+├─• Se ajustó transición de ruta Servicio: entra desde abajo y sale hacia abajo con desplazamiento medio + fade.
+├─• Se eliminó UI bloqueante al abrir detalle (sin oscurecer, sin spinner, sin cinta/texto), dejando precarga silenciosa.
+├─• Se retiró overlay visual interno de "Preparando tarjetas...", manteniendo solo bloqueo táctil silencioso cuando falta precarga.
+└─• Se homologó la geometría de topbars entre Principal/Detalle/Ajustes y se desactivó animación defectuosa en Ajustes.
+
+
+
+VERSION 0.4-Pre-Alpha
+───────
+├─• Se corrigió navegación lateral principal entre Perfil <-> Principal <-> Chats, eliminando desincronización de dirección y saltos en extremos.
+├─• Se mantuvo arquitectura por pantallas y se suavizaron transiciones en Ajustes para evitar animaciones agresivas al entrar/salir de subpantallas.
+├─• Se rediseñó gesto lateral en detalle para navegación tipo cartas (browsing izquierda/derecha), con stack visible y animaciones más fluidas.
+├─• Se agregó precarga de imágenes adyacentes para reducir tirones visuales en cambio de tarjetas.
+├─• Se ajustó comportamiento de back en detalle: si hay scroll interno, vuelve primero arriba; luego permite salir de la pantalla.
+├─• Se ajustó CTA flotante (contactar/editar) para ocultarse al bajar en lectura y reaparecer al subir, mejorando lectura de contenido.
+├─• En detalle, para publicación propia se muestra acción de editar; para publicaciones de terceros se mantiene acción de contactar.
+├─• Se incorporó resumen de trabajador en detalle con foto de perfil, verificado y `@username`, quitando estrellas en ese bloque según definición UX.
+├─• Se reforzó HU-01 en verificación trabajador: RUN + DV en línea, RUN con formato visual `xx.xxx.xxx`, documento con formato `xxx.xxx.xxx` y validación exacta de 9 dígitos.
+├─• Se mejoró validación por capas (UI + ViewModel + repositorio + DB) para evitar envío de verificación inválida.
+├─• Se separó modelo de rangos por usuario: `rango_busqueda_m` y `rango_disponibilidad_m`, ambos persistidos en SQLite (metros).
+├─• Se acotó rango máximo operacional a 50 km en sliders de búsqueda/disponibilidad.
+├─• Se dejó filtro de match por distancia real del buscador, con tolerancia de borde para casos límite cercanos al umbral.
+├─• Se incorporó estado vacío guiado: "Obtén tu ubicación en Ajustes > Ubicación > Obtener ubicación" para cuentas sin coordenadas útiles.
+├─• Se ajustó pull-to-refresh para que funcione también en estado vacío (sin depender del grid con ítems).
+├─• Se integró captura y guardado de ubicación del dispositivo para pruebas reales/FakeGPS, con feedback visual por toast en acciones clave.
+├─• Se mejoró OpenStreetMap embebido en ajustes/detalle, con pin azul centrado y visual de rango consistente.
+├─• Se incorporó modal de filtros/orden para marketplace: categoría, tipo de precio, solo verificados y orden por A->Z / fecha.
+├─• Se agregó soporte de fecha de publicación en tarjetas y detalle para ordenar y dar contexto temporal.
+├─• Se implementó HU-03 con precio estructurado en datos: `tipo_precio` + `monto_base`, generando `precio_texto` derivado y uniforme.
+├─• Tipos de precio soportados: Fijo, Por hora, Desde, Contactar para saber precio; con validación de monto entre 1 y 10.000.000 cuando aplica.
+├─• Se mejoró campo de monto para mostrar `$` dentro del input (visual), manteniendo guardado numérico limpio.
+├─• Se cargaron fotos remotas estables para publicaciones demo y se mantuvo fallback local ante error de imagen.
+├─• Se reforzó tarjeta compacta de exploración: título/precio en una línea, marquee por long-press y bloqueo de scroll vertical durante lectura extendida.
+├─• Se rediseñó resplandor de borde en long-press con loop largo continuo (20s) para transición suave sin corte visual.
+├─• Se ajustó buscador en topbar para mantener mismo contenedor y tamaño, transicionando a estado input blanco con borde glow (morado/cyan/azul).
+├─• Se incorporó overlay de carga reutilizable (fondo oscurecido + spinner) para acciones críticas y preparación de integración backend.
+└─• Se mantuvo persistencia local frontend-first con migración SQLite y reset controlado de demo data cuando corresponde.
+
+
+
 VERSION 0.3-Pre-Alpha
 ───────
 ├─• Se ajustó el registro: RUN (8 dígitos) + DV, máscara visual de RUN/teléfono, fecha de nacimiento por día/mes/año.
@@ -17,7 +68,6 @@ VERSION 0.3-Pre-Alpha
 ├─• Se aplicó filtro local de publicaciones por rango cuando existen coordenadas del usuario.
 ├─• Se estabilizó la persistencia de la foto del servicio copiando la URI al almacenamiento interno para evitar pérdida de imagen entre vistas.
 └─• Se movió el botón "Cerrar sesión" al menu de ajustes (blanco con borde y texto rojo).
-
 
 
 

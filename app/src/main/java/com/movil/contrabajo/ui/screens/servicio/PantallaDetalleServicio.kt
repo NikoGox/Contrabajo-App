@@ -8,13 +8,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,9 +22,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,27 +53,27 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
@@ -92,6 +94,8 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
@@ -108,14 +112,25 @@ fun PantallaDetalleServicio(
 ) {
     val uiState = viewModel.uiState
     val context = LocalContext.current
+    val densidadPantalla = LocalDensity.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    var desplazamientoX by remember { mutableFloatStateOf(0f) }
-    var animandoSwipe by remember { mutableStateOf(false) }
+    val pagerState = rememberPagerState(
+        initialPage = uiState.indiceActual.coerceAtLeast(0),
+        pageCount = { uiState.ofertas.size.coerceAtLeast(1) }
+    )
     var mostrarCta by remember { mutableStateOf(true) }
-    var anchoContenedorPx by remember { mutableIntStateOf(1) }
-    val desplazamientoAnimado = desplazamientoX
     val scope = rememberCoroutineScope()
     var scrollActivo by remember { mutableStateOf<androidx.compose.foundation.ScrollState?>(null) }
+    var paginaAncla by rememberSaveable { mutableIntStateOf(uiState.indiceActual.coerceAtLeast(0)) }
+    var indiceDetalleCompleto by rememberSaveable { mutableIntStateOf(uiState.indiceActual.coerceAtLeast(0)) }
+    var saliendoPantalla by rememberSaveable { mutableStateOf(false) }
+    var swipeEnfriamiento by rememberSaveable { mutableStateOf(false) }
+    val paginasListas = remember { mutableStateMapOf<Int, Boolean>() }
+    var direccionSwipeActiva by rememberSaveable { mutableIntStateOf(0) } // 1 avance, -1 retroceso
+    val comportamientoFlingPager = PagerDefaults.flingBehavior(
+        state = pagerState,
+        pagerSnapDistance = PagerSnapDistance.atMost(1)
+    )
 
     val volverConScroll: () -> Unit = {
         scope.launch {
@@ -123,8 +138,11 @@ fun PantallaDetalleServicio(
             if (scroll != null && scroll.value > 0) {
                 mostrarCta = true
                 scroll.animateScrollTo(0)
+            } else if (!saliendoPantalla) {
+                mostrarCta = false
+                saliendoPantalla = true
             } else {
-                onVolver()
+                Unit
             }
         }
     }
@@ -145,209 +163,329 @@ fun PantallaDetalleServicio(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(uiState.indiceActual, uiState.ofertas) {
-        val indicesPrefetch = listOf(
-            uiState.indiceActual - 1,
-            uiState.indiceActual + 1
-        )
-        indicesPrefetch
-            .mapNotNull { uiState.ofertas.getOrNull(it)?.fotoUrlReferencia }
-            .filter { it.startsWith("http://") || it.startsWith("https://") }
-            .distinct()
-            .forEach { url ->
-                context.imageLoader.enqueue(
-                    ImageRequest.Builder(context)
-                        .data(url)
-                        .memoryCacheKey(url)
-                        .diskCacheKey(url)
-                        .build()
-                )
-            }
+    LaunchedEffect(uiState.indiceActual, uiState.ofertas.size) {
+        if (uiState.ofertas.isEmpty()) return@LaunchedEffect
+        val indiceDestino = uiState.indiceActual.coerceIn(0, uiState.ofertas.lastIndex)
+        if (pagerState.currentPage != indiceDestino) {
+            pagerState.scrollToPage(indiceDestino)
+        }
+        if (!pagerState.isScrollInProgress) {
+            paginaAncla = indiceDestino
+            indiceDetalleCompleto = indiceDestino
+        }
     }
+
+    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress, uiState.ofertas.size) {
+        if (uiState.ofertas.isEmpty()) return@LaunchedEffect
+        if (!pagerState.isScrollInProgress && pagerState.currentPage in uiState.ofertas.indices) {
+            paginaAncla = pagerState.currentPage
+        }
+        if (
+            !pagerState.isScrollInProgress &&
+            pagerState.currentPage in uiState.ofertas.indices &&
+            pagerState.currentPage != uiState.indiceActual
+        ) {
+            viewModel.establecerIndiceActual(pagerState.currentPage)
+        }
+    }
+
+    LaunchedEffect(
+        pagerState.isScrollInProgress,
+        pagerState.currentPage,
+        pagerState.currentPageOffsetFraction,
+        paginaAncla
+    ) {
+        if (!pagerState.isScrollInProgress) {
+            direccionSwipeActiva = 0
+            return@LaunchedEffect
+        }
+        if (direccionSwipeActiva != 0) return@LaunchedEffect
+        val desplazamientoBruto = (pagerState.currentPage - paginaAncla) + pagerState.currentPageOffsetFraction
+        if (abs(desplazamientoBruto) > 0.02f) {
+            direccionSwipeActiva = if (desplazamientoBruto > 0f) 1 else -1
+        }
+    }
+
+    LaunchedEffect(pagerState.currentPage, pagerState.isScrollInProgress) {
+        if (!pagerState.isScrollInProgress) {
+            swipeEnfriamiento = true
+            delay(70)
+            indiceDetalleCompleto = pagerState.currentPage
+            delay(50)
+            swipeEnfriamiento = false
+        }
+    }
+
+    LaunchedEffect(uiState.ofertas) {
+        paginasListas.clear()
+        uiState.ofertas.indices.forEach { indice -> paginasListas[indice] = false }
+    }
+
+    LaunchedEffect(pagerState.currentPage, uiState.ofertas) {
+        if (uiState.ofertas.isEmpty()) return@LaunchedEffect
+        val indicesPrefetch = listOf(
+            pagerState.currentPage,
+            pagerState.currentPage - 1,
+            pagerState.currentPage + 1
+        )
+            .filter { it in uiState.ofertas.indices }
+            .distinct()
+
+        indicesPrefetch.forEach { indice ->
+            launch {
+                if (paginasListas[indice] == true) return@launch
+                val referencia = uiState.ofertas[indice].fotoUrlReferencia
+                if (referencia.startsWith("http://") || referencia.startsWith("https://")) {
+                    runCatching {
+                        context.imageLoader.execute(
+                            ImageRequest.Builder(context)
+                                .data(referencia)
+                                .memoryCacheKey(referencia)
+                                .diskCacheKey(referencia)
+                                .build()
+                        )
+                    }
+                    paginasListas[indice] = true
+                } else {
+                    paginasListas[indice] = true
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(saliendoPantalla) {
+        if (saliendoPantalla) {
+            delay(170)
+            onVolver()
+        }
+    }
+
+    val indiceActualVisible = pagerState.currentPage.coerceIn(0, (uiState.ofertas.size - 1).coerceAtLeast(0))
+    val existeAnterior = indiceActualVisible > 0
+    val existeSiguiente = indiceActualVisible < uiState.ofertas.lastIndex
+    val actualLista = paginasListas[indiceActualVisible] == true
+    val anteriorLista = !existeAnterior || paginasListas[indiceActualVisible - 1] == true
+    val siguienteLista = !existeSiguiente || paginasListas[indiceActualVisible + 1] == true
+    val puedeDeslizar = uiState.ofertas.size > 1 &&
+        !saliendoPantalla &&
+        !swipeEnfriamiento &&
+        actualLista &&
+        anteriorLista &&
+        siguienteLista
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 12.dp)
+        AnimatedVisibility(
+            visible = !saliendoPantalla,
+            enter = fadeIn(animationSpec = tween(140)) + slideInVertically(
+                initialOffsetY = { it / 10 },
+                animationSpec = tween(180, easing = FastOutSlowInEasing)
+            ),
+            exit = fadeOut(animationSpec = tween(120)) + slideOutVertically(
+                targetOffsetY = { it / 12 },
+                animationSpec = tween(160, easing = FastOutSlowInEasing)
+            )
         ) {
-            BarraSuperiorDetalle(onVolver = volverConScroll)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .padding(horizontal = 18.dp, vertical = 12.dp)
+            ) {
+                BarraSuperiorDetalle(onVolver = volverConScroll)
 
-            val oferta = uiState.ofertaActual
-            if (oferta == null) {
-                Text(
-                    text = "No se pudo cargar la oferta.",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(16.dp)
-                )
-            } else {
-                val indiceActual = uiState.indiceActual
-                val indicePrevio = (indiceActual - 1).takeIf { it >= 0 }
-                val indiceSiguiente = (indiceActual + 1).takeIf { it < uiState.ofertas.size }
-                val progresoSwipe = (abs(desplazamientoAnimado) / 420f).coerceIn(0f, 1f)
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .onSizeChanged { anchoContenedorPx = it.width.coerceAtLeast(1) }
-                        .pointerInput(uiState.indiceActual, uiState.ofertas.size, animandoSwipe) {
-                            detectHorizontalDragGestures(
-                                onHorizontalDrag = { change, dragAmount ->
-                                    if (animandoSwipe) return@detectHorizontalDragGestures
-                                    change.consume()
-                                    val limite = anchoContenedorPx * 0.95f
-                                    desplazamientoX = (desplazamientoX + dragAmount).coerceIn(-limite, limite)
-                                },
-                                onDragEnd = {
-                                    if (animandoSwipe) return@detectHorizontalDragGestures
-                                    val umbral = (anchoContenedorPx * 0.22f).coerceAtLeast(120f)
-                                    val destino = when {
-                                        desplazamientoX > umbral && indicePrevio != null -> anchoContenedorPx.toFloat()
-                                        desplazamientoX < -umbral && indiceSiguiente != null -> -anchoContenedorPx.toFloat()
-                                        else -> 0f
-                                    }
-                                    when {
-                                        destino > 0f -> {
-                                            scope.launch {
-                                                animandoSwipe = true
-                                                val anim = Animatable(desplazamientoX)
-                                                anim.animateTo(
-                                                    targetValue = destino,
-                                                    animationSpec = tween(
-                                                        durationMillis = 190,
-                                                        easing = FastOutSlowInEasing
-                                                    )
-                                                ) {
-                                                    desplazamientoX = value
-                                                }
-                                                viewModel.retrocederTarjeta()
-                                                desplazamientoX = 0f
-                                                animandoSwipe = false
-                                            }
-                                        }
-                                        destino < 0f -> {
-                                            scope.launch {
-                                                animandoSwipe = true
-                                                val anim = Animatable(desplazamientoX)
-                                                anim.animateTo(
-                                                    targetValue = destino,
-                                                    animationSpec = tween(
-                                                        durationMillis = 190,
-                                                        easing = FastOutSlowInEasing
-                                                    )
-                                                ) {
-                                                    desplazamientoX = value
-                                                }
-                                                viewModel.avanzarTarjeta()
-                                                desplazamientoX = 0f
-                                                animandoSwipe = false
-                                            }
-                                        }
-                                        else -> {
-                                            scope.launch {
-                                                animandoSwipe = true
-                                                val anim = Animatable(desplazamientoX)
-                                                anim.animateTo(
-                                                    targetValue = 0f,
-                                                    animationSpec = spring(
-                                                        dampingRatio = 0.8f,
-                                                        stiffness = 420f
-                                                    )
-                                                ) {
-                                                    desplazamientoX = value
-                                                }
-                                                desplazamientoX = 0f
-                                                animandoSwipe = false
-                                            }
-                                        }
-                                    }
-                                },
-                                onDragCancel = {
-                                    if (animandoSwipe) return@detectHorizontalDragGestures
-                                    scope.launch {
-                                        val anim = Animatable(desplazamientoX)
-                                        anim.animateTo(
-                                            targetValue = 0f,
-                                            animationSpec = spring(
-                                                dampingRatio = 0.8f,
-                                                stiffness = 420f
-                                            )
-                                        ) {
-                                            desplazamientoX = value
-                                        }
-                                        desplazamientoX = 0f
-                                    }
-                                }
-                            )
-                        }
-                ) {
-                    if (desplazamientoAnimado > 0f && indicePrevio != null) {
-                        key(uiState.ofertas[indicePrevio].idOfertaServicio) {
-                            TarjetaDetallePrevisualizacion(
-                                oferta = uiState.ofertas[indicePrevio],
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .offset {
-                                        IntOffset(
-                                            x = (-110f * (1f - progresoSwipe)).dp.roundToPx(),
-                                            y = (-24f * (1f - progresoSwipe)).dp.roundToPx()
-                                        )
-                                    }
-                                    .graphicsLayer {
-                                        scaleX = 0.95f + (0.05f * progresoSwipe)
-                                        scaleY = 0.95f + (0.05f * progresoSwipe)
-                                        alpha = 0.86f + (0.14f * progresoSwipe)
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 12.dp)
-                            )
-                        }
-                    }
-                    if (desplazamientoAnimado < 0f && indiceSiguiente != null) {
-                        key(uiState.ofertas[indiceSiguiente].idOfertaServicio) {
-                            TarjetaDetallePrevisualizacion(
-                                oferta = uiState.ofertas[indiceSiguiente],
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .offset {
-                                        IntOffset(
-                                            x = (110f * (1f - progresoSwipe)).dp.roundToPx(),
-                                            y = (-12f * (1f - progresoSwipe)).dp.roundToPx()
-                                        )
-                                    }
-                                    .graphicsLayer {
-                                        scaleX = 0.95f + (0.05f * progresoSwipe)
-                                        scaleY = 0.95f + (0.05f * progresoSwipe)
-                                        alpha = 0.86f + (0.14f * progresoSwipe)
-                                    }
-                                    .padding(horizontal = 8.dp, vertical = 12.dp)
-                            )
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .offset {
-                                IntOffset(
-                                    x = desplazamientoAnimado.roundToInt(),
-                                    y = 0
-                                )
+                val oferta = uiState.ofertaActual
+                if (oferta == null) {
+                    Text(
+                        text = "No se pudo cargar la oferta.",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                } else {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .navigationBarsPadding()
+                                .clipToBounds(),
+                            beyondViewportPageCount = 1,
+                            contentPadding = PaddingValues(horizontal = 6.dp),
+                            pageSpacing = 2.dp,
+                            flingBehavior = comportamientoFlingPager,
+                            userScrollEnabled = puedeDeslizar
+                        ) { page ->
+                            val ofertaPagina = uiState.ofertas.getOrNull(page) ?: return@HorizontalPager
+                            val progresoAnclaBruto = (pagerState.currentPage - paginaAncla) + pagerState.currentPageOffsetFraction
+                            val progresoAncla = progresoAnclaBruto.coerceIn(-1f, 1f)
+                            val intensidad = abs(progresoAncla).coerceIn(0f, 1f)
+                            val avance = when {
+                                direccionSwipeActiva > 0 -> intensidad
+                                direccionSwipeActiva < 0 -> 0f
+                                else -> progresoAncla.coerceAtLeast(0f)
                             }
-                    ) {
-                        key(oferta.idOfertaServicio) {
-                            TarjetaDetalleOferta(
-                                oferta = oferta,
-                                bloquearScrollVertical = abs(desplazamientoAnimado) > 6f,
-                                onScrollEstado = { scrollActivo = it },
-                                onDireccionScroll = { mostrar ->
-                                    if (abs(desplazamientoAnimado) <= 6f) {
-                                        mostrarCta = mostrar
+                            val retroceso = when {
+                                direccionSwipeActiva < 0 -> intensidad
+                                direccionSwipeActiva > 0 -> 0f
+                                else -> (-progresoAncla).coerceAtLeast(0f)
+                            }
+                            val esPaginaAncla = page == paginaAncla
+                            val esPaginaSiguiente = page == paginaAncla + 1
+                            val esPaginaAnterior = page == paginaAncla - 1
+                            val esPaginaVecina = esPaginaAncla || esPaginaAnterior || esPaginaSiguiente
+
+                            val traslacionY: Float
+                            val escala: Float
+                            val opacidad: Float
+                            val zTarjeta: Float
+                            val rotacionX: Float
+                            val rotacionY: Float
+                            val elevacionTarjeta: Float
+
+                            when {
+                                esPaginaAncla && avance > 0f -> {
+                                    // Avance: la carta actual se despega y sube levemente antes de salir.
+                                    traslacionY = lerpFloat(0f, -24f, avance)
+                                    escala = lerpFloat(1f, 1.035f, avance)
+                                    opacidad = lerpFloat(1f, 0.96f, avance)
+                                    zTarjeta = 13f
+                                    rotacionX = lerpFloat(0f, -2f, avance)
+                                    rotacionY = lerpFloat(0f, -6f, avance)
+                                    elevacionTarjeta = lerpFloat(12f, 6f, avance)
+                                }
+
+                                esPaginaSiguiente && avance > 0f -> {
+                                    // La siguiente emerge desde profundidad para engancharse al centro.
+                                    traslacionY = lerpFloat(52f, 0f, avance)
+                                    escala = lerpFloat(0.90f, 1f, avance)
+                                    opacidad = lerpFloat(0.74f, 1f, avance)
+                                    zTarjeta = 11f
+                                    rotacionX = lerpFloat(3f, 0f, avance)
+                                    rotacionY = lerpFloat(8f, 0f, avance)
+                                    elevacionTarjeta = lerpFloat(4f, 12f, avance)
+                                }
+
+                                esPaginaAncla && retroceso > 0f -> {
+                                    // Retroceso: la carta actual baja/despeja para destapar la anterior.
+                                    traslacionY = lerpFloat(0f, 16f, retroceso)
+                                    escala = lerpFloat(1f, 0.965f, retroceso)
+                                    opacidad = lerpFloat(1f, 0.95f, retroceso)
+                                    zTarjeta = 10f
+                                    rotacionX = lerpFloat(0f, 2f, retroceso)
+                                    rotacionY = lerpFloat(0f, 4f, retroceso)
+                                    elevacionTarjeta = lerpFloat(12f, 5f, retroceso)
+                                }
+
+                                esPaginaAnterior && retroceso > 0f -> {
+                                    // La anterior entra desde arriba y queda superpuesta.
+                                    traslacionY = lerpFloat(-56f, 0f, retroceso)
+                                    escala = lerpFloat(1.03f, 1f, retroceso)
+                                    opacidad = lerpFloat(0.82f, 1f, retroceso)
+                                    zTarjeta = 15f
+                                    rotacionX = lerpFloat(-8f, 0f, retroceso)
+                                    rotacionY = lerpFloat(-5f, 0f, retroceso)
+                                    elevacionTarjeta = lerpFloat(5f, 13f, retroceso)
+                                }
+
+                                esPaginaAncla -> {
+                                    traslacionY = 0f
+                                    escala = 1f
+                                    opacidad = 1f
+                                    zTarjeta = 12f
+                                    rotacionX = 0f
+                                    rotacionY = 0f
+                                    elevacionTarjeta = 12f
+                                }
+
+                                esPaginaAnterior -> {
+                                    traslacionY = -32f
+                                    escala = 0.96f
+                                    opacidad = 0.86f
+                                    zTarjeta = 10f
+                                    rotacionX = -3f
+                                    rotacionY = -2f
+                                    elevacionTarjeta = 6f
+                                }
+
+                                esPaginaSiguiente -> {
+                                    traslacionY = 36f
+                                    escala = 0.90f
+                                    opacidad = 0.74f
+                                    zTarjeta = 9f
+                                    rotacionX = 4f
+                                    rotacionY = 3f
+                                    elevacionTarjeta = 4f
+                                }
+
+                                !esPaginaVecina -> {
+                                    traslacionY = 64f
+                                    escala = 0.84f
+                                    opacidad = 0f
+                                    zTarjeta = 1f
+                                    rotacionX = 6f
+                                    rotacionY = 0f
+                                    elevacionTarjeta = 0f
+                                }
+
+                                else -> {
+                                    traslacionY = 48f
+                                    escala = 0.88f
+                                    opacidad = 0.65f
+                                    zTarjeta = 7f
+                                    rotacionX = 5f
+                                    rotacionY = 4f
+                                    elevacionTarjeta = 2f
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        translationY = traslacionY
+                                        scaleX = escala
+                                        scaleY = escala
+                                        alpha = opacidad
+                                        rotationX = rotacionX
+                                        rotationY = rotacionY
+                                        cameraDistance = 26f * densidadPantalla.density
                                     }
-                                },
-                                modifier = Modifier.fillMaxSize()
+                                    .zIndex(zTarjeta)
+                            ) {
+                                key(ofertaPagina.idOfertaServicio) {
+                                    TarjetaDetalleOferta(
+                                        oferta = ofertaPagina,
+                                        modoLigero = !esPaginaVecina && page != indiceDetalleCompleto,
+                                        elevacionTarjetaDp = elevacionTarjeta,
+                                        bloquearScrollVertical = pagerState.isScrollInProgress || page != pagerState.currentPage,
+                                        onScrollEstado = { scroll ->
+                                            if (page == pagerState.currentPage) {
+                                                scrollActivo = scroll
+                                            }
+                                        },
+                                        onDireccionScroll = { mostrar ->
+                                            if (page == pagerState.currentPage && !pagerState.isScrollInProgress) {
+                                                mostrarCta = mostrar
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            }
+                        }
+
+                        if (!puedeDeslizar) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .zIndex(40f)
+                                    .clickable(
+                                        indication = null,
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                                    ) { }
                             )
                         }
                     }
@@ -355,8 +493,8 @@ fun PantallaDetalleServicio(
             }
         }
 
-        val ofertaCta = uiState.ofertaActual ?: uiState.ofertas.getOrNull(uiState.indiceActual)
-        if (ofertaCta != null) {
+        val ofertaCta = uiState.ofertas.getOrNull(pagerState.currentPage) ?: uiState.ofertaActual
+        if (!saliendoPantalla && ofertaCta != null) {
             val esPublicacionPropia = ofertaCta.idTrabajador == uiState.idUsuarioActual
             AnimatedVisibility(
                 visible = mostrarCta,
@@ -394,7 +532,8 @@ private fun BarraSuperiorDetalle(onVolver: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .height(56.dp)
+                .padding(horizontal = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -419,23 +558,38 @@ private fun BarraSuperiorDetalle(onVolver: () -> Unit) {
 @Composable
 private fun TarjetaDetalleOferta(
     oferta: OfertaServicio,
+    modoLigero: Boolean = false,
+    elevacionTarjetaDp: Float = 8f,
     bloquearScrollVertical: Boolean = false,
     onScrollEstado: (androidx.compose.foundation.ScrollState) -> Unit = {},
     onDireccionScroll: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var posicionScroll by rememberSaveable(oferta.idOfertaServicio) { mutableIntStateOf(0) }
-    val scrollState = rememberScrollState(posicionScroll)
+    val scrollState = rememberScrollState()
     var ultimoScroll by rememberSaveable(oferta.idOfertaServicio) { mutableIntStateOf(posicionScroll) }
-    LaunchedEffect(scrollState.value) {
-        posicionScroll = scrollState.value
-        val delta = scrollState.value - ultimoScroll
-        when {
-            scrollState.value <= 4 -> onDireccionScroll(true)
-            delta > 10 -> onDireccionScroll(false)
-            delta < -10 -> onDireccionScroll(true)
+    LaunchedEffect(oferta.idOfertaServicio) {
+        if (scrollState.value != posicionScroll) {
+            scrollState.scrollTo(posicionScroll)
         }
-        ultimoScroll = scrollState.value
+        ultimoScroll = posicionScroll
+    }
+    DisposableEffect(oferta.idOfertaServicio, scrollState) {
+        onDispose { posicionScroll = scrollState.value }
+    }
+    LaunchedEffect(scrollState, bloquearScrollVertical) {
+        snapshotFlow { scrollState.value }
+            .distinctUntilChanged()
+            .collect { valor ->
+                val delta = valor - ultimoScroll
+                when {
+                    valor <= 4 -> onDireccionScroll(true)
+                    bloquearScrollVertical -> Unit
+                    delta > 3 -> onDireccionScroll(false)
+                    delta < -2 -> onDireccionScroll(true)
+                }
+                ultimoScroll = valor
+            }
     }
     LaunchedEffect(scrollState) {
         onScrollEstado(scrollState)
@@ -444,23 +598,23 @@ private fun TarjetaDetalleOferta(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 78.dp),
+            .padding(start = 6.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = elevacionTarjetaDp.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState, enabled = !bloquearScrollVertical)
-                .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ImagenDetalleServicio(
                 referencia = oferta.fotoUrlReferencia,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(320.dp)
+                    .height(282.dp)
                     .clip(RoundedCornerShape(20.dp))
             )
 
@@ -546,26 +700,58 @@ private fun TarjetaDetalleOferta(
                 longitud = oferta.longitudReferencia ?: -70.6693,
                 semilla = oferta.idOfertaServicio
             )
-            MapaRangoOpenStreetMap(
-                latitud = coordenadaVisual.first,
-                longitud = coordenadaVisual.second,
-                rangoM = oferta.rangoDisponibilidadM,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(170.dp)
-                    .clip(RoundedCornerShape(14.dp))
-            )
+            if (modoLigero) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(132.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "Vista previa del mapa",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                MapaRangoOpenStreetMap(
+                    latitud = coordenadaVisual.first,
+                    longitud = coordenadaVisual.second,
+                    rangoM = oferta.rangoDisponibilidadM,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(132.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                )
+            }
             Text(
                 text = "Rango de disponibilidad: ${EscalaRango.formatear(oferta.rangoDisponibilidadM)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            ResumenTrabajadorDetalle(
-                nombreTrabajador = oferta.nombreTrabajador,
-                usernameTrabajador = oferta.usernameTrabajador,
-                fotoPerfilTrabajador = oferta.fotoPerfilTrabajador,
-                verificado = oferta.trabajadorVerificado
-            )
+            if (modoLigero) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                ) {
+                    Text(
+                        text = "@${oferta.usernameTrabajador.ifBlank { oferta.nombreTrabajador.replace(" ", "").lowercase() }}",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                ResumenTrabajadorDetalle(
+                    nombreTrabajador = oferta.nombreTrabajador,
+                    usernameTrabajador = oferta.usernameTrabajador,
+                    fotoPerfilTrabajador = oferta.fotoPerfilTrabajador,
+                    verificado = oferta.trabajadorVerificado
+                )
+            }
         }
     }
 }
@@ -578,7 +764,7 @@ private fun TarjetaDetallePrevisualizacion(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 78.dp),
+            .padding(start = 6.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -586,54 +772,116 @@ private fun TarjetaDetallePrevisualizacion(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ImagenDetalleServicio(
                 referencia = oferta.fotoUrlReferencia,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(320.dp)
+                    .height(282.dp)
                     .clip(RoundedCornerShape(20.dp))
             )
             Text(
                 text = oferta.titulo,
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1
-            )
-            Text(
-                text = oferta.precioTexto,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1
+                fontWeight = FontWeight.Bold
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
                 if (oferta.trabajadorVerificado) {
-                    Icon(
-                        imageVector = Icons.Filled.Verified,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Verified,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Trabajador verificado",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Trabajador",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+                if (oferta.puntuacionPromedio <= 0.0) {
+                    Text(
+                        text = "Sin valoraciones todavia",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    FilaValoracionDetalle(valor = oferta.puntuacionPromedio)
                 }
             }
             Text(
+                text = oferta.precioTexto,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "Publicado: ${formatearFechaPublicacion(oferta.fechaPublicacion)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "${calcularDistanciaKm(oferta)} km - ${oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" }}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "Descripcion:",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
                 text = oferta.descripcion,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 3
+            )
+            Text(
+                text = "Ubicacion:",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            val coordenadaVisual = construirCoordenadaVisualPrivada(
+                latitud = oferta.latitudReferencia ?: -33.4489,
+                longitud = oferta.longitudReferencia ?: -70.6693,
+                semilla = oferta.idOfertaServicio
+            )
+            MapaRangoOpenStreetMap(
+                latitud = coordenadaVisual.first,
+                longitud = coordenadaVisual.second,
+                rangoM = oferta.rangoDisponibilidadM,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(132.dp)
+                    .clip(RoundedCornerShape(14.dp))
+            )
+            Text(
+                text = "Rango de disponibilidad: ${EscalaRango.formatear(oferta.rangoDisponibilidadM)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            ResumenTrabajadorDetalle(
+                nombreTrabajador = oferta.nombreTrabajador,
+                usernameTrabajador = oferta.usernameTrabajador,
+                fotoPerfilTrabajador = oferta.fotoPerfilTrabajador,
+                verificado = oferta.trabajadorVerificado
             )
         }
     }
@@ -787,6 +1035,7 @@ private fun MapaRangoOpenStreetMap(
             setOnTouchListener { _, _ -> true }
         }
     }
+    var claveMapaAnterior by remember(mapView) { mutableStateOf<Triple<Double, Double, Int>?>(null) }
 
     DisposableEffect(mapView) {
         onDispose { mapView.onDetach() }
@@ -796,6 +1045,10 @@ private fun MapaRangoOpenStreetMap(
         modifier = modifier,
         factory = { mapView },
         update = { map ->
+            val claveActual = Triple(latitud, longitud, rangoNormalizadoM)
+            if (claveMapaAnterior == claveActual) return@AndroidView
+            claveMapaAnterior = claveActual
+
             val centro = GeoPoint(latitud, longitud)
             map.controller.setZoom(zoom)
             map.controller.setCenter(centro)
@@ -924,6 +1177,10 @@ private fun construirCoordenadaVisualPrivada(
     val deltaLat = (distancia * kotlin.math.cos(angulo)) / 111_320.0
     val deltaLon = (distancia * kotlin.math.sin(angulo)) / (111_320.0 * kotlin.math.cos(Math.toRadians(latitud)))
     return latitud + deltaLat to longitud + deltaLon
+}
+
+private fun lerpFloat(inicio: Float, fin: Float, fraccion: Float): Float {
+    return inicio + ((fin - inicio) * fraccion.coerceIn(0f, 1f))
 }
 
 private fun calcularDistanciaKm(oferta: OfertaServicio): Int {

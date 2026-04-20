@@ -191,6 +191,11 @@ class ContrabajoSQLiteHelper(context: Context) :
         onCreate(db)
     }
 
+    override fun onOpen(db: SQLiteDatabase) {
+        super.onOpen(db)
+        aplicarDescripcionAmpliaDemo(db)
+    }
+
     fun obtenerUsuarioPorCorreoOCuenta(identificador: String, contrasena: String): Usuario? {
         readableDatabase.rawQuery(
             "SELECT * FROM usuarios WHERE (correo = ? OR username = ?) AND contrasena_hash = ? LIMIT 1",
@@ -844,10 +849,26 @@ class ContrabajoSQLiteHelper(context: Context) :
             listOf("Camila", "Lopez", "Reyes", "CamiLr", "30334455", "9", "+56921110009", "camila.lr@contrabajo.cl")
         )
         val publicacionesDemo = listOf(
-            listOf("Gasfiter urgente", "Reparo fugas, llaves y WC en menos de 24 horas.", "Desde 18.000 por visita"),
-            listOf("Arquitecta para planos", "Planos municipales y regularizacion de ampliaciones.", "Desde 120.000 por proyecto"),
-            listOf("Tecnico en computadores", "Formateo, limpieza interna y optimizacion de equipos.", "Desde 22.000 por equipo"),
-            listOf("Electricista domiciliario", "Cambio de enchufes, tableros y luminarias.", "Desde 20.000 segun trabajo"),
+            listOf(
+                "Gasfiter urgente",
+                "Reparo fugas, llaves y WC en menos de 24 horas. Incluye revision completa de filtraciones visibles, ajuste de sellos, cambio de flexibles y pruebas de presion para dejar el sistema estable. Si detecto piezas criticas, te explico opciones y costo antes de ejecutar.",
+                "Desde 18.000 por visita"
+            ),
+            listOf(
+                "Arquitecta para planos",
+                "Planos municipales y regularizacion de ampliaciones. Trabajo levantamiento en terreno, propuestas de distribucion y set final para ingreso en municipalidad. Tambien apoyo con observaciones y correcciones posteriores para agilizar aprobaciones.",
+                "Desde 120.000 por proyecto"
+            ),
+            listOf(
+                "Tecnico en computadores",
+                "Formateo, limpieza interna y optimizacion de equipos. Realizo respaldo previo, reinstalacion segura, actualizaciones, control de temperatura y ajuste de inicio para mejorar rendimiento real en uso diario de trabajo, estudio o gaming.",
+                "Desde 22.000 por equipo"
+            ),
+            listOf(
+                "Electricista domiciliario",
+                "Cambio de enchufes, tableros y luminarias. Incluye diagnostico inicial, mediciones de seguridad, reemplazo de componentes y pruebas finales de funcionamiento para evitar sobrecargas o cortes inesperados.",
+                "Desde 20.000 segun trabajo"
+            ),
             listOf("Maestra pintora", "Pintura interior y exterior con terminacion fina.", "Desde 55.000 por jornada"),
             listOf("Soldador a domicilio", "Rejas, portones y refuerzos metalicos.", "Desde 35.000 por trabajo"),
             listOf("Carpintera muebles", "Fabricacion y reparacion de muebles a medida.", "Desde 48.000 segun mueble"),
@@ -983,6 +1004,27 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("ultima_pantalla", "inicio")
             put("fecha_actualizacion", ahora())
         })
+    }
+
+    private fun aplicarDescripcionAmpliaDemo(db: SQLiteDatabase) {
+        val descripcionesAmplias = mapOf(
+            "Gasfiter urgente" to "Reparo fugas, llaves y WC en menos de 24 horas. Incluye revision completa de filtraciones visibles, ajuste de sellos, cambio de flexibles y pruebas de presion para dejar el sistema estable. Si detecto piezas criticas, te explico opciones y costo antes de ejecutar.",
+            "Arquitecta para planos" to "Planos municipales y regularizacion de ampliaciones. Trabajo levantamiento en terreno, propuestas de distribucion y set final para ingreso en municipalidad. Tambien apoyo con observaciones y correcciones posteriores para agilizar aprobaciones.",
+            "Tecnico en computadores" to "Formateo, limpieza interna y optimizacion de equipos. Realizo respaldo previo, reinstalacion segura, actualizaciones, control de temperatura y ajuste de inicio para mejorar rendimiento real en uso diario de trabajo, estudio o gaming.",
+            "Electricista domiciliario" to "Cambio de enchufes, tableros y luminarias. Incluye diagnostico inicial, mediciones de seguridad, reemplazo de componentes y pruebas finales de funcionamiento para evitar sobrecargas o cortes inesperados."
+        )
+
+        descripcionesAmplias.forEach { (titulo, descripcionLarga) ->
+            db.update(
+                "ofertas_servicio",
+                ContentValues().apply {
+                    put("descripcion", descripcionLarga)
+                    put("detalle", descripcionLarga)
+                },
+                "titulo = ? AND LENGTH(descripcion) < 150",
+                arrayOf(titulo)
+            )
+        }
     }
 
     private fun Cursor.toUsuario(): Usuario = Usuario(

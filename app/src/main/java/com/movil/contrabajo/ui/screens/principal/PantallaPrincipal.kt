@@ -1,15 +1,10 @@
 package com.movil.contrabajo.ui.screens.principal
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,8 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -28,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -58,11 +50,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -70,7 +68,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -85,11 +88,16 @@ import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaMarketplaceCompacta
 import com.movil.contrabajo.ui.viewmodel.OrdenMarketplace
 import com.movil.contrabajo.ui.viewmodel.PrincipalViewModel
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.tween
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 
 @Composable
 @OptIn(ExperimentalMaterialApi::class)
@@ -102,6 +110,8 @@ fun PantallaPrincipal(
     val uiState = viewModel.uiState
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
     var mostrarModalRango by rememberSaveable { mutableStateOf(false) }
     var mostrarModalFiltros by rememberSaveable { mutableStateOf(false) }
     var bloquearScrollVertical by rememberSaveable { mutableStateOf(false) }
@@ -110,15 +120,49 @@ fun PantallaPrincipal(
     var tipoPrecioTemporal by rememberSaveable { mutableStateOf<Int?>(null) }
     var soloVerificadosTemporal by rememberSaveable { mutableStateOf(false) }
     var ordenTemporal by rememberSaveable { mutableStateOf(OrdenMarketplace.FECHA_RECIENTES.name) }
-    var busquedaActiva by rememberSaveable { mutableStateOf(false) }
+    var busquedaActiva by remember { mutableStateOf(false) }
+    val cerrarBusquedaFuera: () -> Unit = {
+        if (busquedaActiva) {
+            busquedaActiva = false
+            focusManager.clearFocus(force = true)
+        }
+    }
+    val cierreBusquedaPorScroll = remember(busquedaActiva) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (
+                    busquedaActiva &&
+                    source == NestedScrollSource.Drag &&
+                    (kotlin.math.abs(available.x) > 0.25f || kotlin.math.abs(available.y) > 0.25f)
+                ) {
+                    cerrarBusquedaFuera()
+                }
+                return Offset.Zero
+            }
+        }
+    }
     val glow = rememberInfiniteTransition(label = "glowBuscadorPrincipal")
     val glowFase by glow.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4200, easing = LinearEasing)
+            animation = tween(durationMillis = 4_600, easing = LinearEasing)
         ),
         label = "glowFaseBuscador"
+    )
+    val glowPulso by glow.animateFloat(
+        initialValue = 0.82f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1_500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowPulsoBuscador"
+    )
+    val progresoBuscador by animateFloatAsState(
+        targetValue = if (busquedaActiva) 1f else 0f,
+        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+        label = "progresoBuscadorTopbar"
     )
 
     val pullRefreshState = rememberPullRefreshState(
@@ -156,8 +200,11 @@ fun PantallaPrincipal(
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.recargar()
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> viewModel.recargar()
+                Lifecycle.Event.ON_PAUSE,
+                Lifecycle.Event.ON_STOP -> cerrarBusquedaFuera()
+                else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -172,140 +219,139 @@ fun PantallaPrincipal(
         mostrarFondo = false
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawWithContent {
+                    drawContent()
+                    if (progresoBuscador <= 0.02f) return@drawWithContent
+                    val fase = size.width * (glowFase * 2.3f)
+                    val radio = CornerRadius(18.dp.toPx(), 18.dp.toPx())
+                    val alphaBase = (0.05f + (0.05f * glowPulso) + (0.04f * progresoBuscador)).coerceIn(0f, 0.13f)
+
+                    drawRoundRect(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF1E88E5).copy(alpha = alphaBase),
+                                Color(0xFF00BCD4).copy(alpha = (alphaBase * 1.05f).coerceAtMost(0.17f)),
+                                Color(0xFF17A673).copy(alpha = alphaBase),
+                                Color(0xFF1E88E5).copy(alpha = alphaBase)
+                            ),
+                            start = Offset(fase - (size.width * 2f), 0f),
+                            end = Offset(fase, size.height)
+                        ),
+                        topLeft = Offset(-2.4f, -2.4f),
+                        size = Size(size.width + 4.8f, size.height + 4.8f),
+                        cornerRadius = CornerRadius(19.dp.toPx(), 19.dp.toPx()),
+                        style = Stroke(width = 4.4.dp.toPx())
+                    )
+
+                    drawRoundRect(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF1E88E5).copy(alpha = 0.8f),
+                                Color(0xFF00BCD4).copy(alpha = 0.88f),
+                                Color(0xFF17A673).copy(alpha = 0.8f),
+                                Color(0xFF1E88E5).copy(alpha = 0.8f)
+                            ),
+                            start = Offset(size.width - fase, 0f),
+                            end = Offset(-fase, size.height)
+                        ),
+                        cornerRadius = radio,
+                        style = Stroke(width = 2.4.dp.toPx())
+                    )
+                },
+            color = lerp(MaterialTheme.colorScheme.primary, Color.White, progresoBuscador),
             shape = RoundedCornerShape(18.dp),
-            shadowElevation = 8.dp
+            shadowElevation = (8f + (8f * progresoBuscador)).dp
         ) {
-            BoxWithConstraints(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .padding(horizontal = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .graphicsLayer {
+                            alpha = (1f - progresoBuscador).coerceIn(0f, 1f)
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    IconButton(
-                        onClick = onAbrirAjustes,
-                        enabled = !busquedaActiva
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = "Ajustes",
-                            tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = if (busquedaActiva) 0.28f else 1f)
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    IconButton(
-                        onClick = { busquedaActiva = true },
-                        enabled = !busquedaActiva
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = "Buscar",
-                            tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = if (busquedaActiva) 0.28f else 1f)
-                        )
-                    }
-                }
-
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = busquedaActiva,
-                    enter = fadeIn(animationSpec = tween(160)),
-                    exit = fadeOut(animationSpec = tween(130)),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .drawWithContent {
-                                drawContent()
-                                val fase = size.width * glowFase
-                                val esquinas = CornerRadius(14.dp.toPx(), 14.dp.toPx())
-                                drawRoundRect(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(
-                                            Color(0xFF7C4DFF).copy(alpha = 0.82f),
-                                            Color(0xFF00BCD4).copy(alpha = 0.86f),
-                                            Color(0xFF2196F3).copy(alpha = 0.82f),
-                                            Color(0xFF7C4DFF).copy(alpha = 0.82f)
-                                        ),
-                                        start = Offset(fase - size.width, 0f),
-                                        end = Offset(fase, size.height)
-                                    ),
-                                    cornerRadius = esquinas,
-                                    style = Stroke(width = 2.2.dp.toPx())
-                                )
-                                drawRoundRect(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(
-                                            Color(0xFF7C4DFF).copy(alpha = 0.16f),
-                                            Color(0xFF00BCD4).copy(alpha = 0.18f),
-                                            Color(0xFF2196F3).copy(alpha = 0.16f),
-                                            Color(0xFF7C4DFF).copy(alpha = 0.16f)
-                                        ),
-                                        start = Offset(size.width - fase, 0f),
-                                        end = Offset(-fase, size.height)
-                                    ),
-                                    topLeft = Offset(-2f, -2f),
-                                    size = Size(size.width + 4f, size.height + 4f),
-                                    cornerRadius = CornerRadius(16.dp.toPx(), 16.dp.toPx()),
-                                    style = Stroke(width = 7.dp.toPx())
-                                )
-                            }
-                            .background(Color.White, RoundedCornerShape(14.dp))
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .padding(start = 12.dp)
-                        )
-                        BasicTextField(
-                            value = uiState.busqueda,
-                            onValueChange = viewModel::actualizarBusqueda,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.CenterStart)
-                                .padding(start = 40.dp, end = 42.dp, top = 10.dp, bottom = 10.dp),
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                color = Color(0xFF0F2124),
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            cursorBrush = SolidColor(Color(0xFF0F2124)),
-                            decorationBox = { innerTextField ->
-                                if (uiState.busqueda.isBlank()) {
-                                    Text(
-                                        text = "Buscar servicios, categorias o trabajador",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color(0xFF60737A)
-                                    )
-                                }
-                                innerTextField()
-                            }
-                        )
+                    if (progresoBuscador < 0.98f) {
                         IconButton(
-                            onClick = { busquedaActiva = false },
-                            modifier = Modifier.align(Alignment.CenterEnd)
+                            onClick = onAbrirAjustes,
+                            enabled = progresoBuscador < 0.12f
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Close,
-                                contentDescription = "Cerrar busqueda",
-                                tint = MaterialTheme.colorScheme.primary
+                                imageVector = Icons.Outlined.Settings,
+                                contentDescription = "Ajustes",
+                                tint = MaterialTheme.colorScheme.onPrimary
                             )
                         }
                     }
+                }
+
+                BasicTextField(
+                    value = uiState.busqueda,
+                    onValueChange = viewModel::actualizarBusqueda,
+                    enabled = busquedaActiva || progresoBuscador > 0.01f,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp, end = 12.dp)
+                        .graphicsLayer {
+                            alpha = progresoBuscador.coerceIn(0f, 1f)
+                        },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = Color(0xFF0F2124),
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    cursorBrush = SolidColor(Color(0xFF0F2124)),
+                    decorationBox = { innerTextField ->
+                        if (uiState.busqueda.isBlank()) {
+                            Text(
+                                text = "Buscar servicios",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = Color(0xFF60737A)
+                            )
+                        }
+                        innerTextField()
+                    }
+                )
+
+                IconButton(
+                    onClick = { busquedaActiva = true }
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Buscar",
+                        tint = if (progresoBuscador > 0.02f) {
+                            Color(0xFF0F2124)
+                        } else {
+                            MaterialTheme.colorScheme.onPrimary
+                        }
+                    )
                 }
             }
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .pointerInput(busquedaActiva) {
+                    if (!busquedaActiva) return@pointerInput
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Final)
+                            if (event.changes.any { it.changedToDownIgnoreConsumed() }) {
+                                cerrarBusquedaFuera()
+                            }
+                        }
+                    }
+                },
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -320,10 +366,16 @@ fun PantallaPrincipal(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { mostrarModalRango = true }
+                    .clickable {
+                        cerrarBusquedaFuera()
+                        mostrarModalRango = true
+                    }
             )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                IconButton(onClick = { mostrarModalFiltros = true }) {
+                IconButton(onClick = {
+                    cerrarBusquedaFuera()
+                    mostrarModalFiltros = true
+                }) {
                     Icon(
                         imageVector = Icons.Outlined.FilterAlt,
                         contentDescription = "Filtros y orden",
@@ -346,11 +398,24 @@ fun PantallaPrincipal(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
+                .pointerInput(busquedaActiva) {
+                    if (!busquedaActiva) return@pointerInput
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Final)
+                            if (event.changes.any { it.changedToDownIgnoreConsumed() }) {
+                                cerrarBusquedaFuera()
+                            }
+                        }
+                    }
+                }
+                .nestedScroll(cierreBusquedaPorScroll)
                 .pullRefresh(pullRefreshState)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .clipToBounds()
                     .offset(y = estiramientoContenido)
             ) {
                 if (uiState.ofertas.isEmpty()) {
@@ -359,32 +424,39 @@ fun PantallaPrincipal(
                     } else {
                         "Obten tu ubicacion en Ajustes > Ubicacion > Obtener ubicacion."
                     }
-                    Column(
+                    Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState()),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .fillMaxSize(),
+                        contentAlignment = Alignment.TopCenter
                     ) {
-                        Spacer(modifier = Modifier.height(86.dp))
                         Text(
                             text = textoEstado,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 86.dp)
                         )
                     }
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clipToBounds(),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         userScrollEnabled = !bloquearScrollVertical,
-                        contentPadding = PaddingValues(bottom = 108.dp)
+                        contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 108.dp)
                     ) {
                         items(uiState.ofertas, key = { it.idOfertaServicio }) { oferta ->
                             TarjetaMarketplaceCompacta(
                                 oferta = oferta,
-                                onAbrirServicio = { onAbrirServicio(oferta.idOfertaServicio) },
+                                onAbrirServicio = {
+                                    scope.launch {
+                                        cerrarBusquedaFuera()
+                                        yield()
+                                        onAbrirServicio(oferta.idOfertaServicio)
+                                    }
+                                },
                                 onMantenerPresionCambio = { activo -> bloquearScrollVertical = activo }
                             )
                         }

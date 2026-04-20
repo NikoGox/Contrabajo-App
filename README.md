@@ -15,42 +15,23 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.4-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.4.1-Pre-Alpha
 
 
 
-> <br>• Se corrigió navegación lateral principal entre Perfil <-> Principal <-> Chats, eliminando desincronización de dirección y saltos en extremos.
-> <br>• Se mantuvo arquitectura por pantallas y se suavizaron transiciones en Ajustes para evitar animaciones agresivas al entrar/salir de subpantallas.
-> <br>• Se rediseñó gesto lateral en detalle para navegación tipo cartas (browsing izquierda/derecha), con stack visible y animaciones más fluidas.
-> <br>• Se agregó precarga de imágenes adyacentes para reducir tirones visuales en cambio de tarjetas.
-> <br>• Se ajustó comportamiento de back en detalle: si hay scroll interno, vuelve primero arriba; luego permite salir de la pantalla.
-> <br>• Se ajustó CTA flotante (contactar/editar) para ocultarse al bajar en lectura y reaparecer al subir, mejorando lectura de contenido.
-> <br>• En detalle, para publicación propia se muestra acción de editar; para publicaciones de terceros se mantiene acción de contactar.
-> <br>• Se incorporó resumen de trabajador en detalle con foto de perfil, verificado y `@username`, quitando estrellas en ese bloque según definición UX.
-> <br>• Se reforzó HU-01 en verificación trabajador: RUN + DV en línea, RUN con formato visual `xx.xxx.xxx`, documento con formato `xxx.xxx.xxx` y validación exacta de 9 dígitos.
-> <br>• Se mejoró validación por capas (UI + ViewModel + repositorio + DB) para evitar envío de verificación inválida.
-> <br>• Se separó modelo de rangos por usuario: `rango_busqueda_m` y `rango_disponibilidad_m`, ambos persistidos en SQLite (metros).
-> <br>• Se acotó rango máximo operacional a 50 km en sliders de búsqueda/disponibilidad.
-> <br>• Se dejó filtro de match por distancia real del buscador, con tolerancia de borde para casos límite cercanos al umbral.
-> <br>• Se incorporó estado vacío guiado: "Obtén tu ubicación en Ajustes > Ubicación > Obtener ubicación" para cuentas sin coordenadas útiles.
-> <br>• Se ajustó pull-to-refresh para que funcione también en estado vacío (sin depender del grid con ítems).
-> <br>• Se integró captura y guardado de ubicación del dispositivo para pruebas reales/FakeGPS, con feedback visual por toast en acciones clave.
-> <br>• Se mejoró OpenStreetMap embebido en ajustes/detalle, con pin azul centrado y visual de rango consistente.
-> <br>• Se incorporó modal de filtros/orden para marketplace: categoría, tipo de precio, solo verificados y orden por A->Z / fecha.
-> <br>• Se agregó soporte de fecha de publicación en tarjetas y detalle para ordenar y dar contexto temporal.
-> <br>• Se implementó HU-03 con precio estructurado en datos: `tipo_precio` + `monto_base`, generando `precio_texto` derivado y uniforme.
-> <br>• Tipos de precio soportados: Fijo, Por hora, Desde, Contactar para saber precio; con validación de monto entre 1 y 10.000.000 cuando aplica.
-> <br>• Se mejoró campo de monto para mostrar `$` dentro del input (visual), manteniendo guardado numérico limpio.
-> <br>• Se cargaron fotos remotas estables para publicaciones demo y se mantuvo fallback local ante error de imagen.
-> <br>• Se reforzó tarjeta compacta de exploración: título/precio en una línea, marquee por long-press y bloqueo de scroll vertical durante lectura extendida.
-> <br>• Se rediseñó resplandor de borde en long-press con loop largo continuo (20s) para transición suave sin corte visual.
-> <br>• Se ajustó buscador en topbar para mantener mismo contenedor y tamaño, transicionando a estado input blanco con borde glow (morado/cyan/azul).
-> <br>• Se incorporó overlay de carga reutilizable (fondo oscurecido + spinner) para acciones críticas y preparación de integración backend.
-> <br>• Se mantuvo persistencia local frontend-first con migración SQLite y reset controlado de demo data cuando corresponde.
-
-
-
-
+> <br>• Iteración de ajuste fino UX/UI sobre `0.4-Pre-Alpha`, enfocada en estabilidad de navegación y fluidez visual en dispositivo real.
+> <br>• Se agregó `SplashActivity` personalizada con `ct_icon`, barra de progreso y transición inicial para mejorar la entrada a la app.
+> <br>• Se actualizó inicio de sesión automático (recordarme) con carga controlada para evitar saltos bruscos al entrar al shell principal.
+> <br>• Se rehízo topbar de búsqueda en Principal con un solo contenedor estable (sin doble borde), glow azul/cyan/verde y cierre por toque fuera.
+> <br>• Se normalizó cancelación de búsqueda al tocar tarjeta/rango/filtros, manteniendo el texto escrito para continuidad de uso.
+> <br>• Se corrigió long-press en tarjetas de exploración para evitar solapes/deformaciones y mantener el grid estable.
+> <br>• Se estabilizó swipe horizontal en detalle con enfoque de 3 tarjetas vivas (anterior/actual/siguiente) y menor tirón visual.
+> <br>• Se mantuvo vinculación entre Exploración y Detalle (mismo orden/dataset/filtros al abrir publicaciones).
+> <br>• Se optimizó render del mapa en detalle para reducir parpadeo e invalidaciones innecesarias durante gestos.
+> <br>• Se ajustó transición de ruta Servicio: entra desde abajo y sale hacia abajo con desplazamiento medio + fade.
+> <br>• Se eliminó UI bloqueante al abrir detalle (sin oscurecer, sin spinner, sin cinta/texto), dejando precarga silenciosa.
+> <br>• Se retiró overlay visual interno de "Preparando tarjetas...", manteniendo solo bloqueo táctil silencioso cuando falta precarga.
+> <br>• Se homologó la geometría de topbars entre Principal/Detalle/Ajustes y se desactivó animación defectuosa en Ajustes.
 
 ---
 

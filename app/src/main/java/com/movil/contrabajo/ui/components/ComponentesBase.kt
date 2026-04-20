@@ -2,12 +2,6 @@ package com.movil.contrabajo.ui.components
 
 import android.net.Uri
 import android.widget.ImageView
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -53,6 +47,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -62,6 +57,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -78,7 +82,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -87,6 +90,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.movil.contrabajo.domain.model.ChatCita
 import com.movil.contrabajo.domain.model.OfertaServicio
@@ -110,22 +114,37 @@ fun FondoContrabajo(modifier: Modifier = Modifier) {
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.95f),
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.background
+                        Color(0xFFEAF7FA),
+                        Color(0xFFDFEFF4),
+                        Color(0xFFD2E6EE),
+                        Color(0xFFC8DEE8)
                     )
                 )
             )
     ) {
         Box(
             modifier = Modifier
-                .size(220.dp)
-                .offset(x = 220.dp, y = (-40).dp)
+                .size(240.dp)
+                .offset(x = 208.dp, y = (-56).dp)
                 .background(
                     Brush.radialGradient(
                         listOf(
-                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.18f),
+                            Color(0xFF78C6D6).copy(alpha = 0.22f),
+                            Color(0xFF4BAFC5).copy(alpha = 0.12f),
+                            Color.Transparent
+                        )
+                    ),
+                    CircleShape
+                )
+        )
+        Box(
+            modifier = Modifier
+                .size(260.dp)
+                .offset(x = (-74).dp, y = 530.dp)
+                .background(
+                    Brush.radialGradient(
+                        listOf(
+                            Color(0xFF7FBFD4).copy(alpha = 0.20f),
                             Color.Transparent
                         )
                     ),
@@ -476,29 +495,11 @@ fun TarjetaMarketplaceCompacta(
     val interaccionTarjeta = remember { MutableInteractionSource() }
     val presionada by interaccionTarjeta.collectIsPressedAsState()
     var mantenerActiva by rememberSaveable(oferta.idOfertaServicio) { mutableStateOf(false) }
-    val glow = rememberInfiniteTransition(label = "glowTarjetaPresionada")
-    val glowRotacion by glow.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 20_000, easing = LinearEasing)
-        ),
-        label = "glowRotacionTarjeta"
+    val elevacionY by animateFloatAsState(
+        targetValue = if (mantenerActiva) -10f else 0f,
+        animationSpec = tween(durationMillis = if (mantenerActiva) 220 else 170),
+        label = "elevacionTarjetaCompacta"
     )
-    val glowPulso by glow.animateFloat(
-        initialValue = 0.88f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 20_000, easing = LinearEasing)
-        ),
-        label = "glowPulsoTarjeta"
-    )
-    val escalaTarjeta by animateFloatAsState(
-        targetValue = if (mantenerActiva) 1.02f else 1f,
-        animationSpec = tween(durationMillis = if (mantenerActiva) 180 else 130),
-        label = "escalaTarjetaCompacta"
-    )
-
     LaunchedEffect(presionada) {
         if (presionada) {
             delay(380)
@@ -518,55 +519,55 @@ fun TarjetaMarketplaceCompacta(
         modifier = modifier
             .fillMaxWidth()
             .graphicsLayer {
-                scaleX = escalaTarjeta
-                scaleY = escalaTarjeta
+                translationY = elevacionY
             }
+            .zIndex(if (mantenerActiva) 2f else 0f)
+            .clip(RoundedCornerShape(20.dp))
             .drawWithContent {
                 drawContent()
                 if (mantenerActiva) {
-                    val strokePrincipal = Stroke(width = 4.5f)
-                    val strokeSuave = Stroke(width = 10f)
-                    val corner = androidx.compose.ui.geometry.CornerRadius(20.dp.toPx(), 20.dp.toPx())
-                    val coloresLoop = listOf(
-                        Color(0xFF7C4DFF).copy(alpha = 0.92f),
-                        Color(0xFF00BCD4).copy(alpha = 0.96f),
-                        Color(0xFF2196F3).copy(alpha = 0.92f),
-                        Color(0xFF7C4DFF).copy(alpha = 0.92f)
-                    )
+                    val strokeFuerte = 2.8f
+                    val strokeAura = 4.2f
+                    val strokeInterno = 1.3f
 
-                    rotate(
-                        degrees = glowRotacion,
-                        pivot = Offset(size.width / 2f, size.height / 2f)
-                    ) {
-                        drawRoundRect(
-                            brush = Brush.sweepGradient(
-                                colors = coloresLoop,
-                                center = Offset(size.width / 2f, size.height / 2f)
-                            ),
-                            size = size,
-                            cornerRadius = corner,
-                            style = strokePrincipal
-                        )
-                    }
-                    rotate(
-                        degrees = -glowRotacion,
-                        pivot = Offset(size.width / 2f, size.height / 2f)
-                    ) {
-                        drawRoundRect(
-                            brush = Brush.sweepGradient(
-                                colors = listOf(
-                                    Color(0xFF7C4DFF).copy(alpha = (0.16f * glowPulso).coerceIn(0f, 0.3f)),
-                                    Color(0xFF00BCD4).copy(alpha = (0.18f * glowPulso).coerceIn(0f, 0.3f)),
-                                    Color(0xFF2196F3).copy(alpha = (0.16f * glowPulso).coerceIn(0f, 0.3f)),
-                                    Color(0xFF7C4DFF).copy(alpha = (0.16f * glowPulso).coerceIn(0f, 0.3f))
-                                ),
-                                center = Offset(size.width / 2f, size.height / 2f)
-                            ),
-                            size = size,
-                            cornerRadius = corner,
-                            style = strokeSuave
-                        )
-                    }
+                    val topLeftAura = Offset(strokeAura / 2f, strokeAura / 2f)
+                    val sizeAura = androidx.compose.ui.geometry.Size(
+                        width = (size.width - strokeAura).coerceAtLeast(0f),
+                        height = (size.height - strokeAura).coerceAtLeast(0f)
+                    )
+                    val topLeftFuerte = Offset(strokeFuerte / 2f, strokeFuerte / 2f)
+                    val sizeFuerte = androidx.compose.ui.geometry.Size(
+                        width = (size.width - strokeFuerte).coerceAtLeast(0f),
+                        height = (size.height - strokeFuerte).coerceAtLeast(0f)
+                    )
+                    val topLeftInterno = Offset(strokeInterno / 2f, strokeInterno / 2f)
+                    val sizeInterno = androidx.compose.ui.geometry.Size(
+                        width = (size.width - strokeInterno).coerceAtLeast(0f),
+                        height = (size.height - strokeInterno).coerceAtLeast(0f)
+                    )
+                    val corner = androidx.compose.ui.geometry.CornerRadius(20.dp.toPx(), 20.dp.toPx())
+
+                    drawRoundRect(
+                        color = TurquesaBrillante.copy(alpha = 0.36f),
+                        topLeft = topLeftAura,
+                        size = sizeAura,
+                        cornerRadius = corner,
+                        style = Stroke(width = strokeAura)
+                    )
+                    drawRoundRect(
+                        color = AzulPetroleoOscuro,
+                        topLeft = topLeftFuerte,
+                        size = sizeFuerte,
+                        cornerRadius = corner,
+                        style = Stroke(width = strokeFuerte)
+                    )
+                    drawRoundRect(
+                        color = TurquesaBrillante.copy(alpha = 0.78f),
+                        topLeft = topLeftInterno,
+                        size = sizeInterno,
+                        cornerRadius = corner,
+                        style = Stroke(width = strokeInterno)
+                    )
                 }
             }
             .combinedClickable(
@@ -875,34 +876,87 @@ fun ResumenPerfilLinea(etiqueta: String, valor: String) {
 @Composable
 fun OverlayPantallaCarga(
     visible: Boolean,
-    mensaje: String = "Cargando..."
+    mensaje: String = "Cargando...",
+    mostrarIndicador: Boolean = true,
+    modoSuave: Boolean = false
 ) {
-    if (!visible) return
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f)),
-        contentAlignment = Alignment.Center
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(durationMillis = 100)),
+        exit = fadeOut(animationSpec = tween(durationMillis = 170))
     ) {
-        Surface(
-            shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-            shadowElevation = 8.dp
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+        if (modoSuave) {
+            val animacion = rememberInfiniteTransition(label = "overlaySuaveCarga")
+            val fase by animacion.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(durationMillis = 1800, easing = LinearEasing)
+                ),
+                label = "faseOverlaySuave"
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.22f))
+                    .drawWithContent {
+                        drawContent()
+                        val desplazamiento = size.width * (fase * 2f)
+                        drawRect(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.White.copy(alpha = 0.08f),
+                                    Color.Transparent
+                                ),
+                                start = Offset(desplazamiento - size.width, 0f),
+                                end = Offset(desplazamiento, size.height)
+                            )
+                        )
+                    },
+                contentAlignment = Alignment.BottomCenter
             ) {
-                CircularProgressIndicator(
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth(0.44f)
+                        .padding(bottom = 86.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(999.dp)),
                     color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 3.dp
+                    trackColor = Color.White.copy(alpha = 0.34f)
                 )
-                Text(
-                    text = mensaje,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            }
+            return@AnimatedVisibility
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                shadowElevation = 8.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (mostrarIndicador) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 3.dp
+                        )
+                    }
+                    Text(
+                        text = mensaje,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

@@ -1,7 +1,6 @@
 package com.movil.contrabajo.ui.components
 
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -33,8 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.movil.contrabajo.ui.navigation.RutasApp
@@ -43,6 +44,7 @@ import com.movil.contrabajo.ui.theme.NavbarBrillo
 import com.movil.contrabajo.ui.theme.NavbarIconoInactivo
 import com.movil.contrabajo.ui.theme.NavbarSeleccion
 import com.movil.contrabajo.ui.theme.NavbarVerde
+import kotlin.math.abs
 
 private data class ItemNavbar(
     val ruta: String,
@@ -95,7 +97,7 @@ fun NavbarFlotante(
         Surface(
             modifier = Modifier.fillMaxWidth(0.86f),
             shape = RoundedCornerShape(34.dp),
-            color = NavbarVerde.copy(alpha = 0.96f),
+            color = NavbarVerde.copy(alpha = 0.9f),
             border = BorderStroke(1.dp, Blanco.copy(alpha = 0.28f)),
             shadowElevation = 16.dp
         ) {
@@ -116,11 +118,14 @@ fun NavbarFlotante(
             ) {
                 val anchoSegmento = maxWidth / items.size
                 val anchoIndicador = 76.dp
+                val density = LocalDensity.current
                 val desplazamientoIndicador by animateDpAsState(
                     targetValue = (anchoSegmento * indiceSeleccionado) + ((anchoSegmento - anchoIndicador) / 2),
                     animationSpec = spring(dampingRatio = 0.8f, stiffness = 420f),
                     label = "navbarIndicatorOffset"
                 )
+                val centroIndicadorPx = with(density) { (desplazamientoIndicador + (anchoIndicador / 2)).toPx() }
+                val anchoSegmentoPx = with(density) { anchoSegmento.toPx() }.coerceAtLeast(1f)
 
                 Box(
                     modifier = Modifier
@@ -146,16 +151,12 @@ fun NavbarFlotante(
                 ) {
                     items.forEachIndexed { indice, item ->
                         val seleccionado = indice == indiceSeleccionado
-                        val escala by animateFloatAsState(
-                            targetValue = if (seleccionado) 1.08f else 1f,
-                            animationSpec = spring(dampingRatio = 0.72f, stiffness = 500f),
-                            label = "navbarIconScale"
-                        )
-                        val elevacionIcono by animateDpAsState(
-                            targetValue = if (seleccionado) (-3).dp else 0.dp,
-                            animationSpec = spring(dampingRatio = 0.8f, stiffness = 420f),
-                            label = "navbarIconLift"
-                        )
+                        val centroItemPx = with(density) { ((anchoSegmento * indice) + (anchoSegmento / 2)).toPx() }
+                        val intensidad = (1f - (abs(centroIndicadorPx - centroItemPx) / anchoSegmentoPx))
+                            .coerceIn(0f, 1f)
+                        val escala = 1f + (0.08f * intensidad)
+                        val elevacionIcono = (-3f * intensidad).dp
+                        val colorIcono = lerp(NavbarIconoInactivo, Blanco, intensidad)
 
                         Box(
                             modifier = Modifier
@@ -172,7 +173,7 @@ fun NavbarFlotante(
                             Icon(
                                 imageVector = item.icono,
                                 contentDescription = item.descripcion,
-                                tint = if (seleccionado) Blanco else NavbarIconoInactivo,
+                                tint = colorIcono,
                                 modifier = Modifier
                                     .size(34.dp)
                                     .offset(y = elevacionIcono)
