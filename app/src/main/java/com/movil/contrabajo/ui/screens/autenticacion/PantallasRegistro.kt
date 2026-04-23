@@ -1,11 +1,25 @@
 package com.movil.contrabajo.ui.screens.autenticacion
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
@@ -21,12 +35,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.movil.contrabajo.ui.components.BotonPrimario
 import com.movil.contrabajo.ui.components.BotonSecundario
 import com.movil.contrabajo.ui.components.CampoContrabajo
@@ -37,6 +56,7 @@ import com.movil.contrabajo.ui.components.LogoContrabajo
 import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaBase
 import com.movil.contrabajo.ui.viewmodel.RegistroViewModel
+import java.time.LocalDate
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,39 +67,129 @@ fun PantallaRegistroPasoUno(
 ) {
     val registro = viewModel.uiState.registro
     val partesFecha = remember(registro.fechaNacimiento) { descomponerFecha(registro.fechaNacimiento) }
+    val anioMinimo = 1926
+    val anioMaximo = 2026
 
     var diaSeleccionado by rememberSaveable(registro.fechaNacimiento) { mutableIntStateOf(partesFecha.first) }
     var mesSeleccionado by rememberSaveable(registro.fechaNacimiento) { mutableIntStateOf(partesFecha.second) }
     var anioInput by rememberSaveable(registro.fechaNacimiento) { mutableStateOf(partesFecha.third) }
+    var intentoContinuar by rememberSaveable { mutableStateOf(false) }
+    var bloquearSiguiente by rememberSaveable { mutableStateOf(false) }
+
+    fun desbloquearValidacionPaso() {
+        intentoContinuar = false
+        bloquearSiguiente = false
+    }
 
     fun actualizarFechaDesdePartes() {
         val anioLimpio = anioInput.filter { it.isDigit() }.take(4)
         anioInput = anioLimpio
-        if (anioLimpio.length == 4) {
-            viewModel.actualizarFechaNacimiento(
-                "%04d-%02d-%02d".format(anioLimpio.toInt(), mesSeleccionado, diaSeleccionado)
-            )
-        } else {
+        if (anioLimpio.length != 4) {
             viewModel.actualizarFechaNacimiento("")
+            return
         }
+
+        val anio = anioLimpio.toIntOrNull() ?: run {
+            viewModel.actualizarFechaNacimiento("")
+            return
+        }
+        val diaMaximoMes = obtenerMaximoDiaDelMes(anio, mesSeleccionado)
+        if (diaSeleccionado > diaMaximoMes) {
+            diaSeleccionado = diaMaximoMes
+        }
+        val fecha = runCatching {
+            LocalDate.of(anio, mesSeleccionado, diaSeleccionado)
+        }.getOrNull() ?: run {
+            viewModel.actualizarFechaNacimiento("")
+            return
+        }
+        if (anio !in anioMinimo..anioMaximo) {
+            viewModel.actualizarFechaNacimiento("")
+            return
+        }
+        viewModel.actualizarFechaNacimiento("%04d-%02d-%02d".format(anio, mesSeleccionado, diaSeleccionado))
     }
 
-    PantallaBase {
-        LogoContrabajo(modifier = Modifier.align(Alignment.CenterHorizontally), compacto = true)
-        TarjetaBase {
-            IndicadorPasos(pasoActual = 1, totalPasos = 2)
-            EncabezadoPantalla(
-                titulo = "Crear cuenta",
-                subtitulo = "Datos personales"
-            )
-            CampoContrabajo(registro.nombre, viewModel::actualizarNombre, "Nombre")
-            CampoContrabajo(registro.apellidoPaterno, viewModel::actualizarApellidoPaterno, "Apellido paterno")
-            CampoContrabajo(registro.apellidoMaterno, viewModel::actualizarApellidoMaterno, "Apellido materno")
+    val errorNombre = if (registro.nombre.isBlank()) "Ingresa tu nombre" else null
+    val errorApellidoPaterno = if (registro.apellidoPaterno.isBlank()) "Ingresa tu apellido paterno" else null
+    val errorRun = when {
+        registro.run.length != 8 -> "El RUN debe tener 8 digitos"
+        registro.dv.isBlank() -> null
+        !validarRut(registro.run, registro.dv) -> "El RUN no es valido"
+        else -> null
+    }
+    val errorDv = if (registro.dv.isBlank()) "Ingresa el DV" else null
+    val errorTelefono = if (registro.telefono.length != 9) "Ingresa un telefono valido de 9 digitos" else null
+    val errorFecha = validarFechaNacimientoRegistro(
+        fechaTexto = registro.fechaNacimiento,
+        anioTexto = anioInput,
+        anioMinimo = anioMinimo,
+        anioMaximo = anioMaximo
+    )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    val formularioPasoUnoValido = listOf(
+        errorNombre,
+        errorApellidoPaterno,
+        errorRun,
+        errorDv,
+        errorTelefono,
+        errorFecha
+    ).all { it == null } && registro.apellidoMaterno.isNotBlank()
+
+    PantallaBase(
+        scrollable = false,
+        mostrarFondo = false
+    ) {
+        EncabezadoRegistroAnimado()
+        TarjetaBase(
+            modifier = Modifier.weight(1f),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            llenarAlto = true
+        ) {
+            IndicadorPasos(pasoActual = 1, totalPasos = 3)
+            EncabezadoPantalla(titulo = "Crear cuenta", subtitulo = "Datos personales")
+
+            CampoContrabajo(
+                valor = registro.nombre,
+                onValueChange = {
+                    desbloquearValidacionPaso()
+                    viewModel.actualizarNombre(it)
+                },
+                etiqueta = "Nombre"
+            )
+            if (intentoContinuar) TextoErrorCampo(errorNombre)
+
+            CampoContrabajo(
+                valor = registro.apellidoPaterno,
+                onValueChange = {
+                    desbloquearValidacionPaso()
+                    viewModel.actualizarApellidoPaterno(it)
+                },
+                etiqueta = "Apellido paterno"
+            )
+            if (intentoContinuar) TextoErrorCampo(errorApellidoPaterno)
+
+            CampoContrabajo(
+                valor = registro.apellidoMaterno,
+                onValueChange = {
+                    desbloquearValidacionPaso()
+                    viewModel.actualizarApellidoMaterno(it)
+                },
+                etiqueta = "Apellido materno"
+            )
+            if (intentoContinuar) TextoErrorCampo(if (registro.apellidoMaterno.isBlank()) "Ingresa tu apellido materno" else null)
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 CampoContrabajo(
                     valor = registro.run,
-                    onValueChange = viewModel::actualizarRun,
+                    onValueChange = {
+                        desbloquearValidacionPaso()
+                        viewModel.actualizarRun(it)
+                    },
                     etiqueta = "RUN",
                     modifier = Modifier.weight(1f),
                     visualTransformation = FormatoRunVisualTransformation
@@ -92,18 +202,26 @@ fun PantallaRegistroPasoUno(
                 )
                 CampoContrabajo(
                     valor = registro.dv,
-                    onValueChange = viewModel::actualizarDv,
+                    onValueChange = {
+                        desbloquearValidacionPaso()
+                        viewModel.actualizarDv(it)
+                    },
                     etiqueta = "DV",
                     modifier = Modifier.weight(0.35f)
                 )
             }
+            if (intentoContinuar) TextoErrorCampo(errorRun ?: errorDv)
 
             CampoContrabajo(
                 valor = registro.telefono,
-                onValueChange = viewModel::actualizarTelefono,
+                onValueChange = {
+                    desbloquearValidacionPaso()
+                    viewModel.actualizarTelefono(it)
+                },
                 etiqueta = "Telefono (+56)",
                 visualTransformation = FormatoTelefonoVisualTransformation
             )
+            if (intentoContinuar) TextoErrorCampo(errorTelefono)
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -116,6 +234,7 @@ fun PantallaRegistroPasoUno(
                     opciones = (1..31).map { it.toString() },
                     modifier = Modifier.weight(0.30f)
                 ) { seleccionado ->
+                    desbloquearValidacionPaso()
                     diaSeleccionado = seleccionado.toIntOrNull() ?: diaSeleccionado
                     actualizarFechaDesdePartes()
                 }
@@ -125,12 +244,14 @@ fun PantallaRegistroPasoUno(
                     opciones = (1..12).map { mesLabel(it) },
                     modifier = Modifier.weight(0.42f)
                 ) { seleccionado ->
+                    desbloquearValidacionPaso()
                     mesSeleccionado = (1..12).firstOrNull { mesLabel(it) == seleccionado } ?: mesSeleccionado
                     actualizarFechaDesdePartes()
                 }
                 CampoContrabajo(
                     valor = anioInput,
                     onValueChange = {
+                        desbloquearValidacionPaso()
                         anioInput = it.filter { c -> c.isDigit() }.take(4)
                         actualizarFechaDesdePartes()
                     },
@@ -138,10 +259,222 @@ fun PantallaRegistroPasoUno(
                     modifier = Modifier.weight(0.28f)
                 )
             }
+            if (intentoContinuar) TextoErrorCampo(errorFecha)
 
-            BotonPrimario(texto = "Siguiente", onClick = onContinuar)
+            Spacer(modifier = Modifier.weight(1f))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                BotonSecundario(
+                    texto = "Volver",
+                    onClick = onVolver,
+                    modifier = Modifier.weight(1f)
+                )
+                BotonPrimario(
+                    texto = "Siguiente",
+                    enabled = !bloquearSiguiente,
+                    onClick = {
+                        intentoContinuar = true
+                        if (formularioPasoUnoValido) {
+                            onContinuar()
+                        } else {
+                            bloquearSiguiente = true
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
-        BotonSecundario(texto = "Volver", onClick = onVolver)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PantallaRegistroPasoDireccion(
+    viewModel: RegistroViewModel,
+    onVolver: () -> Unit,
+    onContinuar: () -> Unit
+) {
+    val registro = viewModel.uiState.registro
+    val context = LocalContext.current
+    var desplegarComunas by rememberSaveable { mutableStateOf(false) }
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+
+    LaunchedEffect(Unit) {
+        if (registro.region.isBlank()) {
+            viewModel.actualizarRegion("Region Metropolitana")
+        }
+    }
+
+    val reportarErrorUbicacion: () -> Unit = {
+        Toast.makeText(
+            context,
+            "No se pudo obtener ubicacion actual. Puedes continuar igual.",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+    val actualizarUbicacionReal: () -> Unit = {
+        val tieneFine = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val prioridad = if (tieneFine) {
+            Priority.PRIORITY_HIGH_ACCURACY
+        } else {
+            Priority.PRIORITY_BALANCED_POWER_ACCURACY
+        }
+        val token = CancellationTokenSource()
+        fusedLocationClient.getCurrentLocation(prioridad, token.token)
+            .addOnSuccessListener { location ->
+                if (location != null) {
+                    viewModel.actualizarCoordenadasRegistro(location.latitude, location.longitude)
+                    Toast.makeText(context, "Ubicacion actual capturada.", Toast.LENGTH_SHORT).show()
+                } else {
+                    fusedLocationClient.lastLocation
+                        .addOnSuccessListener { ultima ->
+                            if (ultima != null) {
+                                viewModel.actualizarCoordenadasRegistro(ultima.latitude, ultima.longitude)
+                                Toast.makeText(context, "Ubicacion actual capturada.", Toast.LENGTH_SHORT).show()
+                            } else {
+                                reportarErrorUbicacion()
+                            }
+                        }
+                        .addOnFailureListener { reportarErrorUbicacion() }
+                }
+            }
+            .addOnFailureListener { reportarErrorUbicacion() }
+    }
+    val solicitudPermisosLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permisos ->
+        val concedido = permisos[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permisos[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (concedido) {
+            actualizarUbicacionReal()
+        } else {
+            reportarErrorUbicacion()
+        }
+    }
+
+    PantallaBase(
+        scrollable = false,
+        mostrarFondo = false
+    ) {
+        EncabezadoRegistroAnimado()
+        TarjetaBase(
+            modifier = Modifier.weight(1f),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            llenarAlto = true
+        ) {
+            IndicadorPasos(pasoActual = 2, totalPasos = 3)
+            EncabezadoPantalla(titulo = "Crear cuenta", subtitulo = "Direccion (opcional)")
+
+            OutlinedTextField(
+                value = "Region Metropolitana",
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Region") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            ExposedDropdownMenuBox(
+                expanded = desplegarComunas,
+                onExpandedChange = { desplegarComunas = !desplegarComunas }
+            ) {
+                OutlinedTextField(
+                    value = registro.comuna.ifBlank { "Seleccionar comuna" },
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Comuna") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegarComunas) },
+                    singleLine = true
+                )
+                DropdownMenu(
+                    expanded = desplegarComunas,
+                    onDismissRequest = { desplegarComunas = false }
+                ) {
+                    COMUNAS_REGION_METROPOLITANA.forEach { comuna ->
+                        DropdownMenuItem(
+                            text = { Text(comuna) },
+                            onClick = {
+                                viewModel.actualizarComuna(comuna)
+                                desplegarComunas = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CampoContrabajo(
+                    valor = registro.calle,
+                    onValueChange = viewModel::actualizarCalle,
+                    etiqueta = "Calle",
+                    modifier = Modifier.weight(1f)
+                )
+                CampoContrabajo(
+                    valor = registro.numeroDireccion,
+                    onValueChange = viewModel::actualizarNumeroDireccion,
+                    etiqueta = "N°",
+                    modifier = Modifier.weight(0.33f)
+                )
+            }
+
+            BotonPrimario(
+                texto = "Obtener ubicacion actual",
+                onClick = {
+                    val tieneFine = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                    val tieneCoarse = ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (tieneFine || tieneCoarse) {
+                        actualizarUbicacionReal()
+                    } else {
+                        solicitudPermisosLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                    }
+                }
+            )
+
+            Text(
+                text = "La direccion es opcional. Si no la ingresas, usaremos datos genericos para continuar.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                BotonSecundario(
+                    texto = "Atras",
+                    onClick = onVolver,
+                    modifier = Modifier.weight(1f)
+                )
+                BotonPrimario(
+                    texto = "Siguiente",
+                    onClick = onContinuar,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
     }
 }
 
@@ -153,6 +486,18 @@ fun PantallaRegistroPasoDos(
 ) {
     val uiState = viewModel.uiState
     val registro = uiState.registro
+    var intentoRegistro by rememberSaveable { mutableStateOf(false) }
+
+    val errorUsername = if (registro.username.isBlank()) "Ingresa un nombre de usuario" else null
+    val errorCorreo = if (registro.correo.isBlank() || !registro.correo.contains("@")) "Ingresa un correo valido" else null
+    val errorContrasena = if (registro.contrasena.length < 6) "La contrasena debe tener al menos 6 caracteres" else null
+    val errorConfirmacion = if (registro.contrasena != registro.confirmarContrasena) "Las contrasenas no coinciden" else null
+    val formularioPasoTresValido = listOf(
+        errorUsername,
+        errorCorreo,
+        errorContrasena,
+        errorConfirmacion
+    ).all { it == null }
 
     LaunchedEffect(uiState.registroExitoso) {
         if (uiState.registroExitoso) {
@@ -161,31 +506,50 @@ fun PantallaRegistroPasoDos(
         }
     }
 
-    PantallaBase {
-        LogoContrabajo(modifier = Modifier.align(Alignment.CenterHorizontally), compacto = true)
-        TarjetaBase {
-            IndicadorPasos(pasoActual = 2, totalPasos = 2)
+    PantallaBase(
+        scrollable = false,
+        mostrarFondo = false
+    ) {
+        EncabezadoRegistroAnimado()
+        TarjetaBase(
+            modifier = Modifier.weight(1f),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            llenarAlto = true
+        ) {
+            IndicadorPasos(pasoActual = 3, totalPasos = 3)
             EncabezadoPantalla(
                 titulo = "Crear cuenta",
                 subtitulo = "Datos de la cuenta"
             )
+
             CampoContrabajo(registro.username, viewModel::actualizarUsername, "Nombre de usuario")
+            if (intentoRegistro || registro.username.isNotBlank()) {
+                TextoErrorCampo(errorUsername)
+            }
+
             CampoContrabajo(registro.correo, viewModel::actualizarCorreo, "Correo electronico")
+            if (intentoRegistro || registro.correo.isNotBlank()) {
+                TextoErrorCampo(errorCorreo)
+            }
+
             CampoSecretoContrabajo(
                 valor = registro.contrasena,
                 onValueChange = viewModel::actualizarContrasena,
                 etiqueta = "Contrasena"
             )
+            if (intentoRegistro || registro.contrasena.isNotBlank()) {
+                TextoErrorCampo(errorContrasena)
+            }
+
             CampoSecretoContrabajo(
                 valor = registro.confirmarContrasena,
                 onValueChange = viewModel::actualizarConfirmarContrasena,
                 etiqueta = "Confirmar contrasena"
             )
-            Text(
-                text = "Acepto los terminos y condiciones.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (intentoRegistro || registro.confirmarContrasena.isNotBlank()) {
+                TextoErrorCampo(errorConfirmacion)
+            }
+
             if (uiState.error != null) {
                 Text(
                     text = uiState.error.orEmpty(),
@@ -194,13 +558,68 @@ fun PantallaRegistroPasoDos(
                     fontWeight = FontWeight.Medium
                 )
             }
-            BotonPrimario(
-                texto = "Registrarse",
-                onClick = viewModel::registrarUsuario
+
+            Spacer(modifier = Modifier.weight(1f))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                BotonSecundario(
+                    texto = "Volver",
+                    onClick = onVolver,
+                    modifier = Modifier.weight(1f)
+                )
+                BotonPrimario(
+                    texto = "Registrarse",
+                    enabled = formularioPasoTresValido,
+                    onClick = {
+                        intentoRegistro = true
+                        if (formularioPasoTresValido) {
+                            viewModel.registrarUsuario()
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EncabezadoRegistroAnimado(modifier: Modifier = Modifier) {
+    var visible by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(animationSpec = tween(durationMillis = 220)) +
+                slideInVertically(
+                    initialOffsetY = { it / 5 },
+                    animationSpec = tween(durationMillis = 260)
+                )
+        ) {
+            LogoContrabajo(
+                tamanoPersonalizado = 148.dp,
+                mostrarTitulo = false
             )
         }
-        BotonSecundario(texto = "Volver", onClick = onVolver)
     }
+}
+
+@Composable
+private fun TextoErrorCampo(error: String?) {
+    if (error == null) return
+    Text(
+        text = error,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
+        fontWeight = FontWeight.Medium
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -230,7 +649,7 @@ private fun ComboRegistro(
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegado) },
             singleLine = true
         )
-        ExposedDropdownMenu(
+        DropdownMenu(
             expanded = desplegado,
             onDismissRequest = { desplegado = false }
         ) {
@@ -272,6 +691,53 @@ private fun descomponerFecha(fecha: String): Triple<Int, Int, String> {
     val mes = partes[1].toIntOrNull()?.coerceIn(1, 12) ?: 1
     val dia = partes[2].toIntOrNull()?.coerceIn(1, 31) ?: 1
     return Triple(dia, mes, anio)
+}
+
+private fun validarFechaNacimientoRegistro(
+    fechaTexto: String,
+    anioTexto: String,
+    anioMinimo: Int,
+    anioMaximo: Int
+): String? {
+    val anioNumerico = anioTexto.toIntOrNull()
+    if (anioTexto.length == 4 && anioNumerico != null && (anioNumerico < anioMinimo || anioNumerico > anioMaximo)) {
+        return "El año debe estar entre $anioMinimo y $anioMaximo"
+    }
+    if (fechaTexto.isBlank()) return "Ingresa una fecha de nacimiento valida"
+    val fecha = runCatching { LocalDate.parse(fechaTexto) }.getOrNull()
+        ?: return "Ingresa una fecha de nacimiento valida"
+    val anio = fecha.year
+    return when {
+        anio !in anioMinimo..anioMaximo -> "El año debe estar entre $anioMinimo y $anioMaximo"
+        else -> null
+    }
+}
+
+private fun obtenerMaximoDiaDelMes(anio: Int, mes: Int): Int {
+    return runCatching {
+        LocalDate.of(anio, mes.coerceIn(1, 12), 1).lengthOfMonth()
+    }.getOrElse { 31 }
+}
+
+private fun validarRut(runRaw: String, dvRaw: String): Boolean {
+    val run = runRaw.filter { it.isDigit() }.take(8)
+    if (run.length != 8) return false
+    val dv = dvRaw.trim().uppercase()
+    if (dv.isBlank()) return false
+
+    var suma = 0
+    var multiplicador = 2
+    for (i in run.length - 1 downTo 0) {
+        suma += (run[i] - '0') * multiplicador
+        multiplicador = if (multiplicador == 7) 2 else multiplicador + 1
+    }
+    val resto = 11 - (suma % 11)
+    val esperado = when (resto) {
+        11 -> "0"
+        10 -> "K"
+        else -> resto.toString()
+    }
+    return dv == esperado
 }
 
 private object FormatoRunVisualTransformation : VisualTransformation {
@@ -354,3 +820,15 @@ private fun mapTransformadoAOriginal(
     }
     return consumidos.coerceIn(0, originalDigits.length)
 }
+
+private val COMUNAS_REGION_METROPOLITANA = listOf(
+    "Alhue", "Buin", "Calera de Tango", "Cerrillos", "Cerro Navia", "Colina",
+    "Conchali", "Curacavi", "El Bosque", "El Monte", "Estacion Central", "Huechuraba",
+    "Independencia", "Isla de Maipo", "La Cisterna", "La Florida", "La Granja", "La Pintana",
+    "La Reina", "Lampa", "Las Condes", "Lo Barnechea", "Lo Espejo", "Lo Prado",
+    "Macul", "Maipu", "Maria Pinto", "Melipilla", "Nunoa", "Padre Hurtado",
+    "Paine", "Pedro Aguirre Cerda", "Penaflor", "Penalolen", "Pirque", "Providencia",
+    "Pudahuel", "Puente Alto", "Quilicura", "Quinta Normal", "Recoleta", "Renca",
+    "San Bernardo", "San Joaquin", "San Jose de Maipo", "San Miguel", "San Pedro",
+    "San Ramon", "Santiago", "Talagante", "Tiltil", "Vitacura"
+)

@@ -5,15 +5,20 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -21,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -29,6 +35,7 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -41,6 +48,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,6 +77,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -105,6 +114,7 @@ fun PantallaPrincipal(
     viewModel: PrincipalViewModel,
     onAbrirServicio: (Long) -> Unit,
     onAbrirAjustes: () -> Unit,
+    onAbrirUbicacionRapida: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState = viewModel.uiState
@@ -119,6 +129,8 @@ fun PantallaPrincipal(
     var categoriaTemporal by rememberSaveable { mutableStateOf<Long?>(null) }
     var tipoPrecioTemporal by rememberSaveable { mutableStateOf<Int?>(null) }
     var soloVerificadosTemporal by rememberSaveable { mutableStateOf(false) }
+    var filtroZonaComunaTemporal by rememberSaveable { mutableStateOf(false) }
+    var comunaTemporal by rememberSaveable { mutableStateOf("") }
     var ordenTemporal by rememberSaveable { mutableStateOf(OrdenMarketplace.FECHA_RECIENTES.name) }
     var busquedaActiva by remember { mutableStateOf(false) }
     val cerrarBusquedaFuera: () -> Unit = {
@@ -188,6 +200,8 @@ fun PantallaPrincipal(
             categoriaTemporal = uiState.filtroCategoriaId
             tipoPrecioTemporal = uiState.filtroTipoPrecio
             soloVerificadosTemporal = uiState.soloTrabajadorVerificado
+            filtroZonaComunaTemporal = uiState.filtroZonaComunaActivo
+            comunaTemporal = uiState.comunaFiltro
             ordenTemporal = uiState.ordenMarketplace.name
         }
     }
@@ -216,7 +230,8 @@ fun PantallaPrincipal(
     PantallaBase(
         modifier = modifier,
         scrollable = false,
-        mostrarFondo = false
+        mostrarFondo = false,
+        respetarNavegacionInferior = false
     ) {
         Surface(
             modifier = Modifier
@@ -374,6 +389,17 @@ fun PantallaPrincipal(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 IconButton(onClick = {
                     cerrarBusquedaFuera()
+                    onAbrirUbicacionRapida()
+                }) {
+                    Icon(
+                        imageVector = Icons.Filled.Place,
+                        contentDescription = "Ubicacion",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                IconButton(onClick = {
+                    cerrarBusquedaFuera()
                     mostrarModalFiltros = true
                 }) {
                     Icon(
@@ -419,8 +445,18 @@ fun PantallaPrincipal(
                     .offset(y = estiramientoContenido)
             ) {
                 if (uiState.ofertas.isEmpty()) {
+                    val hayBusquedaOFiltrosActivos =
+                        uiState.busqueda.isNotBlank() ||
+                            uiState.filtroCategoriaId != null ||
+                            uiState.filtroTipoPrecio != null ||
+                            uiState.soloTrabajadorVerificado ||
+                            uiState.filtroZonaComunaActivo
                     val textoEstado = if (uiState.filtroPorCoordenadasActivo) {
-                        "No hay publicaciones dentro de tu rango actual."
+                        if (hayBusquedaOFiltrosActivos) {
+                            "No hay coincidencias. Ajusta tu busqueda, filtros o rango."
+                        } else {
+                            "No hay publicaciones dentro de tu rango actual."
+                        }
                     } else {
                         "Obten tu ubicacion en Ajustes > Ubicacion > Obtener ubicacion."
                     }
@@ -445,7 +481,7 @@ fun PantallaPrincipal(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         userScrollEnabled = !bloquearScrollVertical,
-                        contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 108.dp)
+                        contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 0.dp)
                     ) {
                         items(uiState.ofertas, key = { it.idOfertaServicio }) { oferta ->
                             TarjetaMarketplaceCompacta(
@@ -528,16 +564,22 @@ fun PantallaPrincipal(
             categoriaSeleccionada = categoriaTemporal,
             tipoPrecioSeleccionado = tipoPrecioTemporal,
             soloVerificados = soloVerificadosTemporal,
+            filtroZonaComunaActivo = filtroZonaComunaTemporal,
+            comunaSeleccionada = comunaTemporal,
             ordenActual = OrdenMarketplace.valueOf(ordenTemporal),
             onCategoriaSeleccionada = { categoriaTemporal = it },
             onTipoPrecioSeleccionado = { tipoPrecioTemporal = it },
             onSoloVerificadosCambiado = { soloVerificadosTemporal = it },
+            onFiltroZonaComunaCambiado = { filtroZonaComunaTemporal = it },
+            onComunaSeleccionada = { comunaTemporal = it },
             onOrdenSeleccionado = { ordenTemporal = it.name },
             onAplicar = {
                 viewModel.aplicarFiltros(
                     categoriaId = categoriaTemporal,
                     tipoPrecio = tipoPrecioTemporal,
                     soloVerificados = soloVerificadosTemporal,
+                    filtroZonaComunaActivo = filtroZonaComunaTemporal,
+                    comunaFiltro = comunaTemporal,
                     orden = OrdenMarketplace.valueOf(ordenTemporal)
                 )
                 mostrarModalFiltros = false
@@ -551,29 +593,40 @@ fun PantallaPrincipal(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun FiltroMarketplaceDialog(
     categorias: List<Pair<Long, String>>,
     categoriaSeleccionada: Long?,
     tipoPrecioSeleccionado: Int?,
     soloVerificados: Boolean,
+    filtroZonaComunaActivo: Boolean,
+    comunaSeleccionada: String,
     ordenActual: OrdenMarketplace,
     onCategoriaSeleccionada: (Long?) -> Unit,
     onTipoPrecioSeleccionado: (Int?) -> Unit,
     onSoloVerificadosCambiado: (Boolean) -> Unit,
+    onFiltroZonaComunaCambiado: (Boolean) -> Unit,
+    onComunaSeleccionada: (String) -> Unit,
     onOrdenSeleccionado: (OrdenMarketplace) -> Unit,
     onAplicar: () -> Unit,
     onLimpiar: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var desplegarCategorias by rememberSaveable { mutableStateOf(false) }
+    var desplegarComunas by rememberSaveable { mutableStateOf(false) }
+    val alturaMaxModal = LocalConfiguration.current.screenHeightDp.dp * 0.72f
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Filtrar y ordenar") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = alturaMaxModal),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 ExposedDropdownMenuBox(
                     expanded = desplegarCategorias,
                     onExpandedChange = { desplegarCategorias = !desplegarCategorias }
@@ -617,32 +670,23 @@ private fun FiltroMarketplaceDialog(
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OpcionFiltro(
-                        texto = "Todos",
-                        seleccionada = tipoPrecioSeleccionado == null,
-                        onClick = { onTipoPrecioSeleccionado(null) }
-                    )
-                    OpcionFiltro(
-                        texto = "Fijo",
-                        seleccionada = tipoPrecioSeleccionado == TipoPrecio.FIJO,
-                        onClick = { onTipoPrecioSeleccionado(TipoPrecio.FIJO) }
-                    )
-                    OpcionFiltro(
-                        texto = "Por hora",
-                        seleccionada = tipoPrecioSeleccionado == TipoPrecio.POR_HORA,
-                        onClick = { onTipoPrecioSeleccionado(TipoPrecio.POR_HORA) }
-                    )
-                    OpcionFiltro(
-                        texto = "Desde",
-                        seleccionada = tipoPrecioSeleccionado == TipoPrecio.DESDE,
-                        onClick = { onTipoPrecioSeleccionado(TipoPrecio.DESDE) }
-                    )
-                    OpcionFiltro(
-                        texto = "Contactar",
-                        seleccionada = tipoPrecioSeleccionado == TipoPrecio.CONTACTAR,
-                        onClick = { onTipoPrecioSeleccionado(TipoPrecio.CONTACTAR) }
-                    )
+                val opcionesTipoPrecio = listOf(
+                    "Todos" to null,
+                    "Fijo" to TipoPrecio.FIJO,
+                    "Por hora" to TipoPrecio.POR_HORA,
+                    "Desde" to TipoPrecio.DESDE,
+                    "Contactar" to TipoPrecio.CONTACTAR
+                )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(opcionesTipoPrecio) { (texto, valor) ->
+                        BotonOrdenCompacto(
+                            texto = texto,
+                            seleccionado = tipoPrecioSeleccionado == valor,
+                            onClick = { onTipoPrecioSeleccionado(valor) }
+                        )
+                    }
                 }
 
                 OpcionFiltro(
@@ -651,25 +695,71 @@ private fun FiltroMarketplaceDialog(
                     onClick = { onSoloVerificadosCambiado(!soloVerificados) }
                 )
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Filtrar por comuna",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Switch(
+                        checked = filtroZonaComunaActivo,
+                        onCheckedChange = { onFiltroZonaComunaCambiado(it) }
+                    )
+                }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { if (filtroZonaComunaActivo) desplegarComunas = true },
+                        enabled = filtroZonaComunaActivo,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = comunaSeleccionada.ifBlank { "Seleccionar comuna" },
+                            modifier = Modifier.fillMaxWidth(),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = desplegarComunas && filtroZonaComunaActivo,
+                        onDismissRequest = { desplegarComunas = false }
+                    ) {
+                        COMUNAS_REGION_METROPOLITANA.forEach { comuna ->
+                            DropdownMenuItem(
+                                text = { Text(comuna) },
+                                onClick = {
+                                    onComunaSeleccionada(comuna)
+                                    desplegarComunas = false
+                                }
+                            )
+                        }
+                    }
+                }
+
                 Text(
                     text = "Orden",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OpcionFiltro(
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    BotonOrdenCompacto(
                         texto = "A -> Z",
-                        seleccionada = ordenActual == OrdenMarketplace.ALFABETICO_A_Z,
+                        seleccionado = ordenActual == OrdenMarketplace.ALFABETICO_A_Z,
                         onClick = { onOrdenSeleccionado(OrdenMarketplace.ALFABETICO_A_Z) }
                     )
-                    OpcionFiltro(
-                        texto = "Mas recientes",
-                        seleccionada = ordenActual == OrdenMarketplace.FECHA_RECIENTES,
+                    BotonOrdenCompacto(
+                        texto = "Recientes",
+                        seleccionado = ordenActual == OrdenMarketplace.FECHA_RECIENTES,
                         onClick = { onOrdenSeleccionado(OrdenMarketplace.FECHA_RECIENTES) }
                     )
-                    OpcionFiltro(
-                        texto = "Mas antiguas",
-                        seleccionada = ordenActual == OrdenMarketplace.FECHA_ANTIGUAS,
+                    BotonOrdenCompacto(
+                        texto = "Antiguas",
+                        seleccionado = ordenActual == OrdenMarketplace.FECHA_ANTIGUAS,
                         onClick = { onOrdenSeleccionado(OrdenMarketplace.FECHA_ANTIGUAS) }
                     )
                 }
@@ -720,3 +810,40 @@ private fun OpcionFiltro(
         )
     }
 }
+
+@Composable
+private fun BotonOrdenCompacto(
+    texto: String,
+    seleccionado: Boolean,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (seleccionado) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        )
+    ) {
+        Text(
+            text = texto,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (seleccionado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+private val COMUNAS_REGION_METROPOLITANA = listOf(
+    "Alhue", "Buin", "Calera de Tango", "Cerrillos", "Cerro Navia", "Colina",
+    "Conchali", "Curacavi", "El Bosque", "El Monte", "Estacion Central", "Huechuraba",
+    "Independencia", "Isla de Maipo", "La Cisterna", "La Florida", "La Granja", "La Pintana",
+    "La Reina", "Lampa", "Las Condes", "Lo Barnechea", "Lo Espejo", "Lo Prado",
+    "Macul", "Maipu", "Maria Pinto", "Melipilla", "Nunoa", "Padre Hurtado",
+    "Paine", "Pedro Aguirre Cerda", "Penaflor", "Penalolen", "Pirque", "Providencia",
+    "Pudahuel", "Puente Alto", "Quilicura", "Quinta Normal", "Recoleta", "Renca",
+    "San Bernardo", "San Joaquin", "San Jose de Maipo", "San Miguel", "San Pedro",
+    "San Ramon", "Santiago", "Talagante", "Tiltil", "Vitacura"
+)

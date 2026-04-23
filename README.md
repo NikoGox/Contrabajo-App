@@ -15,23 +15,26 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.4.1-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.4.2-Pre-Alpha
 
 
 
-> <br>• Iteración de ajuste fino UX/UI sobre `0.4-Pre-Alpha`, enfocada en estabilidad de navegación y fluidez visual en dispositivo real.
-> <br>• Se agregó `SplashActivity` personalizada con `ct_icon`, barra de progreso y transición inicial para mejorar la entrada a la app.
-> <br>• Se actualizó inicio de sesión automático (recordarme) con carga controlada para evitar saltos bruscos al entrar al shell principal.
-> <br>• Se rehízo topbar de búsqueda en Principal con un solo contenedor estable (sin doble borde), glow azul/cyan/verde y cierre por toque fuera.
-> <br>• Se normalizó cancelación de búsqueda al tocar tarjeta/rango/filtros, manteniendo el texto escrito para continuidad de uso.
-> <br>• Se corrigió long-press en tarjetas de exploración para evitar solapes/deformaciones y mantener el grid estable.
-> <br>• Se estabilizó swipe horizontal en detalle con enfoque de 3 tarjetas vivas (anterior/actual/siguiente) y menor tirón visual.
-> <br>• Se mantuvo vinculación entre Exploración y Detalle (mismo orden/dataset/filtros al abrir publicaciones).
-> <br>• Se optimizó render del mapa en detalle para reducir parpadeo e invalidaciones innecesarias durante gestos.
-> <br>• Se ajustó transición de ruta Servicio: entra desde abajo y sale hacia abajo con desplazamiento medio + fade.
-> <br>• Se eliminó UI bloqueante al abrir detalle (sin oscurecer, sin spinner, sin cinta/texto), dejando precarga silenciosa.
-> <br>• Se retiró overlay visual interno de "Preparando tarjetas...", manteniendo solo bloqueo táctil silencioso cuando falta precarga.
-> <br>• Se homologó la geometría de topbars entre Principal/Detalle/Ajustes y se desactivó animación defectuosa en Ajustes.
+> <br>• Iteración enfocada en estabilización UX/UI en dispositivo real y consolidación funcional de mensajería y coordinación entre usuarios.
+> <br>• Se mejoró la navegación entre exploración y detalle para mantener contexto, orden y filtros activos sin perder continuidad.
+> <br>• La búsqueda quedó más consistente al combinar texto, categoría, zona y distancia con resultados más claros.
+> <br>• Se ajustó el filtro por distancia para respetar estrictamente el rango configurado por el usuario.
+> <br>• Se simplificó el comportamiento de filtros al reabrir la app, priorizando una sesión de búsqueda limpia.
+> <br>• Se redujo el tiempo de inicio automático con recordarme para dar una entrada más rápida a la app.
+> <br>• Se rediseñó el flujo de registro para hacerlo más guiado y con validaciones más claras.
+> <br>• Se fortaleció la validación de fecha de nacimiento y datos personales para evitar registros inválidos.
+> <br>• Se simplificó la pantalla de dirección en registro eliminando campos no prioritarios.
+> <br>• Se mejoró el feedback visual de errores en formularios para corregir datos más rápido.
+> <br>• Se actualizó el branding en splash, carga, inicio, login y registro con logos y proporciones más coherentes.
+> <br>• Se habilitó contacto real desde publicación hacia conversación directa entre usuarios.
+> <br>• Se consolidó el historial de mensajes y la experiencia de chat con mejor trazabilidad de lectura.
+> <br>• Se incorporó coordinación por cita dentro de conversación, incluyendo estados visibles de avance.
+> <br>• Se realizaron rondas de pulido visual en detalle, exploración, registro y chat (sombras, alturas e insets).
+> <br>• Se revirtió el último ajuste agresivo de tarjetas en detalle para mantener una versión visual más estable.
 
 ---
 

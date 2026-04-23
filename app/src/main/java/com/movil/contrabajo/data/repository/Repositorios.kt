@@ -2,7 +2,10 @@ package com.movil.contrabajo.data.repository
 
 import com.movil.contrabajo.data.local.ContrabajoSQLiteHelper
 import com.movil.contrabajo.domain.model.CategoriaServicio
+import com.movil.contrabajo.domain.model.CitaServicio
 import com.movil.contrabajo.domain.model.ChatCita
+import com.movil.contrabajo.domain.model.EstadoCita
+import com.movil.contrabajo.domain.model.FiltroMarketplaceConfig
 import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
 import com.movil.contrabajo.domain.model.OfertaServicio
@@ -32,6 +35,9 @@ interface RepositorioPerfil {
     fun guardarPreguntaSeguridad(indice: Int, pregunta: String, respuesta: String): Result<List<PreguntaSeguridadConfig>>
     fun obtenerUbicacionAjustes(): UbicacionAjustesConfig
     fun guardarUbicacionAjustes(config: UbicacionAjustesConfig): Result<UbicacionAjustesConfig>
+    fun obtenerFiltrosMarketplace(): FiltroMarketplaceConfig
+    fun guardarFiltrosMarketplace(config: FiltroMarketplaceConfig): Result<FiltroMarketplaceConfig>
+    fun limpiarFiltrosMarketplace(): Result<FiltroMarketplaceConfig>
     fun actualizarFotoPerfil(uriLocal: String): Result<Usuario>
 }
 
@@ -47,8 +53,15 @@ interface RepositorioOfertas {
 }
 
 interface RepositorioChats {
+    fun obtenerIdUsuarioActual(): Long?
     fun obtenerChatsActuales(): List<ChatCita>
     fun obtenerMensajes(idChatCita: Long): List<MensajeChat>
+    fun iniciarConversacionDesdeOferta(idOfertaServicio: Long): Result<ChatCita>
+    fun obtenerChat(idChatCita: Long): ChatCita?
+    fun enviarMensaje(idChatCita: Long, contenido: String): Result<MensajeChat>
+    fun crearCitaDesdeChat(idChatCita: Long, fechaProgramada: String, detalle: String): Result<CitaServicio>
+    fun obtenerCitaPorChat(idChatCita: Long): CitaServicio?
+    fun actualizarEstadoCita(idCita: Long, nuevoEstado: Int): Result<CitaServicio>
 }
 
 class RepositorioAutenticacionLocal(
@@ -101,6 +114,7 @@ class RepositorioAutenticacionLocal(
 
         val id = db.insertarUsuario(usuario)
         if (id <= 0) return Result.failure(IllegalStateException("No se pudo registrar el usuario"))
+        db.guardarUbicacionUsuario(id, normalizarUbicacionRegistro(registro))
         db.guardarSesion(id, true)
         return Result.success(db.obtenerUsuarioPorId(id) ?: usuario.copy(idUsuario = id))
     }
@@ -109,20 +123,39 @@ class RepositorioAutenticacionLocal(
         db.cerrarSesion()
     }
 
-    private fun validarRegistro(registro: RegistroPendiente): String? = when {
-        registro.nombre.isBlank() -> "Ingresa tu nombre"
-        registro.apellidoPaterno.isBlank() -> "Ingresa tu apellido paterno"
-        registro.run.isBlank() || registro.dv.isBlank() -> "Ingresa un RUN valido"
-        limpiarRun(registro.run).length != 8 -> "El RUN debe tener exactamente 8 digitos"
-        !validarRut(registro.run, registro.dv) -> "El RUN no es valido"
-        digitosTelefono(registro.telefono).length != 9 -> "Ingresa un telefono valido de 9 digitos"
-        registro.username.isBlank() -> "Ingresa un nombre de usuario"
-        registro.correo.isBlank() || !registro.correo.contains("@") -> "Ingresa un correo valido"
-        registro.fechaNacimiento.isBlank() -> "Ingresa tu fecha de nacimiento"
-        !esFechaValida(registro.fechaNacimiento) -> "La fecha de nacimiento debe tener formato yyyy-MM-dd"
-        registro.contrasena.length < 6 -> "La contrasena debe tener al menos 6 caracteres"
-        registro.contrasena != registro.confirmarContrasena -> "Las contrasenas no coinciden"
-        else -> null
+    private fun validarRegistro(registro: RegistroPendiente): String? {
+        val errorFechaNacimiento = if (registro.fechaNacimiento.isBlank()) {
+            "Ingresa tu fecha de nacimiento"
+        } else {
+            validarFechaNacimiento(registro.fechaNacimiento)
+        }
+
+        return when {
+            registro.nombre.isBlank() -> "Ingresa tu nombre"
+            !esNombrePersonaValido(registro.nombre) -> "El nombre solo puede contener letras"
+            registro.apellidoPaterno.isBlank() -> "Ingresa tu apellido paterno"
+            !esNombrePersonaValido(registro.apellidoPaterno) -> "El apellido paterno solo puede contener letras"
+            registro.apellidoMaterno.isBlank() -> "Ingresa tu apellido materno"
+            !esNombrePersonaValido(registro.apellidoMaterno) -> "El apellido materno solo puede contener letras"
+            registro.run.isBlank() || registro.dv.isBlank() -> "Ingresa un RUN valido"
+            limpiarRun(registro.run).length != 8 -> "El RUN debe tener exactamente 8 digitos"
+            !validarRut(registro.run, registro.dv) -> "El RUN no es valido"
+            digitosTelefono(registro.telefono).length != 9 -> "Ingresa un telefono valido de 9 digitos"
+            registro.username.isBlank() -> "Ingresa un nombre de usuario"
+            registro.correo.isBlank() || !registro.correo.contains("@") -> "Ingresa un correo valido"
+            errorFechaNacimiento != null -> errorFechaNacimiento
+            registro.contrasena.length < 6 -> "La contrasena debe tener al menos 6 caracteres"
+            registro.contrasena != registro.confirmarContrasena -> "Las contrasenas no coinciden"
+            else -> null
+        }
+    }
+
+    private fun esNombrePersonaValido(texto: String): Boolean {
+        val limpio = texto.trim()
+        if (limpio.isBlank()) return false
+        return limpio.all { caracter ->
+            caracter.isLetter() || caracter == ' ' || caracter == '\'' || caracter == '-'
+        }
     }
 
     private fun limpiarRun(run: String): String = run.filter { it.isDigit() }
@@ -153,11 +186,29 @@ class RepositorioAutenticacionLocal(
         return dv == dvEsperado
     }
 
-    private fun esFechaValida(fecha: String): Boolean = try {
-        LocalDate.parse(fecha.trim())
-        true
-    } catch (_: DateTimeParseException) {
-        false
+    private fun validarFechaNacimiento(fecha: String): String? {
+        val fechaNacimiento = try {
+            LocalDate.parse(fecha.trim())
+        } catch (_: DateTimeParseException) {
+            return "La fecha de nacimiento debe tener formato yyyy-MM-dd"
+        }
+        val anio = fechaNacimiento.year
+        return when {
+            anio < 1926 || anio > 2026 -> "El año de nacimiento debe estar entre 1926 y 2026"
+            else -> null
+        }
+    }
+
+    private fun normalizarUbicacionRegistro(registro: RegistroPendiente): UbicacionAjustesConfig {
+        return UbicacionAjustesConfig(
+            region = registro.region.trim().ifBlank { "Region Metropolitana" },
+            comuna = registro.comuna.trim().ifBlank { "Sin comuna" },
+            calle = registro.calle.trim().ifBlank { "Sin calle" },
+            numero = registro.numeroDireccion.trim().ifBlank { "Sin numero" },
+            detalle = "Sin detalle",
+            latitud = registro.latitud,
+            longitud = registro.longitud
+        )
     }
 }
 
@@ -228,6 +279,25 @@ class RepositorioPerfilLocal(
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         db.guardarUbicacionUsuario(usuario.idUsuario, config)
         return Result.success(db.obtenerUbicacionUsuario(usuario.idUsuario))
+    }
+
+    override fun obtenerFiltrosMarketplace(): FiltroMarketplaceConfig {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return FiltroMarketplaceConfig()
+        return db.obtenerFiltrosMarketplace(usuario.idUsuario)
+    }
+
+    override fun guardarFiltrosMarketplace(config: FiltroMarketplaceConfig): Result<FiltroMarketplaceConfig> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        db.guardarFiltrosMarketplace(usuario.idUsuario, config)
+        return Result.success(db.obtenerFiltrosMarketplace(usuario.idUsuario))
+    }
+
+    override fun limpiarFiltrosMarketplace(): Result<FiltroMarketplaceConfig> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        db.limpiarFiltrosMarketplace(usuario.idUsuario)
+        return Result.success(db.obtenerFiltrosMarketplace(usuario.idUsuario))
     }
 
     override fun actualizarFotoPerfil(uriLocal: String): Result<Usuario> {
@@ -344,10 +414,107 @@ class RepositorioOfertasLocal(
 class RepositorioChatsLocal(
     private val db: ContrabajoSQLiteHelper
 ) : RepositorioChats {
+    override fun obtenerIdUsuarioActual(): Long? = db.obtenerUsuarioSesionActiva()?.idUsuario
+
     override fun obtenerChatsActuales(): List<ChatCita> {
-        val usuario = db.obtenerUsuarioSesionActiva() ?: db.obtenerUsuarioPorId(2) ?: return emptyList()
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return emptyList()
         return db.obtenerChatsParaUsuario(usuario.idUsuario)
     }
 
-    override fun obtenerMensajes(idChatCita: Long): List<MensajeChat> = db.obtenerMensajesPorChat(idChatCita)
+    override fun obtenerMensajes(idChatCita: Long): List<MensajeChat> {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return emptyList()
+        db.marcarMensajesLeidos(idChatCita = idChatCita, idReceptor = usuario.idUsuario)
+        return db.obtenerMensajesPorChat(idChatCita)
+    }
+
+    override fun iniciarConversacionDesdeOferta(idOfertaServicio: Long): Result<ChatCita> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val ofertaContacto = db.obtenerOfertaParaContacto(idOfertaServicio)
+            ?: return Result.failure(IllegalArgumentException("La oferta no existe"))
+        val idTrabajador = ofertaContacto.first
+        if (usuario.idUsuario == idTrabajador) {
+            return Result.failure(IllegalStateException("No puedes iniciar chat con tu propia publicacion"))
+        }
+
+        val idChat = db.obtenerChatEntreUsuarios(idTrabajador = idTrabajador, idCliente = usuario.idUsuario)
+            ?: db.crearChatCita(idTrabajador = idTrabajador, idCliente = usuario.idUsuario)
+
+        if (idChat <= 0) return Result.failure(IllegalStateException("No se pudo crear el chat"))
+
+        val mensajes = db.obtenerMensajesPorChat(idChat)
+        if (mensajes.isEmpty()) {
+            db.insertarMensajeChat(
+                idChatCita = idChat,
+                idEmisor = usuario.idUsuario,
+                idReceptor = idTrabajador,
+                contenido = "Hola, me interesa tu servicio. ¿Podemos coordinar?"
+            )
+        }
+
+        return db.obtenerChatPorId(idChat, usuario.idUsuario)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("No se pudo abrir el chat"))
+    }
+
+    override fun obtenerChat(idChatCita: Long): ChatCita? {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return null
+        return db.obtenerChatPorId(idChatCita, usuario.idUsuario)
+    }
+
+    override fun enviarMensaje(idChatCita: Long, contenido: String): Result<MensajeChat> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val chat = db.obtenerChatPorId(idChatCita, usuario.idUsuario)
+            ?: return Result.failure(IllegalArgumentException("Chat no encontrado"))
+        val texto = contenido.trim()
+        if (texto.isBlank()) return Result.failure(IllegalArgumentException("Escribe un mensaje"))
+        val idReceptor = if (chat.idCliente == usuario.idUsuario) chat.idTrabajador else chat.idCliente
+        val idMensaje = db.insertarMensajeChat(
+            idChatCita = idChatCita,
+            idEmisor = usuario.idUsuario,
+            idReceptor = idReceptor,
+            contenido = texto
+        )
+        if (idMensaje <= 0) return Result.failure(IllegalStateException("No se pudo enviar el mensaje"))
+        return db.obtenerMensajePorId(idMensaje)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("No se pudo leer el mensaje enviado"))
+    }
+
+    override fun crearCitaDesdeChat(idChatCita: Long, fechaProgramada: String, detalle: String): Result<CitaServicio> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val chat = db.obtenerChatPorId(idChatCita, usuario.idUsuario)
+            ?: return Result.failure(IllegalArgumentException("Chat no encontrado"))
+        if (fechaProgramada.trim().isBlank()) {
+            return Result.failure(IllegalArgumentException("Ingresa fecha y hora de cita"))
+        }
+        if (detalle.trim().isBlank()) {
+            return Result.failure(IllegalArgumentException("Ingresa el detalle de la cita"))
+        }
+        if (db.obtenerCitaPorChat(idChatCita) != null) {
+            return Result.failure(IllegalStateException("Este chat ya tiene una cita registrada"))
+        }
+        val idCita = db.crearCitaServicio(
+            idChatCita = chat.idChatCita,
+            fechaProgramada = fechaProgramada.trim(),
+            detalle = detalle.trim()
+        )
+        if (idCita <= 0) return Result.failure(IllegalStateException("No se pudo crear la cita"))
+        return db.obtenerCitaPorChat(idChatCita)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("No se pudo recuperar la cita"))
+    }
+
+    override fun obtenerCitaPorChat(idChatCita: Long): CitaServicio? = db.obtenerCitaPorChat(idChatCita)
+
+    override fun actualizarEstadoCita(idCita: Long, nuevoEstado: Int): Result<CitaServicio> {
+        if (nuevoEstado !in listOf(EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA, EstadoCita.EN_PROCESO, EstadoCita.FINALIZADA)) {
+            return Result.failure(IllegalArgumentException("Estado de cita invalido"))
+        }
+        val actualizada = db.actualizarEstadoCita(idCita, nuevoEstado)
+        if (!actualizada) return Result.failure(IllegalStateException("No se pudo actualizar el estado de la cita"))
+        val chat = obtenerChatsActuales().firstOrNull { it.idCita == idCita }
+            ?: return Result.failure(IllegalStateException("No se encontro el chat de la cita"))
+        return db.obtenerCitaPorChat(chat.idChatCita)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("No se pudo recuperar la cita actualizada"))
+    }
 }

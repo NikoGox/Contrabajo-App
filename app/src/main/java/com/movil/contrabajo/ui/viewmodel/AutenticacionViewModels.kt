@@ -87,15 +87,15 @@ class RegistroViewModel(
         private set
 
     fun actualizarNombre(valor: String) {
-        actualizarRegistro(uiState.registro.copy(nombre = valor))
+        actualizarRegistro(uiState.registro.copy(nombre = sanitizarNombrePersona(valor)))
     }
 
     fun actualizarApellidoPaterno(valor: String) {
-        actualizarRegistro(uiState.registro.copy(apellidoPaterno = valor))
+        actualizarRegistro(uiState.registro.copy(apellidoPaterno = sanitizarNombrePersona(valor)))
     }
 
     fun actualizarApellidoMaterno(valor: String) {
-        actualizarRegistro(uiState.registro.copy(apellidoMaterno = valor))
+        actualizarRegistro(uiState.registro.copy(apellidoMaterno = sanitizarNombrePersona(valor)))
     }
 
     fun actualizarRun(valor: String) {
@@ -114,6 +114,26 @@ class RegistroViewModel(
     fun actualizarTelefono(valor: String) {
         val digitos = valor.filter { it.isDigit() }.take(9)
         actualizarRegistro(uiState.registro.copy(telefono = digitos))
+    }
+
+    fun actualizarRegion(valor: String) {
+        actualizarRegistro(uiState.registro.copy(region = valor))
+    }
+
+    fun actualizarComuna(valor: String) {
+        actualizarRegistro(uiState.registro.copy(comuna = valor))
+    }
+
+    fun actualizarCalle(valor: String) {
+        actualizarRegistro(uiState.registro.copy(calle = valor))
+    }
+
+    fun actualizarNumeroDireccion(valor: String) {
+        actualizarRegistro(uiState.registro.copy(numeroDireccion = valor))
+    }
+
+    fun actualizarCoordenadasRegistro(latitud: Double?, longitud: Double?) {
+        actualizarRegistro(uiState.registro.copy(latitud = latitud, longitud = longitud))
     }
 
     fun actualizarUsername(valor: String) {
@@ -156,5 +176,13 @@ class RegistroViewModel(
             registro = registro.copy(tipoPerfil = TipoPerfil.USUARIO_BASE),
             error = null
         )
+    }
+
+    private fun sanitizarNombrePersona(valor: String): String {
+        return valor
+            .filter { caracter ->
+                caracter.isLetter() || caracter == ' ' || caracter == '\'' || caracter == '-'
+            }
+            .take(60)
     }
 }

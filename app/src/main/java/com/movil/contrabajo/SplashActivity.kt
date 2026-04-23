@@ -6,12 +6,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -29,20 +30,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.movil.contrabajo.ui.theme.ContrabajoTheme
 import kotlinx.coroutines.delay
 
@@ -72,32 +72,38 @@ private fun PantallaSplash(
     onFinalizar: () -> Unit
 ) {
     var progreso by remember { mutableFloatStateOf(0f) }
+    var mensaje by remember { mutableStateOf("Iniciando app") }
+    val versionApp = recordarVersionApp()
     val glow = rememberInfiniteTransition(label = "glowSplash")
-    val faseGlow by glow.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
+    val pulsoGlow by glow.animateFloat(
+        initialValue = 0.80f,
+        targetValue = 1.18f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4600, easing = LinearEasing)
+            animation = tween(durationMillis = 1650, easing = FastOutSlowInEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
         ),
-        label = "faseGlowSplash"
+        label = "pulsoGlowSplash"
     )
 
     LaunchedEffect(Unit) {
-        repeat(20) {
-            delay(70)
-            progreso = (progreso + 0.03f).coerceAtMost(0.60f)
+        val etapas = listOf(
+            Triple("Iniciando app", 0.20f, 420L),
+            Triple("Preparando interfaz", 0.45f, 480L),
+            Triple("Cargando servicios", 0.72f, 560L),
+            Triple("Cargando mensajes", 0.88f, 520L),
+            Triple("Finalizando", 1.00f, 420L)
+        )
+        etapas.forEach { (texto, objetivo, duracion) ->
+            mensaje = texto
+            val inicio = progreso
+            val pasos = 10
+            repeat(pasos) { paso ->
+                delay(duracion / pasos)
+                val factor = (paso + 1) / pasos.toFloat()
+                progreso = (inicio + ((objetivo - inicio) * factor)).coerceIn(0f, 1f)
+            }
         }
-        repeat(10) {
-            delay(85)
-            progreso = (progreso + 0.025f).coerceAtMost(0.85f)
-        }
-        repeat(4) {
-            delay(95)
-            progreso = (progreso + 0.03f).coerceAtMost(0.97f)
-        }
-        delay(160)
-        progreso = 1f
-        delay(120)
+        delay(100)
         onFinalizar()
     }
 
@@ -122,40 +128,32 @@ private fun PantallaSplash(
         ) {
             Box(
                 modifier = Modifier
-                    .size(142.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Color.White.copy(alpha = 0.92f))
+                    .size(176.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFD4DAE1).copy(alpha = 0.96f))
                     .drawWithContent {
                         drawContent()
-                        val fase = size.width * (faseGlow * 2.2f)
-                        drawRoundRect(
-                            brush = Brush.linearGradient(
+                        drawCircle(
+                            brush = Brush.sweepGradient(
                                 colors = listOf(
-                                    Color(0xFF1E88E5).copy(alpha = 0.18f),
-                                    Color(0xFF00BCD4).copy(alpha = 0.24f),
-                                    Color(0xFF17A673).copy(alpha = 0.20f),
-                                    Color(0xFF1E88E5).copy(alpha = 0.18f)
-                                ),
-                                start = Offset(fase - (size.width * 2f), 0f),
-                                end = Offset(fase, size.height)
+                                    Color(0xFF1E88E5).copy(alpha = (0.10f * pulsoGlow).coerceAtMost(0.16f)),
+                                    Color(0xFF00BCD4).copy(alpha = (0.12f * pulsoGlow).coerceAtMost(0.18f)),
+                                    Color(0xFF17A673).copy(alpha = (0.11f * pulsoGlow).coerceAtMost(0.17f)),
+                                    Color(0xFF1E88E5).copy(alpha = (0.10f * pulsoGlow).coerceAtMost(0.16f))
+                                )
                             ),
-                            topLeft = Offset(2.5.dp.toPx(), 2.5.dp.toPx()),
-                            size = androidx.compose.ui.geometry.Size(
-                                width = size.width - 5.dp.toPx(),
-                                height = size.height - 5.dp.toPx()
-                            ),
-                            cornerRadius = CornerRadius(24.dp.toPx(), 24.dp.toPx()),
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 5.dp.toPx())
+                            radius = ((size.minDimension / 2f) - 4.dp.toPx()) * pulsoGlow.coerceAtMost(1.03f),
+                            style = Stroke(width = 1.8.dp.toPx())
                         )
                     },
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = R.drawable.ct_icon,
+                Image(
+                    painter = painterResource(R.drawable.ct_icon_mini_t),
                     contentDescription = "Icono Contrabajo",
                     modifier = Modifier
-                        .size(104.dp),
-                    contentScale = ContentScale.Fit
+                        .size(138.dp)
+                        .clip(CircleShape)
                 )
             }
 
@@ -168,7 +166,7 @@ private fun PantallaSplash(
                 color = Color(0xFF11474C)
             )
             Text(
-                text = "Cargando experiencia",
+                text = mensaje,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color(0xFF35656A)
             )
@@ -189,6 +187,12 @@ private fun PantallaSplash(
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFF35656A),
                 modifier = Modifier.padding(top = 8.dp)
+            )
+            Text(
+                text = "v$versionApp",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF35656A),
+                modifier = Modifier.padding(top = 6.dp)
             )
         }
     }

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -92,6 +93,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
+import com.movil.contrabajo.R
+import com.movil.contrabajo.recordarVersionApp
 import com.movil.contrabajo.domain.model.ChatCita
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.ui.navigation.RutasApp
@@ -159,6 +162,7 @@ fun PantallaBase(
     modifier: Modifier = Modifier,
     scrollable: Boolean = true,
     mostrarFondo: Boolean = true,
+    respetarNavegacionInferior: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
     if (mostrarFondo) {
@@ -169,6 +173,7 @@ fun PantallaBase(
         modifier = modifier
             .fillMaxSize()
             .statusBarsPadding()
+            .then(if (respetarNavegacionInferior) Modifier.navigationBarsPadding() else Modifier)
             .then(scrollModifier)
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -177,36 +182,30 @@ fun PantallaBase(
 }
 
 @Composable
-fun LogoContrabajo(modifier: Modifier = Modifier, compacto: Boolean = false) {
-    val size = if (compacto) 66.dp else 92.dp
+fun LogoContrabajo(
+    modifier: Modifier = Modifier,
+    compacto: Boolean = false,
+    tamanoPersonalizado: Dp? = null,
+    mostrarTitulo: Boolean = !compacto
+) {
+    val iconSize = tamanoPersonalizado ?: if (compacto) 56.dp else 198.dp
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(if (compacto) 4.dp else 10.dp)
     ) {
-        Box(
+        AsyncImage(
+            model = R.drawable.ct_icon_mini_t,
+            contentDescription = "Logo Contrabajo",
             modifier = Modifier
-                .size(size)
-                .background(
-                    brush = Brush.verticalGradient(
-                        listOf(TurquesaBrillante, AzulPetroleoOscuro)
-                    ),
-                    shape = CircleShape
-                )
-                .border(2.dp, Color.White.copy(alpha = 0.75f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = if (compacto) "C" else "Cb",
-                style = if (compacto) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
-                color = Blanco,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        if (!compacto) {
+                .size(iconSize)
+                .clip(if (compacto) CircleShape else RoundedCornerShape(30.dp)),
+            contentScale = ContentScale.Fit
+        )
+        if (mostrarTitulo) {
             Text(
                 text = "Contrabajo",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -218,6 +217,7 @@ fun LogoContrabajo(modifier: Modifier = Modifier, compacto: Boolean = false) {
 fun TarjetaBase(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(22.dp),
+    llenarAlto: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
@@ -228,6 +228,7 @@ fun TarjetaBase(
     ) {
         Column(
             modifier = Modifier
+                .then(if (llenarAlto) Modifier.fillMaxHeight() else Modifier)
                 .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(22.dp))
                 .padding(contentPadding),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -266,16 +267,18 @@ fun EncabezadoPantalla(
 fun BotonPrimario(
     texto: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp),
+            .height(60.dp),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp, pressedElevation = 2.dp)
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp, pressedElevation = 3.dp)
     ) {
         Text(texto, style = MaterialTheme.typography.labelLarge)
     }
@@ -289,7 +292,7 @@ fun BotonSecundario(
 ) {
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth().height(54.dp),
+        modifier = modifier.fillMaxWidth().height(60.dp),
         shape = RoundedCornerShape(16.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
@@ -812,11 +815,27 @@ fun TarjetaChat(chat: ChatCita, onClick: (() -> Unit)? = null) {
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = chat.horaUltimoMensaje.takeLast(5),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.primary
-        )
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = chat.horaUltimoMensaje.takeLast(5),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            if (chat.mensajesNoLeidos > 0) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary
+                ) {
+                    Text(
+                        text = chat.mensajesNoLeidos.coerceAtMost(99).toString(),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Blanco,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -877,9 +896,11 @@ fun ResumenPerfilLinea(etiqueta: String, valor: String) {
 fun OverlayPantallaCarga(
     visible: Boolean,
     mensaje: String = "Cargando...",
+    progreso: Float? = null,
     mostrarIndicador: Boolean = true,
     modoSuave: Boolean = false
 ) {
+    val versionApp = recordarVersionApp()
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(animationSpec = tween(durationMillis = 100)),
@@ -916,15 +937,25 @@ fun OverlayPantallaCarga(
                     },
                 contentAlignment = Alignment.BottomCenter
             ) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth(0.44f)
-                        .padding(bottom = 86.dp)
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(999.dp)),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = Color.White.copy(alpha = 0.34f)
-                )
+                Column(
+                    modifier = Modifier.padding(bottom = 72.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth(0.44f)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(999.dp)),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = Color.White.copy(alpha = 0.34f)
+                    )
+                    Text(
+                        text = "v$versionApp",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                }
             }
             return@AnimatedVisibility
         }
@@ -942,19 +973,42 @@ fun OverlayPantallaCarga(
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (mostrarIndicador) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 3.dp
-                        )
-                    }
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 3.dp
+                    )
+
                     Text(
                         text = mensaje,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    val progresoNormalizado = progreso?.coerceIn(0f, 1f)
+                    if (progresoNormalizado != null) {
+                        LinearProgressIndicator(
+                            progress = { progresoNormalizado },
+                            modifier = Modifier
+                                .fillMaxWidth(0.72f)
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(999.dp)),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = Color.Black.copy(alpha = 0.12f)
+                        )
+                        Text(
+                            text = "${(progresoNormalizado * 100f).toInt().coerceIn(0, 100)}%",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Text(
+                        text = "v$versionApp",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
                     )
                 }
             }

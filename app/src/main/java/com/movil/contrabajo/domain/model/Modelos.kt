@@ -60,7 +60,9 @@ data class ChatCita(
     val idCita: Long? = null,
     val nombreContacto: String = "",
     val ultimoMensaje: String = "",
-    val horaUltimoMensaje: String = ""
+    val horaUltimoMensaje: String = "",
+    val mensajesNoLeidos: Int = 0,
+    val estadoCita: Int? = null
 )
 
 data class MensajeChat(
@@ -74,6 +76,22 @@ data class MensajeChat(
     val idEstado: Long,
     val contenido: String
 )
+
+data class CitaServicio(
+    val idCita: Long = 0,
+    val idChatCita: Long,
+    val fechaCreacion: String,
+    val fechaProgramada: String,
+    val detalle: String,
+    val estado: Int
+)
+
+object EstadoCita {
+    const val PENDIENTE = 0
+    const val CONFIRMADA = 1
+    const val EN_PROCESO = 2
+    const val FINALIZADA = 3
+}
 
 data class CategoriaServicio(
     val idCategoriaServicio: Long = 0,
@@ -169,6 +187,12 @@ data class RegistroPendiente(
     val run: String = "",
     val dv: String = "",
     val telefono: String = "",
+    val region: String = "Region Metropolitana",
+    val comuna: String = "",
+    val calle: String = "",
+    val numeroDireccion: String = "",
+    val latitud: Double? = null,
+    val longitud: Double? = null,
     val username: String = "",
     val correo: String = "",
     val fechaNacimiento: String = "",
@@ -209,4 +233,13 @@ data class UbicacionAjustesConfig(
     val longitud: Double? = null,
     val rangoDisponibilidadM: Int = 20_000,
     val rangoBusquedaM: Int = 20_000
+)
+
+data class FiltroMarketplaceConfig(
+    val categoriaId: Long? = null,
+    val tipoPrecio: Int? = null,
+    val soloTrabajadorVerificado: Boolean = false,
+    val ordenMarketplace: String = "FECHA_RECIENTES",
+    val filtroZonaComunaActivo: Boolean = false,
+    val comunaFiltro: String = ""
 )

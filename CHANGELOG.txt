@@ -1,3 +1,24 @@
+VERSION 0.4.2-Pre-Alpha
+───────
+├─• Iteración enfocada en estabilización UX/UI en dispositivo real y consolidación funcional de mensajería y coordinación entre usuarios.
+├─• Se mejoró la navegación entre exploración y detalle para mantener contexto, orden y filtros activos sin perder continuidad.
+├─• La búsqueda quedó más consistente al combinar texto, categoría, zona y distancia con resultados más claros.
+├─• Se ajustó el filtro por distancia para respetar estrictamente el rango configurado por el usuario.
+├─• Se simplificó el comportamiento de filtros al reabrir la app, priorizando una sesión de búsqueda limpia.
+├─• Se redujo el tiempo de inicio automático con recordarme para dar una entrada más rápida a la app.
+├─• Se rediseñó el flujo de registro para hacerlo más guiado y con validaciones más claras.
+├─• Se fortaleció la validación de fecha de nacimiento y datos personales para evitar registros inválidos.
+├─• Se simplificó la pantalla de dirección en registro eliminando campos no prioritarios.
+├─• Se mejoró el feedback visual de errores en formularios para corregir datos más rápido.
+├─• Se actualizó el branding en splash, carga, inicio, login y registro con logos y proporciones más coherentes.
+├─• Se habilitó contacto real desde publicación hacia conversación directa entre usuarios.
+├─• Se consolidó el historial de mensajes y la experiencia de chat con mejor trazabilidad de lectura.
+├─• Se incorporó coordinación por cita dentro de conversación, incluyendo estados visibles de avance.
+├─• Se realizaron rondas de pulido visual en detalle, exploración, registro y chat (sombras, alturas e insets).
+└─• Se revirtió el último ajuste agresivo de tarjetas en detalle para mantener una versión visual más estable.
+
+
+
 VERSION 0.4.1-Pre-Alpha
 ───────
 ├─• Iteración de ajuste fino UX/UI sobre `0.4-Pre-Alpha`, enfocada en estabilidad de navegación y fluidez visual en dispositivo real.

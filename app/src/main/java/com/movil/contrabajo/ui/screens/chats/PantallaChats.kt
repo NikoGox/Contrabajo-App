@@ -14,6 +14,7 @@ import com.movil.contrabajo.ui.viewmodel.ChatsViewModel
 @Composable
 fun PantallaChats(
     viewModel: ChatsViewModel,
+    onAbrirChat: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState = viewModel.uiState
@@ -32,7 +33,10 @@ fun PantallaChats(
                 Text("Cuando alguien contacte un servicio, sus mensajes apareceran aqui.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 uiState.chats.forEach { chat ->
-                    TarjetaChat(chat = chat)
+                    TarjetaChat(
+                        chat = chat,
+                        onClick = { onAbrirChat(chat.idChatCita) }
+                    )
                 }
             }
         }

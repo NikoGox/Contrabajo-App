@@ -7,12 +7,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.movil.contrabajo.data.repository.RepositorioAutenticacion
 import com.movil.contrabajo.domain.model.CategoriaServicio
+import com.movil.contrabajo.domain.model.CitaServicio
 import com.movil.contrabajo.data.repository.RepositorioChats
 import com.movil.contrabajo.data.repository.RepositorioOfertas
 import com.movil.contrabajo.data.repository.RepositorioPerfil
 import com.movil.contrabajo.domain.model.ChatCita
+import com.movil.contrabajo.domain.model.EstadoCita
 import com.movil.contrabajo.domain.model.FotoServicioLocal
 import com.movil.contrabajo.domain.model.FormularioServicio
+import com.movil.contrabajo.domain.model.MensajeChat
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.domain.model.PrecioUtils
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
@@ -23,6 +26,7 @@ import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
 import com.movil.contrabajo.domain.model.Usuario
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.Normalizer
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -40,6 +44,8 @@ data class PrincipalUiState(
     val filtroCategoriaId: Long? = null,
     val filtroTipoPrecio: Int? = null,
     val soloTrabajadorVerificado: Boolean = false,
+    val filtroZonaComunaActivo: Boolean = false,
+    val comunaFiltro: String = "",
     val ordenMarketplace: OrdenMarketplace = OrdenMarketplace.FECHA_RECIENTES,
     val mensajePrincipal: String? = null
 )
@@ -119,12 +125,21 @@ class PrincipalViewModel(
         categoriaId: Long?,
         tipoPrecio: Int?,
         soloVerificados: Boolean,
+        filtroZonaComunaActivo: Boolean,
+        comunaFiltro: String,
         orden: OrdenMarketplace
     ) {
+        val comunaNormalizada = if (filtroZonaComunaActivo) {
+            comunaFiltro.trim().ifBlank { "Santiago" }
+        } else {
+            ""
+        }
         uiState = uiState.copy(
             filtroCategoriaId = categoriaId,
             filtroTipoPrecio = tipoPrecio,
             soloTrabajadorVerificado = soloVerificados,
+            filtroZonaComunaActivo = filtroZonaComunaActivo,
+            comunaFiltro = comunaNormalizada,
             ordenMarketplace = orden
         )
         recargar()
@@ -135,6 +150,8 @@ class PrincipalViewModel(
             filtroCategoriaId = null,
             filtroTipoPrecio = null,
             soloTrabajadorVerificado = false,
+            filtroZonaComunaActivo = false,
+            comunaFiltro = "",
             ordenMarketplace = OrdenMarketplace.FECHA_RECIENTES
         )
         recargar()
@@ -159,7 +176,7 @@ class PrincipalViewModel(
                 lat2 = latitudOferta,
                 lon2 = longitudOferta
             )
-            distanciaM <= (rangoBusquedaM + MARGEN_TOLERANCIA_BORDE_M)
+            distanciaM <= rangoBusquedaM
         }
     }
 
@@ -174,6 +191,10 @@ class PrincipalViewModel(
             }
             .filter { oferta ->
                 if (uiState.soloTrabajadorVerificado) oferta.trabajadorVerificado else true
+            }
+            .filter { oferta ->
+                if (!uiState.filtroZonaComunaActivo) return@filter true
+                coincideComunaFiltro(oferta, uiState.comunaFiltro)
             }
             .toList()
 
@@ -201,13 +222,36 @@ class PrincipalViewModel(
         return (radioTierraM * c).roundToInt()
     }
 
-    private companion object {
-        const val MARGEN_TOLERANCIA_BORDE_M = 500
+    private fun coincideComunaFiltro(oferta: OfertaServicio, comunaFiltro: String): Boolean {
+        val filtroNormalizado = normalizarTexto(comunaFiltro)
+        if (filtroNormalizado.isBlank()) return true
+        val comunaOferta = oferta.ubicacionReferencia
+            .substringBefore(",")
+            .trim()
+        return normalizarTexto(comunaOferta) == filtroNormalizado
     }
+
+    private fun normalizarTexto(valor: String): String {
+        val decomposed = Normalizer.normalize(valor, Normalizer.Form.NFD)
+        return decomposed
+            .replace("\\p{M}+".toRegex(), "")
+            .replace("[^A-Za-z0-9 ]".toRegex(), " ")
+            .lowercase()
+            .replace("\\s+".toRegex(), " ")
+            .trim()
+    }
+
 }
 
 data class ChatsUiState(
-    val chats: List<ChatCita> = emptyList()
+    val idUsuarioActual: Long? = null,
+    val chats: List<ChatCita> = emptyList(),
+    val chatActivo: ChatCita? = null,
+    val mensajesActivos: List<MensajeChat> = emptyList(),
+    val citaActiva: CitaServicio? = null,
+    val borradorMensaje: String = "",
+    val mensajeSistema: String? = null,
+    val error: String? = null
 )
 
 class ChatsViewModel(
@@ -221,7 +265,106 @@ class ChatsViewModel(
     }
 
     fun recargar() {
-        uiState = uiState.copy(chats = repositorioChats.obtenerChatsActuales())
+        uiState = uiState.copy(
+            idUsuarioActual = repositorioChats.obtenerIdUsuarioActual(),
+            chats = repositorioChats.obtenerChatsActuales()
+        )
+    }
+
+    fun iniciarConversacionDesdeOferta(idOfertaServicio: Long): Result<ChatCita> {
+        val resultado = repositorioChats.iniciarConversacionDesdeOferta(idOfertaServicio)
+        resultado.onSuccess { chat ->
+            uiState = uiState.copy(
+                mensajeSistema = "Chat iniciado correctamente.",
+                error = null
+            )
+            recargar()
+            abrirChat(chat.idChatCita)
+        }.onFailure {
+            uiState = uiState.copy(
+                error = it.message ?: "No se pudo iniciar la conversacion",
+                mensajeSistema = null
+            )
+        }
+        return resultado
+    }
+
+    fun abrirChat(idChatCita: Long) {
+        val chat = repositorioChats.obtenerChat(idChatCita)
+        if (chat == null) {
+            uiState = uiState.copy(error = "No se pudo abrir el chat")
+            return
+        }
+        uiState = uiState.copy(
+            chatActivo = chat,
+            mensajesActivos = repositorioChats.obtenerMensajes(idChatCita),
+            citaActiva = repositorioChats.obtenerCitaPorChat(idChatCita),
+            borradorMensaje = "",
+            idUsuarioActual = repositorioChats.obtenerIdUsuarioActual(),
+            error = null
+        )
+        recargar()
+    }
+
+    fun actualizarBorradorMensaje(valor: String) {
+        uiState = uiState.copy(borradorMensaje = valor, error = null)
+    }
+
+    fun enviarMensaje() {
+        val chat = uiState.chatActivo ?: return
+        repositorioChats.enviarMensaje(chat.idChatCita, uiState.borradorMensaje)
+            .onSuccess {
+                uiState = uiState.copy(
+                    borradorMensaje = "",
+                    mensajesActivos = repositorioChats.obtenerMensajes(chat.idChatCita),
+                    error = null
+                )
+                recargar()
+            }
+            .onFailure {
+                uiState = uiState.copy(error = it.message ?: "No se pudo enviar el mensaje")
+            }
+    }
+
+    fun crearCita(fechaProgramada: String, detalle: String) {
+        val chat = uiState.chatActivo ?: return
+        repositorioChats.crearCitaDesdeChat(chat.idChatCita, fechaProgramada, detalle)
+            .onSuccess { cita ->
+                uiState = uiState.copy(
+                    citaActiva = cita,
+                    mensajeSistema = "Cita creada correctamente.",
+                    error = null
+                )
+                abrirChat(chat.idChatCita)
+            }
+            .onFailure {
+                uiState = uiState.copy(error = it.message ?: "No se pudo crear la cita")
+            }
+    }
+
+    fun cambiarEstadoCita(nuevoEstado: Int) {
+        val cita = uiState.citaActiva ?: return
+        repositorioChats.actualizarEstadoCita(cita.idCita, nuevoEstado)
+            .onSuccess { citaActualizada ->
+                uiState = uiState.copy(
+                    citaActiva = citaActualizada,
+                    mensajeSistema = "Estado de cita actualizado.",
+                    error = null
+                )
+                uiState.chatActivo?.let { abrirChat(it.idChatCita) }
+            }
+            .onFailure {
+                uiState = uiState.copy(error = it.message ?: "No se pudo actualizar el estado")
+            }
+    }
+
+    fun marcarCitaConfirmada() = cambiarEstadoCita(EstadoCita.CONFIRMADA)
+    fun marcarCitaEnProceso() = cambiarEstadoCita(EstadoCita.EN_PROCESO)
+    fun marcarCitaFinalizada() = cambiarEstadoCita(EstadoCita.FINALIZADA)
+    fun marcarCitaPendiente() = cambiarEstadoCita(EstadoCita.PENDIENTE)
+
+    fun consumirMensajes() {
+        uiState = uiState.copy(mensajeSistema = null, error = null)
     }
 }
 
@@ -735,9 +878,8 @@ class DetalleServicioViewModel(
         if (!forzarRecarga && ofertaActualId == idOfertaServicio && uiState.ofertaActual != null) return
         ofertaActualId = idOfertaServicio
         val idUsuarioActual = repositorioPerfil.obtenerPerfilActual()?.idUsuario
-        val ofertas = ofertasContextoMarketplace
-            ?.takeIf { it.isNotEmpty() }
-            ?: repositorioOfertas.obtenerOfertasMarketplace()
+        val ofertasContexto = ofertasContextoMarketplace?.takeIf { it.isNotEmpty() }
+        val ofertas = ofertasContexto ?: repositorioOfertas.obtenerOfertasMarketplace()
         if (ofertas.isEmpty()) {
             val oferta = repositorioOfertas.obtenerOfertaPorId(idOfertaServicio)
             uiState = uiState.copy(ofertas = listOfNotNull(oferta), indiceActual = 0, idUsuarioActual = idUsuarioActual)
@@ -745,9 +887,13 @@ class DetalleServicioViewModel(
         }
         val indice = ofertas.indexOfFirst { it.idOfertaServicio == idOfertaServicio }
         if (indice < 0) {
-            val fallback = repositorioOfertas.obtenerOfertasMarketplace()
-            val indiceFallback = fallback.indexOfFirst { it.idOfertaServicio == idOfertaServicio }.takeIf { it >= 0 } ?: 0
-            uiState = uiState.copy(ofertas = fallback, indiceActual = indiceFallback, idUsuarioActual = idUsuarioActual)
+            if (ofertasContexto != null) {
+                uiState = uiState.copy(ofertas = ofertasContexto, indiceActual = 0, idUsuarioActual = idUsuarioActual)
+            } else {
+                val fallback = repositorioOfertas.obtenerOfertasMarketplace()
+                val indiceFallback = fallback.indexOfFirst { it.idOfertaServicio == idOfertaServicio }.takeIf { it >= 0 } ?: 0
+                uiState = uiState.copy(ofertas = fallback, indiceActual = indiceFallback, idUsuarioActual = idUsuarioActual)
+            }
         } else {
             uiState = uiState.copy(ofertas = ofertas, indiceActual = indice, idUsuarioActual = idUsuarioActual)
         }

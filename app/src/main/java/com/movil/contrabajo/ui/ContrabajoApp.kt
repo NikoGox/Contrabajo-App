@@ -40,6 +40,7 @@ import com.movil.contrabajo.ui.components.FondoContrabajo
 import com.movil.contrabajo.ui.components.OverlayPantallaCarga
 import com.movil.contrabajo.ui.navigation.RutasApp
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaLogin
+import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoDireccion
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoDos
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoUno
 import com.movil.contrabajo.ui.screens.ajustes.PantallaAjustes
@@ -48,6 +49,7 @@ import com.movil.contrabajo.ui.screens.ajustes.PantallaCuenta
 import com.movil.contrabajo.ui.screens.ajustes.PantallaPreguntasSeguridad
 import com.movil.contrabajo.ui.screens.ajustes.PantallaUbicacion
 import com.movil.contrabajo.ui.screens.ajustes.PantallaVerificarCuentaTrabajador
+import com.movil.contrabajo.ui.screens.chats.PantallaDetalleChat
 import com.movil.contrabajo.ui.screens.chats.PantallaChats
 import com.movil.contrabajo.ui.screens.inicio.PantallaInicial
 import com.movil.contrabajo.ui.screens.perfil.PantallaPerfil
@@ -80,6 +82,7 @@ fun ContrabajoApp() {
     val detalleServicioViewModel: DetalleServicioViewModel = viewModel(factory = factory)
     var mostrarCargaGlobal by rememberSaveable { mutableStateOf(false) }
     var mensajeCargaGlobal by rememberSaveable { mutableStateOf("Cargando...") }
+    var progresoCargaGlobal by rememberSaveable { mutableStateOf(0f) }
     var mostrarIndicadorCargaGlobal by rememberSaveable { mutableStateOf(true) }
     var modoSuaveCargaGlobal by rememberSaveable { mutableStateOf(false) }
     var navegacionEnCarga by rememberSaveable { mutableStateOf(false) }
@@ -90,19 +93,42 @@ fun ContrabajoApp() {
                 val inicioCargaMs = System.currentTimeMillis()
                 navegacionEnCarga = true
                 mensajeCargaGlobal = "Iniciando sesion..."
+                progresoCargaGlobal = 0.08f
                 mostrarIndicadorCargaGlobal = true
                 modoSuaveCargaGlobal = false
                 mostrarCargaGlobal = true
+
                 delay(120)
+                mensajeCargaGlobal = "Validando acceso..."
+                progresoCargaGlobal = 0.18f
+
+                delay(120)
+                mensajeCargaGlobal = "Cargando servicios..."
+                progresoCargaGlobal = 0.34f
                 principalViewModel.recargar()
+
+                delay(90)
+                mensajeCargaGlobal = "Cargando chats..."
+                progresoCargaGlobal = 0.52f
                 chatsViewModel.recargar()
+
+                delay(90)
+                mensajeCargaGlobal = "Cargando perfil..."
+                progresoCargaGlobal = 0.70f
                 perfilViewModel.recargar()
-                delay(140)
+
+                delay(80)
+                mensajeCargaGlobal = "Preparando inicio..."
+                progresoCargaGlobal = 0.84f
                 navController.navigate(RutasApp.PrincipalShell.ruta) {
                     popUpTo(RutasApp.Inicio.ruta) { inclusive = true }
                 }
-                val faltante = (6_000L - (System.currentTimeMillis() - inicioCargaMs)).coerceAtLeast(0L)
+
+                progresoCargaGlobal = 0.94f
+                val faltante = (3_000L - (System.currentTimeMillis() - inicioCargaMs)).coerceAtLeast(0L)
                 if (faltante > 0) delay(faltante)
+                mensajeCargaGlobal = "Listo"
+                progresoCargaGlobal = 1f
                 delay(90)
                 mostrarCargaGlobal = false
                 modoSuaveCargaGlobal = false
@@ -124,6 +150,13 @@ fun ContrabajoApp() {
                 }
             }
         }
+    }
+
+    val abrirChatDesdeOferta: (Long) -> Unit = { idOferta ->
+        chatsViewModel.iniciarConversacionDesdeOferta(idOferta)
+            .onSuccess { chat ->
+                navController.navigate(RutasApp.ChatDetalle.crearRuta(chat.idChatCita))
+            }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -158,6 +191,15 @@ fun ContrabajoApp() {
                     viewModel = registroViewModel,
                     onVolver = { navController.popBackStack() },
                     onContinuar = {
+                        navController.navigate(RutasApp.RegistroPasoDireccion.ruta)
+                    }
+                )
+            }
+            composable(RutasApp.RegistroPasoDireccion.ruta) {
+                PantallaRegistroPasoDireccion(
+                    viewModel = registroViewModel,
+                    onVolver = { navController.popBackStack() },
+                    onContinuar = {
                         navController.navigate(RutasApp.RegistroPasoDos.ruta)
                     }
                 )
@@ -181,8 +223,14 @@ fun ContrabajoApp() {
                         navController.navigate(RutasApp.ServicioEditor.crearRuta("editar"))
                     },
                     onAbrirServicio = abrirDetalleConCarga,
+                    onAbrirChat = { idChat ->
+                        navController.navigate(RutasApp.ChatDetalle.crearRuta(idChat))
+                    },
                     onAbrirAjustes = {
                         navController.navigate(RutasApp.Ajustes.ruta)
+                    },
+                    onAbrirUbicacionRapida = {
+                        navController.navigate(RutasApp.AjustesUbicacion.ruta)
                     }
                 )
             }
@@ -232,6 +280,17 @@ fun ContrabajoApp() {
                 )
             }
             composable(
+                route = RutasApp.ChatDetalle.ruta,
+                arguments = listOf(navArgument("idChatCita") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val idChat = backStackEntry.arguments?.getLong("idChatCita") ?: 0L
+                PantallaDetalleChat(
+                    idChatCita = idChat,
+                    viewModel = chatsViewModel,
+                    onVolver = { navController.popBackStack() }
+                )
+            }
+            composable(
                 route = RutasApp.ServicioEditor.ruta,
                 arguments = listOf(navArgument("modo") { type = NavType.StringType })
             ) { backStackEntry ->
@@ -253,6 +312,7 @@ fun ContrabajoApp() {
                     onEditarServicio = {
                         navController.navigate(RutasApp.ServicioEditor.crearRuta("editar"))
                     },
+                    onContactarServicio = abrirChatDesdeOferta,
                     onVolver = { navController.popBackStack() }
                 )
             }
@@ -261,6 +321,7 @@ fun ContrabajoApp() {
         OverlayPantallaCarga(
             visible = mostrarCargaGlobal,
             mensaje = mensajeCargaGlobal,
+            progreso = progresoCargaGlobal,
             mostrarIndicador = mostrarIndicadorCargaGlobal,
             modoSuave = modoSuaveCargaGlobal
         )
@@ -275,7 +336,9 @@ private fun ShellPrincipal(
     onAbrirCrearServicio: () -> Unit,
     onAbrirEditarServicio: () -> Unit,
     onAbrirServicio: (Long) -> Unit,
+    onAbrirChat: (Long) -> Unit,
     onAbrirAjustes: () -> Unit,
+    onAbrirUbicacionRapida: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var rutaContenido by rememberSaveable { mutableStateOf(RutasApp.Principal.ruta) }
@@ -353,11 +416,13 @@ private fun ShellPrincipal(
                         viewModel = principalViewModel,
                         onAbrirServicio = onAbrirServicio,
                         onAbrirAjustes = onAbrirAjustes,
+                        onAbrirUbicacionRapida = onAbrirUbicacionRapida,
                         modifier = Modifier.padding(innerPadding)
                     )
 
                     RutasApp.Chats.ruta -> PantallaChats(
                         viewModel = chatsViewModel,
+                        onAbrirChat = onAbrirChat,
                         modifier = Modifier.padding(innerPadding)
                     )
 
@@ -372,6 +437,7 @@ private fun ShellPrincipal(
                         viewModel = principalViewModel,
                         onAbrirServicio = onAbrirServicio,
                         onAbrirAjustes = onAbrirAjustes,
+                        onAbrirUbicacionRapida = onAbrirUbicacionRapida,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
@@ -382,6 +448,11 @@ private fun ShellPrincipal(
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionEntrada(): EnterTransition {
     return when {
+        routeEsRegistro(targetState.destination.route) ->
+            slideInVertically(
+                animationSpec = tween(durationMillis = 250),
+                initialOffsetY = { it / 4 }
+            ) + fadeIn(animationSpec = tween(durationMillis = 220))
         routeEsServicio(targetState.destination.route) ->
             slideInVertically(
                 animationSpec = tween(durationMillis = 240),
@@ -395,6 +466,11 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionEnt
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionSalida(): ExitTransition {
     return when {
+        routeEsRegistro(targetState.destination.route) && routeEsInicio(initialState.destination.route) ->
+            slideOutVertically(
+                animationSpec = tween(durationMillis = 200),
+                targetOffsetY = { -it / 6 }
+            ) + fadeOut(animationSpec = tween(durationMillis = 160))
         routeEsServicio(targetState.destination.route) ->
             fadeOut(animationSpec = tween(durationMillis = 100))
         routeEsAjustes(targetState.destination.route) ->
@@ -405,6 +481,8 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionSal
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionPopEntrada(): EnterTransition {
     return when {
+        routeEsRegistro(initialState.destination.route) ->
+            fadeIn(animationSpec = tween(durationMillis = 150))
         routeEsServicio(initialState.destination.route) ->
             fadeIn(animationSpec = tween(durationMillis = 120))
         routeEsAjustes(initialState.destination.route) ->
@@ -415,6 +493,11 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionPop
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionPopSalida(): ExitTransition {
     return when {
+        routeEsRegistro(initialState.destination.route) ->
+            slideOutVertically(
+                animationSpec = tween(durationMillis = 200),
+                targetOffsetY = { it / 5 }
+            ) + fadeOut(animationSpec = tween(durationMillis = 160))
         routeEsServicio(initialState.destination.route) ->
             slideOutVertically(
                 animationSpec = tween(durationMillis = 200),
@@ -429,6 +512,18 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionPop
 private fun routeEsAjustes(route: String?): Boolean {
     val base = route?.substringBefore("/")
     return base == RutasApp.Ajustes.ruta
+}
+
+private fun routeEsInicio(route: String?): Boolean {
+    val base = route?.substringBefore("/")
+    return base == RutasApp.Inicio.ruta
+}
+
+private fun routeEsRegistro(route: String?): Boolean {
+    val base = route?.substringBefore("/")
+    return base == RutasApp.RegistroPasoUno.ruta ||
+        base == RutasApp.RegistroPasoDireccion.ruta ||
+        base == RutasApp.RegistroPasoDos.ruta
 }
 
 private fun routeEsServicio(route: String?): Boolean {

@@ -39,7 +39,7 @@ fun PantallaLogin(
         }
     }
 
-    PantallaBase {
+    PantallaBase(scrollable = false, mostrarFondo = false) {
         LogoContrabajo(modifier = Modifier.align(Alignment.CenterHorizontally), compacto = true)
         TarjetaBase {
             EncabezadoPantalla(

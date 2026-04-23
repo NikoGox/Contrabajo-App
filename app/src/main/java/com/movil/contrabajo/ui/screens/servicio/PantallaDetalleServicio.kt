@@ -64,7 +64,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
@@ -108,6 +107,7 @@ fun PantallaDetalleServicio(
     idOfertaServicio: Long,
     viewModel: DetalleServicioViewModel,
     onEditarServicio: () -> Unit,
+    onContactarServicio: (Long) -> Unit,
     onVolver: () -> Unit
 ) {
     val uiState = viewModel.uiState
@@ -310,11 +310,10 @@ fun PantallaDetalleServicio(
                             state = pagerState,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .navigationBarsPadding()
-                                .clipToBounds(),
+                                .graphicsLayer { clip = false },
                             beyondViewportPageCount = 1,
-                            contentPadding = PaddingValues(horizontal = 6.dp),
-                            pageSpacing = 2.dp,
+                            contentPadding = PaddingValues(horizontal = 0.dp),
+                            pageSpacing = 0.dp,
                             flingBehavior = comportamientoFlingPager,
                             userScrollEnabled = puedeDeslizar
                         ) { page ->
@@ -444,6 +443,7 @@ fun PantallaDetalleServicio(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
+                                    .graphicsLayer { clip = false }
                                     .graphicsLayer {
                                         translationY = traslacionY
                                         scaleX = escala
@@ -514,7 +514,13 @@ fun PantallaDetalleServicio(
             ) {
                 ContactoFlotante(
                     esPropia = esPublicacionPropia,
-                    onClick = { if (esPublicacionPropia) onEditarServicio() }
+                    onClick = {
+                        if (esPublicacionPropia) {
+                            onEditarServicio()
+                        } else {
+                            onContactarServicio(ofertaCta.idOfertaServicio)
+                        }
+                    }
                 )
             }
         }
@@ -565,6 +571,9 @@ private fun TarjetaDetalleOferta(
     onDireccionScroll: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val shapeTarjeta = RoundedCornerShape(24.dp)
+    val elevacionVisualDp = elevacionTarjetaDp.coerceAtLeast(8f)
+
     var posicionScroll by rememberSaveable(oferta.idOfertaServicio) { mutableIntStateOf(0) }
     val scrollState = rememberScrollState()
     var ultimoScroll by rememberSaveable(oferta.idOfertaServicio) { mutableIntStateOf(posicionScroll) }
@@ -598,10 +607,11 @@ private fun TarjetaDetalleOferta(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 6.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
-        shape = RoundedCornerShape(24.dp),
+            .fillMaxHeight(0.93f)
+            .padding(start = 2.dp, end = 2.dp, top = 4.dp, bottom = 2.dp),
+        shape = shapeTarjeta,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = elevacionTarjetaDp.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = elevacionVisualDp.dp)
     ) {
         Column(
             modifier = Modifier

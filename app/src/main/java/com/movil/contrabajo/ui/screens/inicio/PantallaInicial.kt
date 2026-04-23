@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.movil.contrabajo.recordarVersionApp
 import com.movil.contrabajo.ui.components.BotonPrimario
 import com.movil.contrabajo.ui.components.BotonSecundario
 import com.movil.contrabajo.ui.components.LogoContrabajo
@@ -39,6 +40,7 @@ fun PantallaInicial(
 ) {
     val uiState = viewModel.uiState
     var visible by remember { mutableStateOf(false) }
+    val versionApp = recordarVersionApp()
 
     LaunchedEffect(Unit) {
         visible = true
@@ -66,12 +68,16 @@ fun PantallaInicial(
                 ) {
                     Spacer(modifier = Modifier.weight(0.35f))
                     Text(
-                        text = "Bienvenido a",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "Bienvenido",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
-                    LogoContrabajo(modifier = Modifier.align(Alignment.CenterHorizontally))
+                    LogoContrabajo(
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        tamanoPersonalizado = 148.dp
+                    )
                     TarjetaBase {
                         Text(
                             text = "Servicios y oficios cerca de ti",
@@ -88,7 +94,7 @@ fun PantallaInicial(
                         BotonSecundario(texto = "Crear cuenta", onClick = irARegistro)
                     }
                     Text(
-                        text = "v0.4.1-Pre-Alpha",
+                        text = "v$versionApp",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier

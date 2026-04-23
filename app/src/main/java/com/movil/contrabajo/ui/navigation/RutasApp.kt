@@ -4,10 +4,14 @@ sealed class RutasApp(val ruta: String) {
     data object Inicio : RutasApp("inicio")
     data object Login : RutasApp("login")
     data object RegistroPasoUno : RutasApp("registro_paso_uno")
+    data object RegistroPasoDireccion : RutasApp("registro_paso_direccion")
     data object RegistroPasoDos : RutasApp("registro_paso_dos")
     data object PrincipalShell : RutasApp("principal_shell")
     data object Principal : RutasApp("principal")
     data object Chats : RutasApp("chats")
+    data object ChatDetalle : RutasApp("chat_detalle/{idChatCita}") {
+        fun crearRuta(idChatCita: Long): String = "chat_detalle/$idChatCita"
+    }
     data object Perfil : RutasApp("perfil")
     data object Ajustes : RutasApp("ajustes")
     data object AjustesSeguridad : RutasApp("ajustes/seguridad")
