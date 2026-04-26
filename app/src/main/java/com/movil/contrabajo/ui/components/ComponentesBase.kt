@@ -94,7 +94,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import com.movil.contrabajo.R
-import com.movil.contrabajo.recordarVersionApp
 import com.movil.contrabajo.domain.model.ChatCita
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.ui.navigation.RutasApp
@@ -197,9 +196,7 @@ fun LogoContrabajo(
         AsyncImage(
             model = R.drawable.ct_icon_mini_t,
             contentDescription = "Logo Contrabajo",
-            modifier = Modifier
-                .size(iconSize)
-                .clip(if (compacto) CircleShape else RoundedCornerShape(30.dp)),
+            modifier = Modifier.size(iconSize),
             contentScale = ContentScale.Fit
         )
         if (mostrarTitulo) {
@@ -781,58 +778,93 @@ private fun EstrellaFraccion(
 }
 
 @Composable
-fun TarjetaChat(chat: ChatCita, onClick: (() -> Unit)? = null) {
-    Row(
+fun TarjetaChat(
+    chat: ChatCita,
+    esChatComoTrabajador: Boolean = false,
+    onClick: (() -> Unit)? = null
+) {
+    val fondoTarjeta = if (esChatComoTrabajador) {
+        Color(0xFFDCEBFF)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = onClick != null) { onClick?.invoke() }
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .clickable(enabled = onClick != null) { onClick?.invoke() },
+        shape = RoundedCornerShape(14.dp),
+        color = fondoTarjeta,
+        tonalElevation = if (esChatComoTrabajador) 1.dp else 0.dp
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(52.dp)
-                .background(
-                    Brush.linearGradient(listOf(TurquesaBrillante, AzulPetroleo)),
-                    CircleShape
-                ),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = chat.nombreContacto.take(1).uppercase(),
-                color = Blanco,
-                fontWeight = FontWeight.Bold
-            )
-        }
-        Spacer(modifier = Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(chat.nombreContacto, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(
-                chat.ultimoMensaje,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2
-            )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(
-                text = chat.horaUltimoMensaje.takeLast(5),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-            if (chat.mensajesNoLeidos > 0) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary
-                ) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .background(
+                        Brush.linearGradient(listOf(TurquesaBrillante, AzulPetroleo)),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = chat.nombreContacto.take(1).uppercase(),
+                    color = Blanco,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = chat.tituloServicio.ifBlank { "Servicio" },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "@${chat.usernameContacto.ifBlank { "usuario" }}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    chat.ultimoMensaje,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2
+                )
+                if (chat.chatCerrado) {
                     Text(
-                        text = chat.mensajesNoLeidos.coerceAtMost(99).toString(),
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                        text = "Chat cerrado",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Blanco,
-                        fontWeight = FontWeight.Bold
+                        color = MaterialTheme.colorScheme.error
                     )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = chat.horaUltimoMensaje.takeLast(5),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (chat.mensajesNoLeidos > 0) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary
+                    ) {
+                        Text(
+                            text = chat.mensajesNoLeidos.coerceAtMost(99).toString(),
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Blanco,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -900,7 +932,6 @@ fun OverlayPantallaCarga(
     mostrarIndicador: Boolean = true,
     modoSuave: Boolean = false
 ) {
-    val versionApp = recordarVersionApp()
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(animationSpec = tween(durationMillis = 100)),
@@ -949,11 +980,6 @@ fun OverlayPantallaCarga(
                             .clip(RoundedCornerShape(999.dp)),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = Color.White.copy(alpha = 0.34f)
-                    )
-                    Text(
-                        text = "v$versionApp",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.85f)
                     )
                 }
             }
@@ -1005,11 +1031,6 @@ fun OverlayPantallaCarga(
                         )
                     }
 
-                    Text(
-                        text = "v$versionApp",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
-                    )
                 }
             }
         }

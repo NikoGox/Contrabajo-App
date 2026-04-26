@@ -12,11 +12,11 @@ import com.movil.contrabajo.data.repository.RepositorioChats
 import com.movil.contrabajo.data.repository.RepositorioOfertas
 import com.movil.contrabajo.data.repository.RepositorioPerfil
 import com.movil.contrabajo.domain.model.ChatCita
-import com.movil.contrabajo.domain.model.EstadoCita
 import com.movil.contrabajo.domain.model.FotoServicioLocal
 import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
 import com.movil.contrabajo.domain.model.OfertaServicio
+import com.movil.contrabajo.domain.model.NotificacionMensajePendiente
 import com.movil.contrabajo.domain.model.PrecioUtils
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
 import com.movil.contrabajo.domain.model.EscalaRango
@@ -246,6 +246,9 @@ class PrincipalViewModel(
 data class ChatsUiState(
     val idUsuarioActual: Long? = null,
     val chats: List<ChatCita> = emptyList(),
+    val totalMensajesNoLeidos: Int = 0,
+    val idPrimerChatPendiente: Long? = null,
+    val notificacionesPendientes: List<NotificacionMensajePendiente> = emptyList(),
     val chatActivo: ChatCita? = null,
     val mensajesActivos: List<MensajeChat> = emptyList(),
     val citaActiva: CitaServicio? = null,
@@ -265,9 +268,14 @@ class ChatsViewModel(
     }
 
     fun recargar() {
+        val chatsActuales = repositorioChats.obtenerChatsActuales()
+        val notificacionesPendientes = repositorioChats.obtenerNotificacionesPendientes()
         uiState = uiState.copy(
             idUsuarioActual = repositorioChats.obtenerIdUsuarioActual(),
-            chats = repositorioChats.obtenerChatsActuales()
+            chats = chatsActuales,
+            totalMensajesNoLeidos = chatsActuales.sumOf { it.mensajesNoLeidos.coerceAtLeast(0) },
+            idPrimerChatPendiente = chatsActuales.firstOrNull { it.mensajesNoLeidos > 0 }?.idChatCita,
+            notificacionesPendientes = notificacionesPendientes
         )
     }
 
@@ -326,9 +334,13 @@ class ChatsViewModel(
             }
     }
 
-    fun crearCita(fechaProgramada: String, detalle: String) {
+    fun crearCita(fechaProgramada: String, comentario: String) {
         val chat = uiState.chatActivo ?: return
-        repositorioChats.crearCitaDesdeChat(chat.idChatCita, fechaProgramada, detalle)
+        repositorioChats.crearCitaDesdeChat(
+            idChatCita = chat.idChatCita,
+            fechaProgramada = fechaProgramada,
+            comentario = comentario
+        )
             .onSuccess { cita ->
                 uiState = uiState.copy(
                     citaActiva = cita,
@@ -342,29 +354,104 @@ class ChatsViewModel(
             }
     }
 
-    fun cambiarEstadoCita(nuevoEstado: Int) {
-        val cita = uiState.citaActiva ?: return
-        repositorioChats.actualizarEstadoCita(cita.idCita, nuevoEstado)
-            .onSuccess { citaActualizada ->
+    fun aceptarCitaTrabajador() {
+        val chat = uiState.chatActivo ?: return
+        procesarTransicionCita(
+            accion = { repositorioChats.aceptarCitaTrabajador(chat.idChatCita) },
+            mensajeExito = "Cita aceptada. Estado: Handshake."
+        )
+    }
+
+    fun rechazarCitaTrabajador() {
+        val chat = uiState.chatActivo ?: return
+        procesarTransicionCita(
+            accion = { repositorioChats.rechazarCitaTrabajador(chat.idChatCita) },
+            mensajeExito = "Propuesta rechazada. Puedes seguir negociando sobre la misma cita."
+        )
+    }
+
+    fun reenviarPropuestaCitaCliente() {
+        val chat = uiState.chatActivo ?: return
+        procesarTransicionCita(
+            accion = { repositorioChats.reenviarPropuestaCitaCliente(chat.idChatCita) },
+            mensajeExito = "Propuesta reenviada. Estado actualizado a pendiente."
+        )
+    }
+
+    fun solicitarInicioTrabajoTrabajador() {
+        val chat = uiState.chatActivo ?: return
+        procesarTransicionCita(
+            accion = { repositorioChats.solicitarInicioTrabajoTrabajador(chat.idChatCita) },
+            mensajeExito = "Solicitud de inicio enviada al cliente."
+        )
+    }
+
+    fun aceptarInicioTrabajoCliente() {
+        val chat = uiState.chatActivo ?: return
+        procesarTransicionCita(
+            accion = { repositorioChats.aceptarInicioTrabajoCliente(chat.idChatCita) },
+            mensajeExito = "Inicio del trabajo confirmado."
+        )
+    }
+
+    fun solicitarFinalizarTrabajoTrabajador() {
+        val chat = uiState.chatActivo ?: return
+        procesarTransicionCita(
+            accion = { repositorioChats.solicitarFinalizarTrabajoTrabajador(chat.idChatCita) },
+            mensajeExito = "Solicitud de finalizacion enviada al cliente."
+        )
+    }
+
+    fun aceptarFinalizarTrabajoCliente() {
+        val chat = uiState.chatActivo ?: return
+        procesarTransicionCita(
+            accion = { repositorioChats.aceptarFinalizarTrabajoCliente(chat.idChatCita) },
+            mensajeExito = "Trabajo finalizado correctamente."
+        )
+    }
+
+    fun cerrarChatActivo() {
+        val chat = uiState.chatActivo ?: return
+        repositorioChats.cerrarChat(chat.idChatCita)
+            .onSuccess {
                 uiState = uiState.copy(
-                    citaActiva = citaActualizada,
-                    mensajeSistema = "Estado de cita actualizado.",
+                    mensajeSistema = "Chat finalizado. Queda en solo lectura.",
                     error = null
                 )
-                uiState.chatActivo?.let { abrirChat(it.idChatCita) }
+                abrirChat(chat.idChatCita)
             }
             .onFailure {
-                uiState = uiState.copy(error = it.message ?: "No se pudo actualizar el estado")
+                uiState = uiState.copy(error = it.message ?: "No se pudo finalizar el chat")
             }
     }
 
-    fun marcarCitaConfirmada() = cambiarEstadoCita(EstadoCita.CONFIRMADA)
-    fun marcarCitaEnProceso() = cambiarEstadoCita(EstadoCita.EN_PROCESO)
-    fun marcarCitaFinalizada() = cambiarEstadoCita(EstadoCita.FINALIZADA)
-    fun marcarCitaPendiente() = cambiarEstadoCita(EstadoCita.PENDIENTE)
+    private fun procesarTransicionCita(
+        accion: () -> Result<CitaServicio>,
+        mensajeExito: String
+    ) {
+        val chat = uiState.chatActivo ?: return
+        accion()
+            .onSuccess { citaActualizada ->
+                uiState = uiState.copy(
+                    citaActiva = citaActualizada,
+                    mensajeSistema = mensajeExito,
+                    error = null
+                )
+                abrirChat(chat.idChatCita)
+            }
+            .onFailure {
+                uiState = uiState.copy(error = it.message ?: "No se pudo actualizar la cita")
+            }
+    }
 
     fun consumirMensajes() {
         uiState = uiState.copy(mensajeSistema = null, error = null)
+    }
+
+    fun marcarNotificacionesMostradas(idsMensaje: List<Long>) {
+        if (idsMensaje.isEmpty()) return
+        repositorioChats.marcarNotificacionesComoMostradas(idsMensaje)
+        recargar()
     }
 }
 

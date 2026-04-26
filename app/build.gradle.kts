@@ -12,8 +12,8 @@ android {
         applicationId = "com.movil.contrabajo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.4.2-Pre-Alpha"
+        versionCode = 3
+        versionName = "0.5.0-Pre-Alpha"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

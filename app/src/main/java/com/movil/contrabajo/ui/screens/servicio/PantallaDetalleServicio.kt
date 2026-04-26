@@ -43,11 +43,13 @@ import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -125,6 +127,8 @@ fun PantallaDetalleServicio(
     var indiceDetalleCompleto by rememberSaveable { mutableIntStateOf(uiState.indiceActual.coerceAtLeast(0)) }
     var saliendoPantalla by rememberSaveable { mutableStateOf(false) }
     var swipeEnfriamiento by rememberSaveable { mutableStateOf(false) }
+    var mostrarConfirmacionChat by rememberSaveable { mutableStateOf(false) }
+    var ofertaPendienteChatId by rememberSaveable { mutableStateOf<Long?>(null) }
     val paginasListas = remember { mutableStateMapOf<Int, Boolean>() }
     var direccionSwipeActiva by rememberSaveable { mutableIntStateOf(0) } // 1 avance, -1 retroceso
     val comportamientoFlingPager = PagerDefaults.flingBehavior(
@@ -518,11 +522,42 @@ fun PantallaDetalleServicio(
                         if (esPublicacionPropia) {
                             onEditarServicio()
                         } else {
-                            onContactarServicio(ofertaCta.idOfertaServicio)
+                            ofertaPendienteChatId = ofertaCta.idOfertaServicio
+                            mostrarConfirmacionChat = true
                         }
                     }
                 )
             }
+        }
+
+        if (mostrarConfirmacionChat && ofertaPendienteChatId != null) {
+            AlertDialog(
+                onDismissRequest = { mostrarConfirmacionChat = false },
+                title = { Text("Iniciar conversación") },
+                text = { Text("¿Estás seguro de que deseas iniciar la conversación con este trabajador?") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val idOferta = ofertaPendienteChatId
+                            mostrarConfirmacionChat = false
+                            ofertaPendienteChatId = null
+                            if (idOferta != null) onContactarServicio(idOferta)
+                        }
+                    ) {
+                        Text("Sí, continuar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            mostrarConfirmacionChat = false
+                            ofertaPendienteChatId = null
+                        }
+                    ) {
+                        Text("Cancelar")
+                    }
+                }
+            )
         }
     }
 }

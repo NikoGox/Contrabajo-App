@@ -57,12 +57,18 @@ data class ChatCita(
     val fechaCreacion: String,
     val idTrabajador: Long,
     val idCliente: Long,
+    val idOfertaServicio: Long? = null,
     val idCita: Long? = null,
     val nombreContacto: String = "",
+    val usernameContacto: String = "",
+    val tituloServicio: String = "",
+    val categoriaServicio: String = "",
     val ultimoMensaje: String = "",
     val horaUltimoMensaje: String = "",
     val mensajesNoLeidos: Int = 0,
-    val estadoCita: Int? = null
+    val estadoCita: Int? = null,
+    val chatCerrado: Boolean = false,
+    val bloqueadoHastaMs: Long? = null
 )
 
 data class MensajeChat(
@@ -77,20 +83,41 @@ data class MensajeChat(
     val contenido: String
 )
 
+data class NotificacionMensajePendiente(
+    val idMensajeChat: Long,
+    val idChatCita: Long,
+    val titulo: String,
+    val contenido: String
+)
+
 data class CitaServicio(
     val idCita: Long = 0,
     val idChatCita: Long,
     val fechaCreacion: String,
     val fechaProgramada: String,
-    val detalle: String,
+    val comentario: String,
+    val precioAcordado: Int,
+    val fechaInicioTrabajo: String? = null,
+    val fechaFinTrabajo: String? = null,
     val estado: Int
 )
 
 object EstadoCita {
-    const val PENDIENTE = 0
-    const val CONFIRMADA = 1
-    const val EN_PROCESO = 2
-    const val FINALIZADA = 3
+    const val PENDIENTE = 401
+    const val HANDSHAKE = 402
+    const val COMENZANDO = 403
+    const val EN_PROCESO = 404
+    const val FINALIZANDO = 405
+    const val FINALIZADO = 406
+    const val CANCELADO = 407
+    const val CERRADO = 408
+    const val RECHAZADA = 409
+}
+
+object EstadoCodigo {
+    const val MSG_ENVIADO = 301L
+    const val MSG_ENTREGADO = 302L
+    const val MSG_LEIDO = 303L
 }
 
 data class CategoriaServicio(

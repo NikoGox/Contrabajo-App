@@ -8,6 +8,7 @@ import com.movil.contrabajo.domain.model.EstadoCita
 import com.movil.contrabajo.domain.model.FiltroMarketplaceConfig
 import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
+import com.movil.contrabajo.domain.model.NotificacionMensajePendiente
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.domain.model.PrecioUtils
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
@@ -59,9 +60,18 @@ interface RepositorioChats {
     fun iniciarConversacionDesdeOferta(idOfertaServicio: Long): Result<ChatCita>
     fun obtenerChat(idChatCita: Long): ChatCita?
     fun enviarMensaje(idChatCita: Long, contenido: String): Result<MensajeChat>
-    fun crearCitaDesdeChat(idChatCita: Long, fechaProgramada: String, detalle: String): Result<CitaServicio>
+    fun crearCitaDesdeChat(idChatCita: Long, fechaProgramada: String, comentario: String, precioAcordado: Int = 0): Result<CitaServicio>
     fun obtenerCitaPorChat(idChatCita: Long): CitaServicio?
-    fun actualizarEstadoCita(idCita: Long, nuevoEstado: Int): Result<CitaServicio>
+    fun aceptarCitaTrabajador(idChatCita: Long): Result<CitaServicio>
+    fun rechazarCitaTrabajador(idChatCita: Long): Result<CitaServicio>
+    fun reenviarPropuestaCitaCliente(idChatCita: Long): Result<CitaServicio>
+    fun solicitarInicioTrabajoTrabajador(idChatCita: Long): Result<CitaServicio>
+    fun aceptarInicioTrabajoCliente(idChatCita: Long): Result<CitaServicio>
+    fun solicitarFinalizarTrabajoTrabajador(idChatCita: Long): Result<CitaServicio>
+    fun aceptarFinalizarTrabajoCliente(idChatCita: Long): Result<CitaServicio>
+    fun cerrarChat(idChatCita: Long): Result<ChatCita>
+    fun obtenerNotificacionesPendientes(): List<NotificacionMensajePendiente>
+    fun marcarNotificacionesComoMostradas(idsMensaje: List<Long>)
 }
 
 class RepositorioAutenticacionLocal(
@@ -418,11 +428,13 @@ class RepositorioChatsLocal(
 
     override fun obtenerChatsActuales(): List<ChatCita> {
         val usuario = db.obtenerUsuarioSesionActiva() ?: return emptyList()
+        db.marcarMensajesRecibidos(idReceptor = usuario.idUsuario)
         return db.obtenerChatsParaUsuario(usuario.idUsuario)
     }
 
     override fun obtenerMensajes(idChatCita: Long): List<MensajeChat> {
         val usuario = db.obtenerUsuarioSesionActiva() ?: return emptyList()
+        db.marcarMensajesRecibidos(idReceptor = usuario.idUsuario)
         db.marcarMensajesLeidos(idChatCita = idChatCita, idReceptor = usuario.idUsuario)
         return db.obtenerMensajesPorChat(idChatCita)
     }
@@ -437,20 +449,49 @@ class RepositorioChatsLocal(
             return Result.failure(IllegalStateException("No puedes iniciar chat con tu propia publicacion"))
         }
 
-        val idChat = db.obtenerChatEntreUsuarios(idTrabajador = idTrabajador, idCliente = usuario.idUsuario)
-            ?: db.crearChatCita(idTrabajador = idTrabajador, idCliente = usuario.idUsuario)
+        val idChatExistente = db.obtenerChatEntreUsuarios(
+            idTrabajador = idTrabajador,
+            idCliente = usuario.idUsuario,
+            idOfertaServicio = idOfertaServicio
+        )
 
-        if (idChat <= 0) return Result.failure(IllegalStateException("No se pudo crear el chat"))
-
-        val mensajes = db.obtenerMensajesPorChat(idChat)
-        if (mensajes.isEmpty()) {
-            db.insertarMensajeChat(
-                idChatCita = idChat,
-                idEmisor = usuario.idUsuario,
-                idReceptor = idTrabajador,
-                contenido = "Hola, me interesa tu servicio. ¿Podemos coordinar?"
+        val idChat = if (idChatExistente != null) {
+            val chatExistente = db.obtenerChatPorId(idChatExistente, usuario.idUsuario)
+            if (chatExistente != null) {
+                val estadoCita = chatExistente.estadoCita
+                val citaCerrada = estadoCita in setOf(
+                    EstadoCita.CERRADO,
+                    EstadoCita.FINALIZADO,
+                    EstadoCita.CANCELADO
+                )
+                if (chatExistente.chatCerrado && citaCerrada) {
+                    db.crearChatCita(
+                        idTrabajador = idTrabajador,
+                        idCliente = usuario.idUsuario,
+                        idOfertaServicio = idOfertaServicio
+                    )
+                } else {
+                    if (chatExistente.chatCerrado) {
+                        db.actualizarChatCerrado(idChatCita = idChatExistente, cerrado = false, bloqueadoHastaMs = null)
+                    }
+                    idChatExistente
+                }
+            } else {
+                db.crearChatCita(
+                    idTrabajador = idTrabajador,
+                    idCliente = usuario.idUsuario,
+                    idOfertaServicio = idOfertaServicio
+                )
+            }
+        } else {
+            db.crearChatCita(
+                idTrabajador = idTrabajador,
+                idCliente = usuario.idUsuario,
+                idOfertaServicio = idOfertaServicio
             )
         }
+
+        if (idChat <= 0) return Result.failure(IllegalStateException("No se pudo crear el chat"))
 
         return db.obtenerChatPorId(idChat, usuario.idUsuario)?.let { Result.success(it) }
             ?: Result.failure(IllegalStateException("No se pudo abrir el chat"))
@@ -466,6 +507,9 @@ class RepositorioChatsLocal(
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         val chat = db.obtenerChatPorId(idChatCita, usuario.idUsuario)
             ?: return Result.failure(IllegalArgumentException("Chat no encontrado"))
+        if (chat.chatCerrado) {
+            return Result.failure(IllegalStateException("Este chat esta cerrado y es solo lectura."))
+        }
         val texto = contenido.trim()
         if (texto.isBlank()) return Result.failure(IllegalArgumentException("Escribe un mensaje"))
         val idReceptor = if (chat.idCliente == usuario.idUsuario) chat.idTrabajador else chat.idCliente
@@ -480,41 +524,268 @@ class RepositorioChatsLocal(
             ?: Result.failure(IllegalStateException("No se pudo leer el mensaje enviado"))
     }
 
-    override fun crearCitaDesdeChat(idChatCita: Long, fechaProgramada: String, detalle: String): Result<CitaServicio> {
+    override fun crearCitaDesdeChat(
+        idChatCita: Long,
+        fechaProgramada: String,
+        comentario: String,
+        precioAcordado: Int
+    ): Result<CitaServicio> {
         val usuario = db.obtenerUsuarioSesionActiva()
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         val chat = db.obtenerChatPorId(idChatCita, usuario.idUsuario)
             ?: return Result.failure(IllegalArgumentException("Chat no encontrado"))
+        if (chat.chatCerrado) {
+            return Result.failure(IllegalStateException("No puedes crear cita en un chat cerrado"))
+        }
+        if (chat.idCliente != usuario.idUsuario) {
+            return Result.failure(IllegalStateException("Solo el cliente puede generar la cita"))
+        }
         if (fechaProgramada.trim().isBlank()) {
             return Result.failure(IllegalArgumentException("Ingresa fecha y hora de cita"))
         }
-        if (detalle.trim().isBlank()) {
-            return Result.failure(IllegalArgumentException("Ingresa el detalle de la cita"))
+        val formateador = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+        val fechaProgramadaDateTime = try {
+            LocalDateTime.parse(fechaProgramada.trim(), formateador)
+        } catch (_: DateTimeParseException) {
+            return Result.failure(IllegalArgumentException("Selecciona una fecha y hora validas para la cita"))
+        }
+        val ahora = LocalDateTime.now().withSecond(0).withNano(0)
+        if (fechaProgramadaDateTime.isBefore(ahora)) {
+            return Result.failure(IllegalArgumentException("La fecha de la cita debe ser desde el momento actual hacia adelante"))
+        }
+        if (comentario.trim().isBlank()) {
+            return Result.failure(IllegalArgumentException("Ingresa comentario de la cita"))
         }
         if (db.obtenerCitaPorChat(idChatCita) != null) {
             return Result.failure(IllegalStateException("Este chat ya tiene una cita registrada"))
         }
         val idCita = db.crearCitaServicio(
             idChatCita = chat.idChatCita,
-            fechaProgramada = fechaProgramada.trim(),
-            detalle = detalle.trim()
+            fechaProgramada = fechaProgramadaDateTime.format(formateador),
+            comentario = comentario.trim(),
+            precioAcordado = precioAcordado.coerceAtLeast(0)
         )
         if (idCita <= 0) return Result.failure(IllegalStateException("No se pudo crear la cita"))
+        val nombreCliente = "${usuario.nombre} ${usuario.apellidoPaterno}".trim()
+        db.insertarMensajeChat(
+            idChatCita = chat.idChatCita,
+            idEmisor = usuario.idUsuario,
+            idReceptor = chat.idTrabajador,
+            contenido = "El usuario $nombreCliente genero la cita y esta esperando tu confirmacion."
+        )
         return db.obtenerCitaPorChat(idChatCita)?.let { Result.success(it) }
             ?: Result.failure(IllegalStateException("No se pudo recuperar la cita"))
     }
 
     override fun obtenerCitaPorChat(idChatCita: Long): CitaServicio? = db.obtenerCitaPorChat(idChatCita)
 
-    override fun actualizarEstadoCita(idCita: Long, nuevoEstado: Int): Result<CitaServicio> {
-        if (nuevoEstado !in listOf(EstadoCita.PENDIENTE, EstadoCita.CONFIRMADA, EstadoCita.EN_PROCESO, EstadoCita.FINALIZADA)) {
-            return Result.failure(IllegalArgumentException("Estado de cita invalido"))
+    override fun aceptarCitaTrabajador(idChatCita: Long): Result<CitaServicio> =
+        transicionarCita(
+            idChatCita = idChatCita,
+            validarRol = { chat, usuario -> chat.idTrabajador == usuario.idUsuario },
+            estadosPermitidos = setOf(EstadoCita.PENDIENTE),
+            nuevoEstado = EstadoCita.HANDSHAKE,
+            mensajeSistema = "El trabajador acepto la cita y condiciones."
+        )
+
+    override fun rechazarCitaTrabajador(idChatCita: Long): Result<CitaServicio> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val chat = db.obtenerChatPorId(idChatCita, usuario.idUsuario)
+            ?: return Result.failure(IllegalArgumentException("Chat no encontrado"))
+        if (chat.chatCerrado) {
+            return Result.failure(IllegalStateException("El chat esta cerrado y no admite cambios."))
         }
-        val actualizada = db.actualizarEstadoCita(idCita, nuevoEstado)
-        if (!actualizada) return Result.failure(IllegalStateException("No se pudo actualizar el estado de la cita"))
-        val chat = obtenerChatsActuales().firstOrNull { it.idCita == idCita }
-            ?: return Result.failure(IllegalStateException("No se encontro el chat de la cita"))
-        return db.obtenerCitaPorChat(chat.idChatCita)?.let { Result.success(it) }
+        if (chat.idTrabajador != usuario.idUsuario) {
+            return Result.failure(IllegalStateException("No tienes permisos para esta accion."))
+        }
+        val cita = db.obtenerCitaPorChat(idChatCita)
+            ?: return Result.failure(IllegalStateException("Este chat no tiene cita activa"))
+        if (cita.estado != EstadoCita.PENDIENTE) {
+            return Result.failure(IllegalStateException("Solo puedes rechazar citas pendientes."))
+        }
+        val estadoActualizado = db.actualizarEstadoCita(
+            idCita = cita.idCita,
+            nuevoEstado = EstadoCita.RECHAZADA,
+            fechaInicioTrabajo = null,
+            fechaFinTrabajo = null
+        )
+        if (!estadoActualizado) {
+            return Result.failure(IllegalStateException("No se pudo actualizar la cita a rechazada."))
+        }
+        val idReceptor = if (chat.idCliente == usuario.idUsuario) chat.idTrabajador else chat.idCliente
+        db.insertarMensajeChat(
+            idChatCita = idChatCita,
+            idEmisor = usuario.idUsuario,
+            idReceptor = idReceptor,
+            contenido = "El trabajador rechazo la propuesta actual. Puedes reenviar una nueva propuesta sobre esta misma cita."
+        )
+        return db.obtenerCitaPorChat(idChatCita)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("No se pudo recuperar la cita rechazada"))
+    }
+
+    override fun reenviarPropuestaCitaCliente(idChatCita: Long): Result<CitaServicio> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val chat = db.obtenerChatPorId(idChatCita, usuario.idUsuario)
+            ?: return Result.failure(IllegalArgumentException("Chat no encontrado"))
+        if (chat.chatCerrado) {
+            return Result.failure(IllegalStateException("El chat esta cerrado y no admite cambios."))
+        }
+        if (chat.idCliente != usuario.idUsuario) {
+            return Result.failure(IllegalStateException("Solo el cliente puede reenviar la propuesta."))
+        }
+        val cita = db.obtenerCitaPorChat(idChatCita)
+            ?: return Result.failure(IllegalStateException("Este chat no tiene cita activa"))
+        if (cita.estado != EstadoCita.RECHAZADA) {
+            return Result.failure(IllegalStateException("Solo puedes reenviar una cita en estado rechazada."))
+        }
+
+        val estadoActualizado = db.actualizarEstadoCita(
+            idCita = cita.idCita,
+            nuevoEstado = EstadoCita.PENDIENTE,
+            fechaInicioTrabajo = cita.fechaInicioTrabajo,
+            fechaFinTrabajo = cita.fechaFinTrabajo
+        )
+        if (!estadoActualizado) {
+            return Result.failure(IllegalStateException("No se pudo reenviar la propuesta."))
+        }
+        val idReceptor = if (chat.idCliente == usuario.idUsuario) chat.idTrabajador else chat.idCliente
+        db.insertarMensajeChat(
+            idChatCita = idChatCita,
+            idEmisor = usuario.idUsuario,
+            idReceptor = idReceptor,
+            contenido = "El cliente envio una nueva propuesta de cita para continuar la negociacion."
+        )
+        return db.obtenerCitaPorChat(idChatCita)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("No se pudo recuperar la cita reenviada"))
+    }
+
+    override fun solicitarInicioTrabajoTrabajador(idChatCita: Long): Result<CitaServicio> =
+        transicionarCita(
+            idChatCita = idChatCita,
+            validarRol = { chat, usuario -> chat.idTrabajador == usuario.idUsuario },
+            estadosPermitidos = setOf(EstadoCita.HANDSHAKE),
+            nuevoEstado = EstadoCita.COMENZANDO,
+            mensajeSistema = "El trabajador solicito iniciar el trabajo. Espera confirmacion del cliente."
+        )
+
+    override fun aceptarInicioTrabajoCliente(idChatCita: Long): Result<CitaServicio> =
+        transicionarCita(
+            idChatCita = idChatCita,
+            validarRol = { chat, usuario -> chat.idCliente == usuario.idUsuario },
+            estadosPermitidos = setOf(EstadoCita.COMENZANDO),
+            nuevoEstado = EstadoCita.EN_PROCESO,
+            mensajeSistema = "El cliente confirmo el inicio del trabajo.",
+            fechaInicio = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(LocalDateTime.now())
+        )
+
+    override fun solicitarFinalizarTrabajoTrabajador(idChatCita: Long): Result<CitaServicio> =
+        transicionarCita(
+            idChatCita = idChatCita,
+            validarRol = { chat, usuario -> chat.idTrabajador == usuario.idUsuario },
+            estadosPermitidos = setOf(EstadoCita.EN_PROCESO),
+            nuevoEstado = EstadoCita.FINALIZANDO,
+            mensajeSistema = "El trabajador solicito finalizar el trabajo. Espera confirmacion del cliente."
+        )
+
+    override fun aceptarFinalizarTrabajoCliente(idChatCita: Long): Result<CitaServicio> =
+        transicionarCita(
+            idChatCita = idChatCita,
+            validarRol = { chat, usuario -> chat.idCliente == usuario.idUsuario },
+            estadosPermitidos = setOf(EstadoCita.FINALIZANDO),
+            nuevoEstado = EstadoCita.FINALIZADO,
+            mensajeSistema = "El cliente confirmo la finalizacion del trabajo.",
+            fechaFin = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(LocalDateTime.now())
+        )
+
+    override fun cerrarChat(idChatCita: Long): Result<ChatCita> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val chat = db.obtenerChatPorId(idChatCita, usuario.idUsuario)
+            ?: return Result.failure(IllegalArgumentException("Chat no encontrado"))
+        val idReceptor = if (chat.idCliente == usuario.idUsuario) chat.idTrabajador else chat.idCliente
+
+        val cita = db.obtenerCitaPorChat(idChatCita)
+        if (cita != null) {
+            val estadoFinal = if (cita.estado == EstadoCita.FINALIZADO) EstadoCita.CERRADO else EstadoCita.CANCELADO
+            db.actualizarEstadoCita(
+                idCita = cita.idCita,
+                nuevoEstado = estadoFinal,
+                fechaInicioTrabajo = null,
+                fechaFinTrabajo = null
+            )
+        }
+
+        db.insertarMensajeChat(
+            idChatCita = idChatCita,
+            idEmisor = usuario.idUsuario,
+            idReceptor = idReceptor,
+            contenido = "El chat fue finalizado. Queda disponible solo para lectura."
+        )
+
+        val actualizado = db.actualizarChatCerrado(
+            idChatCita = idChatCita,
+            cerrado = true,
+            bloqueadoHastaMs = null
+        )
+        if (!actualizado) return Result.failure(IllegalStateException("No se pudo cerrar el chat"))
+        return db.obtenerChatPorId(idChatCita, usuario.idUsuario)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("No se pudo recargar el chat cerrado"))
+    }
+
+    override fun obtenerNotificacionesPendientes(): List<NotificacionMensajePendiente> {
+        val idUsuario = db.obtenerUsuarioSesionActiva()?.idUsuario ?: return emptyList()
+        return db.obtenerMensajesPendientesNotificacion(idUsuario)
+    }
+
+    override fun marcarNotificacionesComoMostradas(idsMensaje: List<Long>) {
+        db.marcarMensajesNotificados(idsMensaje)
+    }
+
+    private fun transicionarCita(
+        idChatCita: Long,
+        validarRol: (ChatCita, Usuario) -> Boolean,
+        estadosPermitidos: Set<Int>,
+        nuevoEstado: Int,
+        mensajeSistema: String,
+        fechaInicio: String? = null,
+        fechaFin: String? = null
+    ): Result<CitaServicio> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val chat = db.obtenerChatPorId(idChatCita, usuario.idUsuario)
+            ?: return Result.failure(IllegalArgumentException("Chat no encontrado"))
+        if (chat.chatCerrado) {
+            return Result.failure(IllegalStateException("El chat esta cerrado y no admite cambios."))
+        }
+        if (!validarRol(chat, usuario)) {
+            return Result.failure(IllegalStateException("No tienes permisos para esta accion."))
+        }
+        val cita = db.obtenerCitaPorChat(idChatCita)
+            ?: return Result.failure(IllegalStateException("Este chat no tiene cita activa"))
+        if (cita.estado !in estadosPermitidos) {
+            return Result.failure(IllegalStateException("El estado actual no permite esta accion."))
+        }
+
+        val actualizada = db.actualizarEstadoCita(
+            idCita = cita.idCita,
+            nuevoEstado = nuevoEstado,
+            fechaInicioTrabajo = fechaInicio,
+            fechaFinTrabajo = fechaFin
+        )
+        if (!actualizada) return Result.failure(IllegalStateException("No se pudo actualizar la cita"))
+
+        val idReceptor = if (chat.idCliente == usuario.idUsuario) chat.idTrabajador else chat.idCliente
+        db.insertarMensajeChat(
+            idChatCita = idChatCita,
+            idEmisor = usuario.idUsuario,
+            idReceptor = idReceptor,
+            contenido = mensajeSistema
+        )
+
+        return db.obtenerCitaPorChat(idChatCita)?.let { Result.success(it) }
             ?: Result.failure(IllegalStateException("No se pudo recuperar la cita actualizada"))
     }
+
 }

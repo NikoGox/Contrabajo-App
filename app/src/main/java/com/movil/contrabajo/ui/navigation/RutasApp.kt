@@ -12,6 +12,9 @@ sealed class RutasApp(val ruta: String) {
     data object ChatDetalle : RutasApp("chat_detalle/{idChatCita}") {
         fun crearRuta(idChatCita: Long): String = "chat_detalle/$idChatCita"
     }
+    data object CitaDetalle : RutasApp("cita_detalle/{idChatCita}") {
+        fun crearRuta(idChatCita: Long): String = "cita_detalle/$idChatCita"
+    }
     data object Perfil : RutasApp("perfil")
     data object Ajustes : RutasApp("ajustes")
     data object AjustesSeguridad : RutasApp("ajustes/seguridad")

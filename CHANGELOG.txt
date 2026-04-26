@@ -1,3 +1,25 @@
+VERSION 0.5.0-Pre-Alpha
+───────
+├─• Se consolidó un módulo de mensajería contextual por servicio, donde cada conversación queda ligada a una publicación específica.
+├─• Se incorporó confirmación previa al inicio de conversación, reforzando intención de contacto antes de abrir chat.
+├─• Se implementó flujo de cita desde chat con coordinación por roles (cliente/trabajador) y acciones diferenciadas según etapa.
+├─• Se habilitó vista dedicada de cita con estado, servicio asociado, fechas clave y controles operativos según el rol activo.
+├─• Se formalizó una máquina de estados de cita completa para negociación y ejecución del servicio: pendiente, handshake, comenzando, en proceso, finalizando, finalizado, cancelado y cerrado.
+├─• Se añadió estado de negociación rechazada (409) para mantener trazabilidad en la misma cita sin perder historial ni contexto.
+├─• Se agregó capacidad de reenvío de propuesta sobre una cita rechazada, permitiendo negociación continua sin recrear el proceso completo.
+├─• Se integró modal de creación de cita con fecha y hora obligatorias, validación temporal (solo futuro) y comentario ampliado para acuerdos.
+├─• Se implementaron estados de mensaje tipo mensajería moderna (enviado, entregado, leído) con persistencia local y lectura contextual.
+├─• Se habilitaron notificaciones nativas del teléfono por mensaje individual, con deep-link directo al chat correspondiente.
+├─• Se enriqueció el contenido de notificación con formato contextual: servicio + usuario emisor + texto del mensaje.
+├─• Se convirtió el resumen de cita dentro del chat en panel desplegable/colapsable para optimizar espacio de lectura conversacional.
+├─• Se incorporó organización temporal del chat con separadores por día (Hoy, Ayer, fecha) y apertura automática en los últimos mensajes.
+├─• Se reforzó la identidad visual del módulo de chat con contraste por rol, burbujas más legibles y diferenciación de conversaciones del trabajador.
+├─• Se añadió cabecera de chat interactiva que permite abrir directamente el detalle del servicio asociado desde la misma conversación.
+├─• Se consolidó una matriz de estados transversal en formatos CSV/XLSX para estandarizar códigos operativos por dominio (usuarios, servicios, comunicaciones, citas/otros).
+└─• Se mantuvo el enfoque frontend-first con SQLite local, dejando la lógica lista para integración backend posterior sin romper el flujo funcional actual.
+
+
+
 VERSION 0.4.2-Pre-Alpha
 ───────
 ├─• Iteración enfocada en estabilización UX/UI en dispositivo real y consolidación funcional de mensajería y coordinación entre usuarios.

@@ -15,26 +15,26 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.4.2-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.5.0-Pre-Alpha
 
 
 
-> <br>• Iteración enfocada en estabilización UX/UI en dispositivo real y consolidación funcional de mensajería y coordinación entre usuarios.
-> <br>• Se mejoró la navegación entre exploración y detalle para mantener contexto, orden y filtros activos sin perder continuidad.
-> <br>• La búsqueda quedó más consistente al combinar texto, categoría, zona y distancia con resultados más claros.
-> <br>• Se ajustó el filtro por distancia para respetar estrictamente el rango configurado por el usuario.
-> <br>• Se simplificó el comportamiento de filtros al reabrir la app, priorizando una sesión de búsqueda limpia.
-> <br>• Se redujo el tiempo de inicio automático con recordarme para dar una entrada más rápida a la app.
-> <br>• Se rediseñó el flujo de registro para hacerlo más guiado y con validaciones más claras.
-> <br>• Se fortaleció la validación de fecha de nacimiento y datos personales para evitar registros inválidos.
-> <br>• Se simplificó la pantalla de dirección en registro eliminando campos no prioritarios.
-> <br>• Se mejoró el feedback visual de errores en formularios para corregir datos más rápido.
-> <br>• Se actualizó el branding en splash, carga, inicio, login y registro con logos y proporciones más coherentes.
-> <br>• Se habilitó contacto real desde publicación hacia conversación directa entre usuarios.
-> <br>• Se consolidó el historial de mensajes y la experiencia de chat con mejor trazabilidad de lectura.
-> <br>• Se incorporó coordinación por cita dentro de conversación, incluyendo estados visibles de avance.
-> <br>• Se realizaron rondas de pulido visual en detalle, exploración, registro y chat (sombras, alturas e insets).
-> <br>• Se revirtió el último ajuste agresivo de tarjetas en detalle para mantener una versión visual más estable.
+> <br>• Se consolidó un módulo de mensajería contextual por servicio, donde cada conversación queda ligada a una publicación específica.
+> <br>• Se incorporó confirmación previa al inicio de conversación, reforzando intención de contacto antes de abrir chat.
+> <br>• Se implementó flujo de cita desde chat con coordinación por roles (cliente/trabajador) y acciones diferenciadas según etapa.
+> <br>• Se habilitó vista dedicada de cita con estado, servicio asociado, fechas clave y controles operativos según el rol activo.
+> <br>• Se formalizó una máquina de estados de cita completa para negociación y ejecución del servicio: pendiente, handshake, comenzando, en proceso, finalizando, finalizado, cancelado y cerrado.
+> <br>• Se añadió estado de negociación rechazada (409) para mantener trazabilidad en la misma cita sin perder historial ni contexto.
+> <br>• Se agregó capacidad de reenvío de propuesta sobre una cita rechazada, permitiendo negociación continua sin recrear el proceso completo.
+> <br>• Se integró modal de creación de cita con fecha y hora obligatorias, validación temporal (solo futuro) y comentario ampliado para acuerdos.
+> <br>• Se implementaron estados de mensaje tipo mensajería moderna (enviado, entregado, leído) con persistencia local y lectura contextual.
+> <br>• Se habilitaron notificaciones nativas del teléfono por mensaje individual, con deep-link directo al chat correspondiente.
+> <br>• Se enriqueció el contenido de notificación con formato contextual: servicio + usuario emisor + texto del mensaje.
+> <br>• Se convirtió el resumen de cita dentro del chat en panel desplegable/colapsable para optimizar espacio de lectura conversacional.
+> <br>• Se incorporó organización temporal del chat con separadores por día (Hoy, Ayer, fecha) y apertura automática en los últimos mensajes.
+> <br>• Se reforzó la identidad visual del módulo de chat con contraste por rol, burbujas más legibles y diferenciación de conversaciones del trabajador.
+> <br>• Se añadió cabecera de chat interactiva que permite abrir directamente el detalle del servicio asociado desde la misma conversación.
+> <br>• Se consolidó una matriz de estados transversal en formatos CSV/XLSX para estandarizar códigos operativos por dominio (usuarios, servicios, comunicaciones, citas/otros).
 
 ---
 

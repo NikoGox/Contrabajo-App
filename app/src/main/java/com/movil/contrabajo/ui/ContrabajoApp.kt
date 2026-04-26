@@ -39,6 +39,7 @@ import com.movil.contrabajo.ui.components.ContenedorConNavbarFlotante
 import com.movil.contrabajo.ui.components.FondoContrabajo
 import com.movil.contrabajo.ui.components.OverlayPantallaCarga
 import com.movil.contrabajo.ui.navigation.RutasApp
+import com.movil.contrabajo.ui.notificaciones.NotificacionesMensajes
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaLogin
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoDireccion
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoDos
@@ -50,6 +51,7 @@ import com.movil.contrabajo.ui.screens.ajustes.PantallaPreguntasSeguridad
 import com.movil.contrabajo.ui.screens.ajustes.PantallaUbicacion
 import com.movil.contrabajo.ui.screens.ajustes.PantallaVerificarCuentaTrabajador
 import com.movil.contrabajo.ui.screens.chats.PantallaDetalleChat
+import com.movil.contrabajo.ui.screens.chats.PantallaCitaServicio
 import com.movil.contrabajo.ui.screens.chats.PantallaChats
 import com.movil.contrabajo.ui.screens.inicio.PantallaInicial
 import com.movil.contrabajo.ui.screens.perfil.PantallaPerfil
@@ -69,7 +71,10 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 @Composable
-fun ContrabajoApp() {
+fun ContrabajoApp(
+    chatNotificacionPendienteId: Long? = null,
+    onConsumirChatNotificacionPendiente: () -> Unit = {}
+) {
     val context = LocalContext.current
     val repositorios = remember(context) { ProveedorRepositorios(context) }
     val factory = remember(repositorios) { ContrabajoViewModelFactory(repositorios) }
@@ -157,6 +162,17 @@ fun ContrabajoApp() {
             .onSuccess { chat ->
                 navController.navigate(RutasApp.ChatDetalle.crearRuta(chat.idChatCita))
             }
+    }
+
+    LaunchedEffect(chatNotificacionPendienteId) {
+        val idChat = chatNotificacionPendienteId ?: return@LaunchedEffect
+        navController.navigate(RutasApp.PrincipalShell.ruta) {
+            launchSingleTop = true
+        }
+        navController.navigate(RutasApp.ChatDetalle.crearRuta(idChat)) {
+            launchSingleTop = true
+        }
+        onConsumirChatNotificacionPendiente()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -287,6 +303,23 @@ fun ContrabajoApp() {
                 PantallaDetalleChat(
                     idChatCita = idChat,
                     viewModel = chatsViewModel,
+                    onVolver = { navController.popBackStack() },
+                    onAbrirCita = { idChatCita ->
+                        navController.navigate(RutasApp.CitaDetalle.crearRuta(idChatCita))
+                    },
+                    onAbrirServicioAsociado = { idOfertaServicio ->
+                        navController.navigate(RutasApp.Servicio.crearRuta(idOfertaServicio))
+                    }
+                )
+            }
+            composable(
+                route = RutasApp.CitaDetalle.ruta,
+                arguments = listOf(navArgument("idChatCita") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val idChat = backStackEntry.arguments?.getLong("idChatCita") ?: 0L
+                PantallaCitaServicio(
+                    idChatCita = idChat,
+                    viewModel = chatsViewModel,
                     onVolver = { navController.popBackStack() }
                 )
             }
@@ -341,15 +374,24 @@ private fun ShellPrincipal(
     onAbrirUbicacionRapida: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var rutaContenido by rememberSaveable { mutableStateOf(RutasApp.Principal.ruta) }
     var desplazamientoHorizontal by remember { mutableStateOf(0f) }
     val rutasSwipe = remember { listOf(RutasApp.Perfil.ruta, RutasApp.Principal.ruta, RutasApp.Chats.ruta) }
 
     LaunchedEffect(rutaContenido) {
         when (rutaContenido) {
+            RutasApp.Principal.ruta -> chatsViewModel.recargar()
             RutasApp.Chats.ruta -> chatsViewModel.recargar()
             RutasApp.Perfil.ruta -> perfilViewModel.recargar()
         }
+    }
+
+    LaunchedEffect(chatsViewModel.uiState.notificacionesPendientes) {
+        val pendientes = chatsViewModel.uiState.notificacionesPendientes
+        if (pendientes.isEmpty()) return@LaunchedEffect
+        NotificacionesMensajes.mostrarNotificacionesMensajes(context, pendientes)
+        chatsViewModel.marcarNotificacionesMostradas(pendientes.map { it.idMensajeChat })
     }
 
     ContenedorConNavbarFlotante(

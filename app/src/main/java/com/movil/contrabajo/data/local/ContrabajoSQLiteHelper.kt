@@ -7,12 +7,14 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.movil.contrabajo.domain.model.CategoriaServicio
 import com.movil.contrabajo.domain.model.CitaServicio
+import com.movil.contrabajo.domain.model.EstadoCodigo
 import com.movil.contrabajo.domain.model.EstadoCita
 import com.movil.contrabajo.domain.model.ChatCita
 import com.movil.contrabajo.domain.model.FiltroMarketplaceConfig
 import com.movil.contrabajo.domain.model.FotoServicioLocal
 import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
+import com.movil.contrabajo.domain.model.NotificacionMensajePendiente
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.domain.model.PrecioUtils
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
@@ -112,6 +114,9 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "fecha_creacion TEXT NOT NULL," +
                 "id_trabajador INTEGER NOT NULL," +
                 "id_cliente INTEGER NOT NULL," +
+                "id_oferta_servicio INTEGER," +
+                "cerrado INTEGER NOT NULL DEFAULT 0," +
+                "bloqueado_hasta_ms INTEGER," +
                 "id_cita INTEGER)"
         )
         db.execSQL(
@@ -120,8 +125,11 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "id_chat_cita INTEGER NOT NULL UNIQUE," +
                 "fecha_creacion TEXT NOT NULL," +
                 "fecha_programada TEXT NOT NULL," +
-                "detalle TEXT NOT NULL," +
-                "estado_cita INTEGER NOT NULL DEFAULT 0," +
+                "comentario TEXT NOT NULL," +
+                "precio_acordado INTEGER NOT NULL DEFAULT 0," +
+                "fecha_inicio_trabajo TEXT," +
+                "fecha_fin_trabajo TEXT," +
+                "estado_cita INTEGER NOT NULL DEFAULT 401," +
                 "fecha_actualizacion TEXT NOT NULL)"
         )
         db.execSQL(
@@ -134,6 +142,7 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "id_receptor INTEGER NOT NULL," +
                 "id_chat_cita INTEGER NOT NULL," +
                 "id_estado INTEGER NOT NULL," +
+                "notificado_local INTEGER NOT NULL DEFAULT 0," +
                 "contenido TEXT NOT NULL)"
         )
         db.execSQL(
@@ -705,9 +714,12 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     fun obtenerChatsParaUsuario(idUsuario: Long): List<ChatCita> {
         readableDatabase.rawQuery(
-            "SELECT c.id_chat_cita, c.fecha_creacion, c.id_trabajador, c.id_cliente, c.id_cita, " +
+            "SELECT c.id_chat_cita, c.fecha_creacion, c.id_trabajador, c.id_cliente, c.id_oferta_servicio, c.id_cita, c.cerrado, c.bloqueado_hasta_ms, " +
                 "CASE WHEN c.id_cliente = ? THEN ut.nombre || ' ' || ut.apellido_paterno " +
                 "ELSE uc.nombre || ' ' || uc.apellido_paterno END AS nombre_contacto, " +
+                "CASE WHEN c.id_cliente = ? THEN ut.username ELSE uc.username END AS username_contacto, " +
+                "COALESCE(os.titulo, 'Servicio') AS titulo_servicio, " +
+                "COALESCE(cat.nombre, '') AS categoria_servicio, " +
                 "COALESCE(m.contenido, '') AS ultimo_mensaje, " +
                 "COALESCE(m.fecha_envio, c.fecha_creacion) AS hora_ultimo_mensaje, " +
                 "COALESCE(cs.estado_cita, NULL) AS estado_cita, " +
@@ -719,10 +731,18 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "LEFT JOIN mensajes_chat m ON m.id_mensaje_chat = (" +
                 "SELECT id_mensaje_chat FROM mensajes_chat WHERE id_chat_cita = c.id_chat_cita " +
                 "ORDER BY id_mensaje_chat DESC LIMIT 1) " +
+                "LEFT JOIN ofertas_servicio os ON os.id_oferta_servicio = c.id_oferta_servicio " +
+                "LEFT JOIN categorias_servicio cat ON cat.id_categoria_servicio = os.id_categoria_servicio " +
                 "LEFT JOIN citas_servicio cs ON cs.id_chat_cita = c.id_chat_cita " +
                 "WHERE c.id_trabajador = ? OR c.id_cliente = ? " +
                 "ORDER BY hora_ultimo_mensaje DESC",
-            arrayOf(idUsuario.toString(), idUsuario.toString(), idUsuario.toString(), idUsuario.toString())
+            arrayOf(
+                idUsuario.toString(),
+                idUsuario.toString(),
+                idUsuario.toString(),
+                idUsuario.toString(),
+                idUsuario.toString()
+            )
         ).use { cursor ->
             val chats = mutableListOf<ChatCita>()
             while (cursor.moveToNext()) chats += cursor.toChatCita()
@@ -743,9 +763,12 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     fun obtenerChatPorId(idChatCita: Long, idUsuario: Long): ChatCita? {
         readableDatabase.rawQuery(
-            "SELECT c.id_chat_cita, c.fecha_creacion, c.id_trabajador, c.id_cliente, c.id_cita, " +
+            "SELECT c.id_chat_cita, c.fecha_creacion, c.id_trabajador, c.id_cliente, c.id_oferta_servicio, c.id_cita, c.cerrado, c.bloqueado_hasta_ms, " +
                 "CASE WHEN c.id_cliente = ? THEN ut.nombre || ' ' || ut.apellido_paterno " +
                 "ELSE uc.nombre || ' ' || uc.apellido_paterno END AS nombre_contacto, " +
+                "CASE WHEN c.id_cliente = ? THEN ut.username ELSE uc.username END AS username_contacto, " +
+                "COALESCE(os.titulo, 'Servicio') AS titulo_servicio, " +
+                "COALESCE(cat.nombre, '') AS categoria_servicio, " +
                 "COALESCE(m.contenido, '') AS ultimo_mensaje, " +
                 "COALESCE(m.fecha_envio, c.fecha_creacion) AS hora_ultimo_mensaje, " +
                 "COALESCE(cs.estado_cita, NULL) AS estado_cita, " +
@@ -757,9 +780,11 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "LEFT JOIN mensajes_chat m ON m.id_mensaje_chat = (" +
                 "SELECT id_mensaje_chat FROM mensajes_chat WHERE id_chat_cita = c.id_chat_cita " +
                 "ORDER BY id_mensaje_chat DESC LIMIT 1) " +
+                "LEFT JOIN ofertas_servicio os ON os.id_oferta_servicio = c.id_oferta_servicio " +
+                "LEFT JOIN categorias_servicio cat ON cat.id_categoria_servicio = os.id_categoria_servicio " +
                 "LEFT JOIN citas_servicio cs ON cs.id_chat_cita = c.id_chat_cita " +
                 "WHERE c.id_chat_cita = ? LIMIT 1",
-            arrayOf(idUsuario.toString(), idUsuario.toString(), idChatCita.toString())
+            arrayOf(idUsuario.toString(), idUsuario.toString(), idUsuario.toString(), idChatCita.toString())
         ).use { cursor ->
             return if (cursor.moveToFirst()) cursor.toChatCita() else null
         }
@@ -777,20 +802,25 @@ class ContrabajoSQLiteHelper(context: Context) :
         }
     }
 
-    fun obtenerChatEntreUsuarios(idTrabajador: Long, idCliente: Long): Long? {
+    fun obtenerChatEntreUsuarios(idTrabajador: Long, idCliente: Long, idOfertaServicio: Long): Long? {
         readableDatabase.rawQuery(
-            "SELECT id_chat_cita FROM chats_cita WHERE id_trabajador = ? AND id_cliente = ? LIMIT 1",
-            arrayOf(idTrabajador.toString(), idCliente.toString())
+            "SELECT id_chat_cita FROM chats_cita " +
+                "WHERE id_trabajador = ? AND id_cliente = ? AND id_oferta_servicio = ? " +
+                "ORDER BY id_chat_cita DESC LIMIT 1",
+            arrayOf(idTrabajador.toString(), idCliente.toString(), idOfertaServicio.toString())
         ).use { cursor ->
             return if (cursor.moveToFirst()) cursor.getLong(cursor.getColumnIndexOrThrow("id_chat_cita")) else null
         }
     }
 
-    fun crearChatCita(idTrabajador: Long, idCliente: Long): Long {
+    fun crearChatCita(idTrabajador: Long, idCliente: Long, idOfertaServicio: Long): Long {
         return writableDatabase.insert("chats_cita", null, ContentValues().apply {
             put("fecha_creacion", ahora())
             put("id_trabajador", idTrabajador)
             put("id_cliente", idCliente)
+            put("id_oferta_servicio", idOfertaServicio)
+            put("cerrado", 0)
+            putNull("bloqueado_hasta_ms")
         })
     }
 
@@ -807,7 +837,8 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("id_emisor", idEmisor)
             put("id_receptor", idReceptor)
             put("id_chat_cita", idChatCita)
-            put("id_estado", 2)
+            put("id_estado", EstadoCodigo.MSG_ENVIADO)
+            put("notificado_local", 0)
             put("contenido", contenido.trim())
         })
     }
@@ -821,29 +852,77 @@ class ContrabajoSQLiteHelper(context: Context) :
         }
     }
 
+    fun marcarMensajesRecibidos(idReceptor: Long) {
+        writableDatabase.update(
+            "mensajes_chat",
+            ContentValues().apply {
+                put("fecha_recibido", ahora())
+                put("id_estado", EstadoCodigo.MSG_ENTREGADO)
+            },
+            "id_receptor = ? AND fecha_recibido IS NULL",
+            arrayOf(idReceptor.toString())
+        )
+    }
+
     fun marcarMensajesLeidos(idChatCita: Long, idReceptor: Long) {
         writableDatabase.update(
             "mensajes_chat",
             ContentValues().apply {
-                put("fecha_leido", ahora())
-                put("fecha_recibido", ahora())
-                put("id_estado", 3)
+                val fechaActual = ahora()
+                put("fecha_leido", fechaActual)
+                put("fecha_recibido", fechaActual)
+                put("id_estado", EstadoCodigo.MSG_LEIDO)
+                put("notificado_local", 1)
             },
             "id_chat_cita = ? AND id_receptor = ? AND fecha_leido IS NULL",
             arrayOf(idChatCita.toString(), idReceptor.toString())
         )
     }
 
+    fun obtenerMensajesPendientesNotificacion(idReceptor: Long): List<NotificacionMensajePendiente> {
+        readableDatabase.rawQuery(
+            "SELECT m.id_mensaje_chat, m.id_chat_cita, " +
+                "(COALESCE(os.titulo, 'Servicio') || ' - ' || COALESCE(u.username, 'usuario')) AS titulo_notificacion, " +
+                "m.contenido " +
+                "FROM mensajes_chat m " +
+                "LEFT JOIN chats_cita c ON c.id_chat_cita = m.id_chat_cita " +
+                "LEFT JOIN ofertas_servicio os ON os.id_oferta_servicio = c.id_oferta_servicio " +
+                "LEFT JOIN usuarios u ON u.id_usuario = m.id_emisor " +
+                "WHERE m.id_receptor = ? AND m.fecha_leido IS NULL AND m.notificado_local = 0 " +
+                "ORDER BY m.id_mensaje_chat ASC",
+            arrayOf(idReceptor.toString())
+        ).use { cursor ->
+            val lista = mutableListOf<NotificacionMensajePendiente>()
+            while (cursor.moveToNext()) {
+                lista += cursor.toNotificacionMensajePendiente()
+            }
+            return lista
+        }
+    }
+
+    fun marcarMensajesNotificados(idsMensaje: List<Long>) {
+        if (idsMensaje.isEmpty()) return
+        val marcadores = idsMensaje.joinToString(",") { "?" }
+        writableDatabase.execSQL(
+            "UPDATE mensajes_chat SET notificado_local = 1 WHERE id_mensaje_chat IN ($marcadores)",
+            idsMensaje.map { it.toString() }.toTypedArray()
+        )
+    }
+
     fun crearCitaServicio(
         idChatCita: Long,
         fechaProgramada: String,
-        detalle: String
+        comentario: String,
+        precioAcordado: Int
     ): Long {
         val idCita = writableDatabase.insert("citas_servicio", null, ContentValues().apply {
             put("id_chat_cita", idChatCita)
             put("fecha_creacion", ahora())
             put("fecha_programada", fechaProgramada)
-            put("detalle", detalle.trim())
+            put("comentario", comentario.trim())
+            put("precio_acordado", precioAcordado)
+            putNull("fecha_inicio_trabajo")
+            putNull("fecha_fin_trabajo")
             put("estado_cita", EstadoCita.PENDIENTE)
             put("fecha_actualizacion", ahora())
         })
@@ -868,10 +947,26 @@ class ContrabajoSQLiteHelper(context: Context) :
     }
 
     fun actualizarEstadoCita(idCita: Long, nuevoEstado: Int): Boolean {
+        return actualizarEstadoCita(
+            idCita = idCita,
+            nuevoEstado = nuevoEstado,
+            fechaInicioTrabajo = null,
+            fechaFinTrabajo = null
+        )
+    }
+
+    fun actualizarEstadoCita(
+        idCita: Long,
+        nuevoEstado: Int,
+        fechaInicioTrabajo: String?,
+        fechaFinTrabajo: String?
+    ): Boolean {
         val actualizadas = writableDatabase.update(
             "citas_servicio",
             ContentValues().apply {
                 put("estado_cita", nuevoEstado)
+                if (fechaInicioTrabajo != null) put("fecha_inicio_trabajo", fechaInicioTrabajo)
+                if (fechaFinTrabajo != null) put("fecha_fin_trabajo", fechaFinTrabajo)
                 put("fecha_actualizacion", ahora())
             },
             "id_cita = ?",
@@ -880,13 +975,55 @@ class ContrabajoSQLiteHelper(context: Context) :
         return actualizadas > 0
     }
 
+    fun actualizarChatCerrado(idChatCita: Long, cerrado: Boolean, bloqueadoHastaMs: Long?): Boolean {
+        val actualizadas = writableDatabase.update(
+            "chats_cita",
+            ContentValues().apply {
+                put("cerrado", if (cerrado) 1 else 0)
+                if (bloqueadoHastaMs != null) put("bloqueado_hasta_ms", bloqueadoHastaMs) else putNull("bloqueado_hasta_ms")
+            },
+            "id_chat_cita = ?",
+            arrayOf(idChatCita.toString())
+        )
+        return actualizadas > 0
+    }
+
     private fun sembrarDatosIniciales(db: SQLiteDatabase) {
         listOf(
-            Triple("ACT", "Activo", "Registro activo y visible"),
-            Triple("ENV", "Enviado", "Mensaje enviado correctamente"),
-            Triple("LEI", "Leido", "Mensaje leido por el receptor")
-        ).forEach { (codigo, nombre, descripcion) ->
+            listOf(101, "USR_ACTIVO", "Usuario activo", "Usuario habilitado para operar en la plataforma."),
+            listOf(102, "USR_SUSPENDIDO", "Usuario suspendido", "Usuario suspendido temporalmente."),
+            listOf(103, "USR_BANEADO", "Usuario baneado", "Usuario bloqueado por incumplimiento."),
+            listOf(104, "USR_VERIF_PEND", "Verificacion pendiente", "Solicitud de verificacion de trabajador en revision."),
+            listOf(105, "USR_VERIFICADO", "Usuario verificado", "Usuario validado oficialmente."),
+
+            listOf(201, "SRV_PUBLICADO", "Servicio publicado", "Servicio visible para clientes."),
+            listOf(202, "SRV_PAUSADO", "Servicio pausado", "Servicio temporalmente inactivo."),
+            listOf(203, "SRV_OCULTO", "Servicio oculto", "Servicio no visible en exploracion."),
+            listOf(204, "SRV_RESERVADO", "Servicio reservado", "Servicio con gestion activa de cita."),
+
+            listOf(301, "MSG_ENVIADO", "Mensaje enviado", "Mensaje enviado por emisor."),
+            listOf(302, "MSG_ENTREGADO", "Mensaje entregado", "Mensaje recibido en el dispositivo del receptor."),
+            listOf(303, "MSG_LEIDO", "Mensaje leido", "Mensaje abierto y leido por el receptor."),
+            listOf(304, "CHAT_ABIERTO", "Chat abierto", "Chat habilitado para escritura."),
+            listOf(305, "CHAT_CERRADO", "Chat cerrado", "Chat cerrado para escritura, solo lectura."),
+            listOf(306, "CHAT_BLOQUEADO", "Chat bloqueado", "Chat temporalmente bloqueado para nuevo contacto."),
+
+            listOf(401, "CITA_PENDIENTE", "Cita pendiente", "El cliente genero la cita."),
+            listOf(402, "CITA_HANDSHAKE", "Handshake", "El trabajador acepto la cita y condiciones."),
+            listOf(403, "CITA_COMENZANDO", "Comenzando", "Trabajador solicita iniciar trabajo; falta confirmacion cliente."),
+            listOf(404, "CITA_EN_PROCESO", "En proceso", "Cliente confirma inicio de trabajo."),
+            listOf(405, "CITA_FINALIZANDO", "Finalizando", "Trabajador solicita finalizar; falta confirmacion cliente."),
+            listOf(406, "CITA_FINALIZADO", "Finalizado", "Cliente confirma finalizacion del trabajo."),
+            listOf(407, "CITA_CANCELADO", "Cancelado", "Cita cancelada por rechazo o cierre anticipado."),
+            listOf(408, "CITA_CERRADO", "Cerrado", "Cita/Chat cerrados para escritura."),
+            listOf(409, "CITA_RECHAZADA", "Rechazada", "Trabajador rechaza propuesta y la cita queda negociable para reenvio.")
+        ).forEach { estado ->
+            val idEstado = estado[0] as Int
+            val codigo = estado[1] as String
+            val nombre = estado[2] as String
+            val descripcion = estado[3] as String
             db.insert("estados", null, ContentValues().apply {
+                put("id_estado", idEstado)
                 put("codigo", codigo)
                 put("nombre", nombre)
                 put("descripcion", descripcion)
@@ -1205,7 +1342,7 @@ class ContrabajoSQLiteHelper(context: Context) :
                 put("id_emisor", idEmisor)
                 put("id_receptor", idReceptor)
                 put("id_chat_cita", chatId)
-                put("id_estado", 3)
+                put("id_estado", EstadoCodigo.MSG_LEIDO)
                 put("contenido", contenido)
             })
         }
@@ -1297,12 +1434,18 @@ class ContrabajoSQLiteHelper(context: Context) :
         fechaCreacion = getString(getColumnIndexOrThrow("fecha_creacion")),
         idTrabajador = getLong(getColumnIndexOrThrow("id_trabajador")),
         idCliente = getLong(getColumnIndexOrThrow("id_cliente")),
+        idOfertaServicio = getLongNullable("id_oferta_servicio"),
         idCita = getLongNullable("id_cita"),
         nombreContacto = getStringNullable("nombre_contacto").orEmpty(),
+        usernameContacto = getStringNullable("username_contacto").orEmpty(),
+        tituloServicio = getStringNullable("titulo_servicio").orEmpty(),
+        categoriaServicio = getStringNullable("categoria_servicio").orEmpty(),
         ultimoMensaje = getStringNullable("ultimo_mensaje").orEmpty(),
         horaUltimoMensaje = getStringNullable("hora_ultimo_mensaje").orEmpty(),
         mensajesNoLeidos = getIntNullable("mensajes_no_leidos") ?: 0,
-        estadoCita = getIntNullable("estado_cita")
+        estadoCita = getIntNullable("estado_cita"),
+        chatCerrado = getIntNullable("cerrado") == 1,
+        bloqueadoHastaMs = getLongNullable("bloqueado_hasta_ms")
     )
 
     private fun Cursor.toMensajeChat(): MensajeChat = MensajeChat(
@@ -1317,12 +1460,22 @@ class ContrabajoSQLiteHelper(context: Context) :
         contenido = getString(getColumnIndexOrThrow("contenido"))
     )
 
+    private fun Cursor.toNotificacionMensajePendiente(): NotificacionMensajePendiente = NotificacionMensajePendiente(
+        idMensajeChat = getLong(getColumnIndexOrThrow("id_mensaje_chat")),
+        idChatCita = getLong(getColumnIndexOrThrow("id_chat_cita")),
+        titulo = getString(getColumnIndexOrThrow("titulo_notificacion")),
+        contenido = getString(getColumnIndexOrThrow("contenido"))
+    )
+
     private fun Cursor.toCitaServicio(): CitaServicio = CitaServicio(
         idCita = getLong(getColumnIndexOrThrow("id_cita")),
         idChatCita = getLong(getColumnIndexOrThrow("id_chat_cita")),
         fechaCreacion = getString(getColumnIndexOrThrow("fecha_creacion")),
         fechaProgramada = getString(getColumnIndexOrThrow("fecha_programada")),
-        detalle = getString(getColumnIndexOrThrow("detalle")),
+        comentario = getString(getColumnIndexOrThrow("comentario")),
+        precioAcordado = getInt(getColumnIndexOrThrow("precio_acordado")),
+        fechaInicioTrabajo = getStringNullable("fecha_inicio_trabajo"),
+        fechaFinTrabajo = getStringNullable("fecha_fin_trabajo"),
         estado = getInt(getColumnIndexOrThrow("estado_cita"))
     )
 
@@ -1348,7 +1501,7 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     companion object {
         private const val DATABASE_NAME = "contrabajo_local.db"
-        private const val DATABASE_VERSION = 14
+        private const val DATABASE_VERSION = 17
         private const val SESION_EXPIRACION_MS = 30 * 60 * 1000L
         private const val VERIFICACION_TRABAJADOR_MS = 3 * 60 * 1000L
         private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")

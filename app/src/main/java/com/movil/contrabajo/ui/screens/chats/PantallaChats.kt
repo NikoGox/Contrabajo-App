@@ -33,8 +33,10 @@ fun PantallaChats(
                 Text("Cuando alguien contacte un servicio, sus mensajes apareceran aqui.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 uiState.chats.forEach { chat ->
+                    val esChatComoTrabajador = uiState.idUsuarioActual != null && chat.idTrabajador == uiState.idUsuarioActual
                     TarjetaChat(
                         chat = chat,
+                        esChatComoTrabajador = esChatComoTrabajador,
                         onClick = { onAbrirChat(chat.idChatCita) }
                     )
                 }

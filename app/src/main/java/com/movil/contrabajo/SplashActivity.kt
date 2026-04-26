@@ -152,8 +152,7 @@ private fun PantallaSplash(
                     painter = painterResource(R.drawable.ct_icon_mini_t),
                     contentDescription = "Icono Contrabajo",
                     modifier = Modifier
-                        .size(138.dp)
-                        .clip(CircleShape)
+                        .size(138.dp),
                 )
             }
 
