@@ -11,12 +11,15 @@ import com.movil.contrabajo.domain.model.MensajeChat
 import com.movil.contrabajo.domain.model.NotificacionMensajePendiente
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.domain.model.PrecioUtils
+import com.movil.contrabajo.domain.model.PreguntasSeguridadCatalogo
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
 import com.movil.contrabajo.domain.model.RegistroPendiente
 import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.domain.model.TipoPrecio
 import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
 import com.movil.contrabajo.domain.model.Usuario
+import com.movil.contrabajo.domain.model.Valoracion
+import com.movil.contrabajo.domain.model.ValoracionesServicio
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeParseException
@@ -26,6 +29,15 @@ interface RepositorioAutenticacion {
     fun obtenerSesionActiva(): Usuario?
     fun iniciarSesion(identificador: String, contrasena: String, recordarme: Boolean): Result<Usuario>
     fun registrarUsuario(registro: RegistroPendiente): Result<Usuario>
+    fun obtenerPreguntasRecuperacion(identificador: String): Result<List<PreguntaSeguridadConfig>>
+    fun validarRespuestasRecuperacion(identificador: String, respuesta1: String, respuesta2: String): Result<Unit>
+    fun restablecerContrasenaRecuperacion(
+        identificador: String,
+        respuesta1: String,
+        respuesta2: String,
+        nuevaContrasena: String,
+        confirmarContrasena: String
+    ): Result<Unit>
     fun cerrarSesion()
 }
 
@@ -45,12 +57,16 @@ interface RepositorioPerfil {
 interface RepositorioOfertas {
     fun obtenerOfertaPrincipal(): OfertaServicio?
     fun obtenerOfertasMarketplace(busqueda: String = ""): List<OfertaServicio>
-    fun obtenerOfertaPorId(idOfertaServicio: Long): OfertaServicio?
+    fun obtenerOfertaPorId(idOfertaServicio: Long, incluirEliminadas: Boolean = false): OfertaServicio?
+    fun obtenerOfertasPropias(): List<OfertaServicio>
     fun obtenerOfertaPropiaActual(): OfertaServicio?
+    fun obtenerOfertaPropiaPorId(idOfertaServicio: Long): OfertaServicio?
+    fun obtenerIdsOfertasConTrabajoEnCursoPropias(): Set<Long>
+    fun obtenerValoracionesPropiasPorServicio(): List<ValoracionesServicio>
     fun obtenerCategoriasServicio(): List<CategoriaServicio>
-    fun guardarOfertaPropia(formulario: FormularioServicio): Result<OfertaServicio>
-    fun actualizarDisponibilidadOfertaPropia(disponible: Boolean): Result<OfertaServicio>
-    fun eliminarOfertaPropia(): Result<Unit>
+    fun guardarOfertaPropia(formulario: FormularioServicio, idOfertaServicio: Long? = null): Result<OfertaServicio>
+    fun actualizarDisponibilidadOfertaPropia(idOfertaServicio: Long, disponible: Boolean): Result<OfertaServicio>
+    fun eliminarOfertaPropia(idOfertaServicio: Long): Result<Unit>
 }
 
 interface RepositorioChats {
@@ -70,6 +86,8 @@ interface RepositorioChats {
     fun solicitarFinalizarTrabajoTrabajador(idChatCita: Long): Result<CitaServicio>
     fun aceptarFinalizarTrabajoCliente(idChatCita: Long): Result<CitaServicio>
     fun cerrarChat(idChatCita: Long): Result<ChatCita>
+    fun obtenerValoracionPorChat(idChatCita: Long): Valoracion?
+    fun guardarValoracionChat(idChatCita: Long, voto: Int, comentario: String): Result<Valoracion>
     fun obtenerNotificacionesPendientes(): List<NotificacionMensajePendiente>
     fun marcarNotificacionesComoMostradas(idsMensaje: List<Long>)
 }
@@ -124,9 +142,79 @@ class RepositorioAutenticacionLocal(
 
         val id = db.insertarUsuario(usuario)
         if (id <= 0) return Result.failure(IllegalStateException("No se pudo registrar el usuario"))
+        db.guardarPreguntaSeguridad(
+            idUsuario = id,
+            indice = 1,
+            pregunta = registro.preguntaSeguridad1.trim(),
+            respuesta = registro.respuestaSeguridad1.trim()
+        )
+        db.guardarPreguntaSeguridad(
+            idUsuario = id,
+            indice = 2,
+            pregunta = registro.preguntaSeguridad2.trim(),
+            respuesta = registro.respuestaSeguridad2.trim()
+        )
         db.guardarUbicacionUsuario(id, normalizarUbicacionRegistro(registro))
         db.guardarSesion(id, true)
         return Result.success(db.obtenerUsuarioPorId(id) ?: usuario.copy(idUsuario = id))
+    }
+
+    override fun obtenerPreguntasRecuperacion(identificador: String): Result<List<PreguntaSeguridadConfig>> {
+        val usuario = db.obtenerUsuarioPorIdentificador(identificador.trim())
+            ?: return Result.failure(IllegalArgumentException("No existe una cuenta con ese usuario o correo"))
+        val preguntas = db.obtenerPreguntasSeguridad(usuario.idUsuario)
+            .filter { it.indice in 1..2 }
+        if (preguntas.size < 2 || preguntas.any { !it.configurada }) {
+            return Result.failure(IllegalStateException("La cuenta aun no tiene preguntas de seguridad configuradas"))
+        }
+        return Result.success(preguntas.sortedBy { it.indice })
+    }
+
+    override fun validarRespuestasRecuperacion(identificador: String, respuesta1: String, respuesta2: String): Result<Unit> {
+        val usuario = db.obtenerUsuarioPorIdentificador(identificador.trim())
+            ?: return Result.failure(IllegalArgumentException("No existe una cuenta con ese usuario o correo"))
+        val preguntas = db.obtenerPreguntasSeguridad(usuario.idUsuario)
+            .filter { it.indice in 1..2 }
+            .sortedBy { it.indice }
+        if (preguntas.size < 2) {
+            return Result.failure(IllegalStateException("No se pudieron cargar las preguntas de seguridad de la cuenta"))
+        }
+        val r1 = respuesta1.trim()
+        val r2 = respuesta2.trim()
+        if (r1.isBlank() || r2.isBlank()) {
+            return Result.failure(IllegalArgumentException("Debes responder ambas preguntas de seguridad"))
+        }
+        val coincide = preguntas[0].respuesta.equals(r1, ignoreCase = true) &&
+            preguntas[1].respuesta.equals(r2, ignoreCase = true)
+        return if (coincide) {
+            Result.success(Unit)
+        } else {
+            Result.failure(IllegalArgumentException("Las respuestas de seguridad no coinciden"))
+        }
+    }
+
+    override fun restablecerContrasenaRecuperacion(
+        identificador: String,
+        respuesta1: String,
+        respuesta2: String,
+        nuevaContrasena: String,
+        confirmarContrasena: String
+    ): Result<Unit> {
+        validarRespuestasRecuperacion(identificador, respuesta1, respuesta2)
+            .onFailure { return Result.failure(it) }
+
+        val usuario = db.obtenerUsuarioPorIdentificador(identificador.trim())
+            ?: return Result.failure(IllegalArgumentException("No existe una cuenta con ese usuario o correo"))
+        val nueva = nuevaContrasena.trim()
+        val confirmar = confirmarContrasena.trim()
+        if (nueva.length < 6) {
+            return Result.failure(IllegalArgumentException("La contrasena debe tener al menos 6 caracteres"))
+        }
+        if (nueva != confirmar) {
+            return Result.failure(IllegalArgumentException("Las contrasenas no coinciden"))
+        }
+        db.actualizarContrasenaUsuario(usuario.idUsuario, nueva)
+        return Result.success(Unit)
     }
 
     override fun cerrarSesion() {
@@ -156,6 +244,12 @@ class RepositorioAutenticacionLocal(
             errorFechaNacimiento != null -> errorFechaNacimiento
             registro.contrasena.length < 6 -> "La contrasena debe tener al menos 6 caracteres"
             registro.contrasena != registro.confirmarContrasena -> "Las contrasenas no coinciden"
+            !PreguntasSeguridadCatalogo.esValida(registro.preguntaSeguridad1) -> "Selecciona una pregunta de seguridad valida (1)"
+            !PreguntasSeguridadCatalogo.esValida(registro.preguntaSeguridad2) -> "Selecciona una pregunta de seguridad valida (2)"
+            registro.preguntaSeguridad1.trim().equals(registro.preguntaSeguridad2.trim(), ignoreCase = true) ->
+                "Debes seleccionar dos preguntas de seguridad diferentes"
+            registro.respuestaSeguridad1.trim().isBlank() || registro.respuestaSeguridad2.trim().isBlank() ->
+                "Debes responder ambas preguntas de seguridad"
             else -> null
         }
     }
@@ -261,19 +355,26 @@ class RepositorioPerfilLocal(
     ): Result<List<PreguntaSeguridadConfig>> {
         val usuario = db.obtenerUsuarioSesionActiva()
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
-        if (indice !in 1..3) {
+        if (indice !in 1..2) {
             return Result.failure(IllegalArgumentException("Indice de pregunta invalido"))
         }
-        if (pregunta.trim().isBlank()) {
-            return Result.failure(IllegalArgumentException("Ingresa la pregunta de seguridad"))
+        val preguntaNormalizada = pregunta.trim()
+        if (!PreguntasSeguridadCatalogo.esValida(preguntaNormalizada)) {
+            return Result.failure(IllegalArgumentException("Selecciona una pregunta valida"))
         }
         if (respuesta.trim().isBlank()) {
             return Result.failure(IllegalArgumentException("Ingresa la respuesta de seguridad"))
         }
+        val indiceAlterno = if (indice == 1) 2 else 1
+        val preguntasActuales = db.obtenerPreguntasSeguridad(usuario.idUsuario)
+        val preguntaAlterna = preguntasActuales.firstOrNull { it.indice == indiceAlterno }?.pregunta.orEmpty()
+        if (preguntaAlterna.equals(preguntaNormalizada, ignoreCase = true)) {
+            return Result.failure(IllegalArgumentException("Debes elegir preguntas diferentes"))
+        }
         db.guardarPreguntaSeguridad(
             idUsuario = usuario.idUsuario,
             indice = indice,
-            pregunta = pregunta.trim(),
+            pregunta = preguntaNormalizada,
             respuesta = respuesta.trim()
         )
         return Result.success(db.obtenerPreguntasSeguridad(usuario.idUsuario))
@@ -328,15 +429,42 @@ class RepositorioOfertasLocal(
 ) : RepositorioOfertas {
     override fun obtenerOfertaPrincipal(): OfertaServicio? = db.obtenerOfertaPrincipal()
     override fun obtenerOfertasMarketplace(busqueda: String): List<OfertaServicio> = db.obtenerOfertasMarketplace(busqueda)
-    override fun obtenerOfertaPorId(idOfertaServicio: Long): OfertaServicio? = db.obtenerOfertaPorId(idOfertaServicio)
+    override fun obtenerOfertaPorId(idOfertaServicio: Long, incluirEliminadas: Boolean): OfertaServicio? =
+        db.obtenerOfertaPorId(idOfertaServicio, incluirEliminadas)
+
+    override fun obtenerOfertasPropias(): List<OfertaServicio> {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return emptyList()
+        return db.obtenerOfertasPorTrabajador(usuario.idUsuario, incluirEliminadas = false)
+    }
+
     override fun obtenerOfertaPropiaActual(): OfertaServicio? {
+        return obtenerOfertasPropias().firstOrNull()
+    }
+    override fun obtenerOfertaPropiaPorId(idOfertaServicio: Long): OfertaServicio? {
         val usuario = db.obtenerUsuarioSesionActiva() ?: return null
-        return db.obtenerOfertaPorTrabajador(usuario.idUsuario)
+        return db.obtenerOfertaPorId(idOfertaServicio, incluirEliminadas = false)
+            ?.takeIf { it.idTrabajador == usuario.idUsuario }
+    }
+
+    override fun obtenerIdsOfertasConTrabajoEnCursoPropias(): Set<Long> {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return emptySet()
+        return db.obtenerIdsOfertasConTrabajoEnCursoPorTrabajador(usuario.idUsuario).toSet()
+    }
+
+    override fun obtenerValoracionesPropiasPorServicio(): List<ValoracionesServicio> {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return emptyList()
+        val ofertas = db.obtenerOfertasPorTrabajador(usuario.idUsuario, incluirEliminadas = true)
+        return ofertas.map { oferta ->
+            ValoracionesServicio(
+                oferta = oferta,
+                valoraciones = db.obtenerValoracionesPorOferta(oferta.idOfertaServicio)
+            )
+        }
     }
 
     override fun obtenerCategoriasServicio(): List<CategoriaServicio> = db.obtenerCategoriasServicio()
 
-    override fun guardarOfertaPropia(formulario: FormularioServicio): Result<OfertaServicio> {
+    override fun guardarOfertaPropia(formulario: FormularioServicio, idOfertaServicio: Long?): Result<OfertaServicio> {
         val usuario = db.obtenerUsuarioSesionActiva()
             ?: return Result.failure(IllegalStateException("No hay una sesion activa para guardar el servicio"))
         if (usuario.tipoPerfil !in listOf(TipoPerfil.TRABAJADOR, TipoPerfil.PREMIUM)) {
@@ -346,31 +474,52 @@ class RepositorioOfertasLocal(
         val error = validarFormularioServicio(formulario)
         if (error != null) return Result.failure(IllegalArgumentException(error))
 
-        val ofertaExistente = db.obtenerOfertaPorTrabajador(usuario.idUsuario)
-        val maximoServicios = if (usuario.tipoPerfil == TipoPerfil.PREMIUM) 3 else 1
-        if (ofertaExistente == null && db.contarOfertasActivasPorTrabajador(usuario.idUsuario) >= maximoServicios) {
+        val maximoServiciosTotales = 3
+        val maximoServiciosActivos = 1
+        val ofertaExistente = idOfertaServicio?.takeIf { it > 0 }?.let { ofertaId ->
+            db.obtenerOfertaPorId(ofertaId, incluirEliminadas = false)?.takeIf { it.idTrabajador == usuario.idUsuario }
+                ?: return Result.failure(IllegalStateException("No existe el servicio que intentas editar"))
+        }
+        val esEdicion = ofertaExistente != null
+        if (!esEdicion && db.contarOfertasPorTrabajador(usuario.idUsuario) >= maximoServiciosTotales) {
             return Result.failure(
-                IllegalStateException("Tu perfil permite hasta $maximoServicios servicio(s) activo(s)")
+                IllegalStateException("Puedes tener hasta $maximoServiciosTotales servicios en total")
             )
         }
+        val activosSinObjetivo = if (esEdicion) {
+            db.contarOfertasActivasPorTrabajadorExcluyendo(usuario.idUsuario, ofertaExistente.idOfertaServicio)
+        } else {
+            db.contarOfertasActivasPorTrabajador(usuario.idUsuario)
+        }
+        val disponibleNormalizado = if (!esEdicion && activosSinObjetivo >= maximoServiciosActivos) {
+            false
+        } else {
+            formulario.disponible
+        }
+        if (esEdicion && disponibleNormalizado && activosSinObjetivo >= maximoServiciosActivos) {
+            return Result.failure(
+                IllegalStateException("Ya tienes un servicio activo. Desactívalo antes de activar otro.")
+            )
+        }
+        val formularioNormalizado = formulario.copy(disponible = disponibleNormalizado)
         val idFotoPortada = when {
-            formulario.foto == null -> ofertaExistente?.idFotoPortada
-            formulario.foto.idFoto != null -> {
-                db.actualizarFotoServicio(formulario.foto.idFoto, formulario.foto)
-                formulario.foto.idFoto
+            formularioNormalizado.foto == null -> ofertaExistente?.idFotoPortada
+            formularioNormalizado.foto.idFoto != null -> {
+                db.actualizarFotoServicio(formularioNormalizado.foto.idFoto, formularioNormalizado.foto)
+                formularioNormalizado.foto.idFoto
             }
 
-            else -> db.insertarFotoServicio(formulario.foto)
+            else -> db.insertarFotoServicio(formularioNormalizado.foto)
         }
 
         val idOferta = if (ofertaExistente == null) {
-            db.insertarOfertaServicio(usuario.idUsuario, formulario, idFotoPortada)
+            db.insertarOfertaServicio(usuario.idUsuario, formularioNormalizado, idFotoPortada)
         } else {
-            db.actualizarOfertaServicio(ofertaExistente.idOfertaServicio, formulario, idFotoPortada)
+            db.actualizarOfertaServicio(ofertaExistente.idOfertaServicio, formularioNormalizado, idFotoPortada)
             ofertaExistente.idOfertaServicio
         }
 
-        val ofertaActualizada = db.obtenerOfertaPorId(idOferta)
+        val ofertaActualizada = db.obtenerOfertaPorId(idOferta, incluirEliminadas = false)
         return if (ofertaActualizada != null) {
             Result.success(ofertaActualizada)
         } else {
@@ -378,14 +527,27 @@ class RepositorioOfertasLocal(
         }
     }
 
-    override fun actualizarDisponibilidadOfertaPropia(disponible: Boolean): Result<OfertaServicio> {
+    override fun actualizarDisponibilidadOfertaPropia(idOfertaServicio: Long, disponible: Boolean): Result<OfertaServicio> {
         val usuario = db.obtenerUsuarioSesionActiva()
             ?: return Result.failure(IllegalStateException("No hay una sesion activa para actualizar disponibilidad"))
-        val oferta = db.obtenerOfertaPorTrabajador(usuario.idUsuario)
-            ?: return Result.failure(IllegalStateException("No existe un servicio para actualizar"))
+        val oferta = db.obtenerOfertaPorId(idOfertaServicio, incluirEliminadas = false)
+            ?.takeIf { it.idTrabajador == usuario.idUsuario }
+            ?: return Result.failure(IllegalStateException("No existe un servicio propio para actualizar"))
+        if (db.existeTrabajoEnCursoPorOferta(oferta.idOfertaServicio)) {
+            return Result.failure(IllegalStateException("No puedes cambiar disponibilidad mientras el servicio esta En Curso"))
+        }
+        if (disponible) {
+            val activosSinObjetivo = db.contarOfertasActivasPorTrabajadorExcluyendo(
+                idTrabajador = usuario.idUsuario,
+                idOfertaExcluir = oferta.idOfertaServicio
+            )
+            if (activosSinObjetivo >= 1) {
+                return Result.failure(IllegalStateException("Ya tienes un servicio activo. Desactívalo antes de activar otro."))
+            }
+        }
 
         db.actualizarDisponibilidadOferta(oferta.idOfertaServicio, disponible)
-        val actualizada = db.obtenerOfertaPorId(oferta.idOfertaServicio)
+        val actualizada = db.obtenerOfertaPorId(oferta.idOfertaServicio, incluirEliminadas = false)
         return if (actualizada != null) {
             Result.success(actualizada)
         } else {
@@ -393,11 +555,12 @@ class RepositorioOfertasLocal(
         }
     }
 
-    override fun eliminarOfertaPropia(): Result<Unit> {
+    override fun eliminarOfertaPropia(idOfertaServicio: Long): Result<Unit> {
         val usuario = db.obtenerUsuarioSesionActiva()
             ?: return Result.failure(IllegalStateException("No hay una sesion activa para eliminar el servicio"))
-        val oferta = db.obtenerOfertaPorTrabajador(usuario.idUsuario)
-            ?: return Result.failure(IllegalStateException("No existe un servicio para eliminar"))
+        val oferta = db.obtenerOfertaPorId(idOfertaServicio, incluirEliminadas = false)
+            ?.takeIf { it.idTrabajador == usuario.idUsuario }
+            ?: return Result.failure(IllegalStateException("No existe un servicio propio para eliminar"))
         db.eliminarOfertaServicio(oferta.idOfertaServicio)
         return Result.success(Unit)
     }
@@ -671,14 +834,40 @@ class RepositorioChatsLocal(
         )
 
     override fun aceptarInicioTrabajoCliente(idChatCita: Long): Result<CitaServicio> =
-        transicionarCita(
-            idChatCita = idChatCita,
-            validarRol = { chat, usuario -> chat.idCliente == usuario.idUsuario },
-            estadosPermitidos = setOf(EstadoCita.COMENZANDO),
-            nuevoEstado = EstadoCita.EN_PROCESO,
-            mensajeSistema = "El cliente confirmo el inicio del trabajo.",
-            fechaInicio = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(LocalDateTime.now())
-        )
+        run {
+            val usuario = db.obtenerUsuarioSesionActiva()
+                ?: return@run Result.failure(IllegalStateException("No hay sesion activa"))
+            val chat = db.obtenerChatPorId(idChatCita, usuario.idUsuario)
+                ?: return@run Result.failure(IllegalArgumentException("Chat no encontrado"))
+            if (chat.chatCerrado) {
+                return@run Result.failure(IllegalStateException("El chat esta cerrado y no admite cambios."))
+            }
+            if (chat.idCliente != usuario.idUsuario) {
+                return@run Result.failure(IllegalStateException("No tienes permisos para esta accion."))
+            }
+            val cita = db.obtenerCitaPorChat(idChatCita)
+                ?: return@run Result.failure(IllegalStateException("Este chat no tiene cita activa"))
+            if (cita.estado != EstadoCita.COMENZANDO) {
+                return@run Result.failure(IllegalStateException("El estado actual no permite esta accion."))
+            }
+            val existeEnCurso = db.existeCitaEnProcesoTrabajador(
+                idTrabajador = chat.idTrabajador,
+                idCitaExcluir = cita.idCita
+            )
+            if (existeEnCurso) {
+                return@run Result.failure(
+                    IllegalStateException("Ya existe una cita en proceso para este trabajador. Finaliza esa cita antes de iniciar otra.")
+                )
+            }
+            transicionarCita(
+                idChatCita = idChatCita,
+                validarRol = { chatLocal, usuarioLocal -> chatLocal.idCliente == usuarioLocal.idUsuario },
+                estadosPermitidos = setOf(EstadoCita.COMENZANDO),
+                nuevoEstado = EstadoCita.EN_PROCESO,
+                mensajeSistema = "El cliente confirmo el inicio del trabajo.",
+                fechaInicio = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(LocalDateTime.now())
+            )
+        }
 
     override fun solicitarFinalizarTrabajoTrabajador(idChatCita: Long): Result<CitaServicio> =
         transicionarCita(
@@ -732,6 +921,50 @@ class RepositorioChatsLocal(
         if (!actualizado) return Result.failure(IllegalStateException("No se pudo cerrar el chat"))
         return db.obtenerChatPorId(idChatCita, usuario.idUsuario)?.let { Result.success(it) }
             ?: Result.failure(IllegalStateException("No se pudo recargar el chat cerrado"))
+    }
+
+    override fun obtenerValoracionPorChat(idChatCita: Long): Valoracion? {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return null
+        return db.obtenerValoracionPorChat(idChatCita = idChatCita, idCliente = usuario.idUsuario)
+    }
+
+    override fun guardarValoracionChat(idChatCita: Long, voto: Int, comentario: String): Result<Valoracion> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val chat = db.obtenerChatPorId(idChatCita, usuario.idUsuario)
+            ?: return Result.failure(IllegalArgumentException("Chat no encontrado"))
+        if (chat.idCliente != usuario.idUsuario) {
+            return Result.failure(IllegalStateException("Solo el cliente puede valorar este contacto"))
+        }
+        if (!chat.chatCerrado) {
+            return Result.failure(IllegalStateException("Debes finalizar el chat antes de valorar"))
+        }
+        val cita = db.obtenerCitaPorChat(idChatCita)
+        val estadoFinalizable = cita?.estado in setOf(EstadoCita.FINALIZADO, EstadoCita.CERRADO)
+        if (!estadoFinalizable) {
+            return Result.failure(IllegalStateException("Solo puedes valorar cuando el trabajo ya fue finalizado"))
+        }
+        if (voto !in 1..5) {
+            return Result.failure(IllegalArgumentException("La valoracion debe estar entre 1 y 5 estrellas"))
+        }
+        if (db.existeValoracionPorChatCliente(idChatCita = idChatCita, idCliente = usuario.idUsuario)) {
+            return Result.failure(IllegalStateException("Este chat ya fue valorado anteriormente"))
+        }
+        val idOferta = chat.idOfertaServicio
+            ?: return Result.failure(IllegalStateException("No se encontro el servicio asociado al chat"))
+        val idValoracion = db.insertarValoracion(
+            voto = voto,
+            comentario = comentario.trim(),
+            idTrabajador = chat.idTrabajador,
+            idCliente = usuario.idUsuario,
+            idChatCita = idChatCita,
+            idOfertaServicio = idOferta
+        )
+        if (idValoracion <= 0) {
+            return Result.failure(IllegalStateException("No se pudo guardar la valoracion"))
+        }
+        return db.obtenerValoracionPorId(idValoracion)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("No se pudo recuperar la valoracion guardada"))
     }
 
     override fun obtenerNotificacionesPendientes(): List<NotificacionMensajePendiente> {

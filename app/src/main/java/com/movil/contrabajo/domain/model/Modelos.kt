@@ -49,7 +49,9 @@ data class OfertaServicio(
     val fotoNombreArchivo: String = "",
     val fotoMimeType: String = "",
     val fotoPendienteSincronizacion: Boolean = false,
-    val fotoPerfilTrabajador: String = ""
+    val fotoPerfilTrabajador: String = "",
+    val eliminada: Boolean = false,
+    val fechaEliminacion: String? = null
 )
 
 data class ChatCita(
@@ -184,7 +186,11 @@ data class Valoracion(
     val fechaVoto: String,
     val comentario: String,
     val idTrabajador: Long,
-    val idCliente: Long
+    val idCliente: Long,
+    val idChatCita: Long,
+    val idOfertaServicio: Long,
+    val usernameCliente: String = "",
+    val fechaFinalizacionCita: String? = null
 )
 
 data class SesionLocal(
@@ -225,7 +231,11 @@ data class RegistroPendiente(
     val fechaNacimiento: String = "",
     val tipoPerfil: Int = TipoPerfil.USUARIO_BASE,
     val contrasena: String = "",
-    val confirmarContrasena: String = ""
+    val confirmarContrasena: String = "",
+    val preguntaSeguridad1: String = "",
+    val respuestaSeguridad1: String = "",
+    val preguntaSeguridad2: String = "",
+    val respuestaSeguridad2: String = ""
 )
 
 object TipoPerfil {
@@ -249,6 +259,23 @@ data class PreguntaSeguridadConfig(
 ) {
     val configurada: Boolean get() = pregunta.isNotBlank() && respuesta.isNotBlank()
 }
+
+object PreguntasSeguridadCatalogo {
+    val opciones: List<String> = listOf(
+        "Nombre de mascota",
+        "Ciudad de nacimiento",
+        "Pelicula favorita",
+        "Comida favorita",
+        "Primer vehiculo"
+    )
+
+    fun esValida(pregunta: String): Boolean = opciones.contains(pregunta.trim())
+}
+
+data class ValoracionesServicio(
+    val oferta: OfertaServicio,
+    val valoraciones: List<Valoracion> = emptyList()
+)
 
 data class UbicacionAjustesConfig(
     val region: String = "Region Metropolitana",

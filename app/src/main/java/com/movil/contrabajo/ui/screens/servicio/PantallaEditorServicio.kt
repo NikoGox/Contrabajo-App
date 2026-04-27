@@ -68,6 +68,7 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 fun PantallaEditorServicio(
     modo: String,
+    idOfertaServicio: Long,
     viewModel: PerfilViewModel,
     onVolver: () -> Unit,
     modifier: Modifier = Modifier
@@ -126,9 +127,9 @@ fun PantallaEditorServicio(
         if (concedido) capturarDesdeCamara()
     }
 
-    LaunchedEffect(modo) {
+    LaunchedEffect(modo, idOfertaServicio) {
         if (modo == "editar") {
-            viewModel.mostrarFormularioEdicion()
+            viewModel.mostrarFormularioEdicion(idOfertaServicio)
         } else {
             viewModel.mostrarFormularioCreacion()
         }

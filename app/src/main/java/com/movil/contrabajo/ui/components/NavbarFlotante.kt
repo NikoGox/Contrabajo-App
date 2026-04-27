@@ -52,7 +52,7 @@ private data class ItemNavbar(
     val icono: ImageVector
 )
 
-val PaddingNavbarFlotante = PaddingValues(bottom = 0.dp)
+val PaddingNavbarFlotante = PaddingValues(bottom = 112.dp)
 
 @Composable
 fun ContenedorConNavbarFlotante(

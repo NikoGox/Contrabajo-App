@@ -94,7 +94,7 @@ fun PantallaInicial(
                         BotonSecundario(texto = "Crear cuenta", onClick = irARegistro)
                     }
                     Text(
-                        text = "v$versionApp",
+                        text = "Version actual: $versionApp",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier

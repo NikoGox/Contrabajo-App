@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.movil.contrabajo.data.repository.RepositorioAutenticacion
+import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
+import com.movil.contrabajo.domain.model.PreguntasSeguridadCatalogo
 import com.movil.contrabajo.domain.model.RegistroPendiente
 import com.movil.contrabajo.domain.model.TipoPerfil
 
@@ -37,7 +39,16 @@ data class LoginUiState(
     val contrasena: String = "123456",
     val recordarme: Boolean = true,
     val error: String? = null,
-    val loginExitoso: Boolean = false
+    val loginExitoso: Boolean = false,
+    val recuperacionIdentificador: String = "",
+    val recuperacionPreguntas: List<PreguntaSeguridadConfig> = emptyList(),
+    val recuperacionRespuesta1: String = "",
+    val recuperacionRespuesta2: String = "",
+    val recuperacionValidada: Boolean = false,
+    val nuevaContrasenaRecuperacion: String = "",
+    val confirmarContrasenaRecuperacion: String = "",
+    val errorRecuperacion: String? = null,
+    val mensajeRecuperacion: String? = null
 )
 
 class LoginViewModel(
@@ -71,6 +82,127 @@ class LoginViewModel(
 
     fun consumirNavegacionExitosa() {
         uiState = uiState.copy(loginExitoso = false)
+    }
+
+    fun actualizarIdentificadorRecuperacion(valor: String) {
+        uiState = uiState.copy(
+            recuperacionIdentificador = valor.trim(),
+            errorRecuperacion = null,
+            mensajeRecuperacion = null
+        )
+    }
+
+    fun cargarPreguntasRecuperacion() {
+        val identificador = uiState.recuperacionIdentificador.trim()
+        if (identificador.isBlank()) {
+            uiState = uiState.copy(errorRecuperacion = "Ingresa tu usuario o correo")
+            return
+        }
+        repositorioAutenticacion.obtenerPreguntasRecuperacion(identificador)
+            .onSuccess { preguntas ->
+                uiState = uiState.copy(
+                    recuperacionPreguntas = preguntas,
+                    recuperacionRespuesta1 = "",
+                    recuperacionRespuesta2 = "",
+                    recuperacionValidada = false,
+                    nuevaContrasenaRecuperacion = "",
+                    confirmarContrasenaRecuperacion = "",
+                    errorRecuperacion = null,
+                    mensajeRecuperacion = null
+                )
+            }
+            .onFailure {
+                uiState = uiState.copy(errorRecuperacion = it.message, mensajeRecuperacion = null)
+            }
+    }
+
+    fun actualizarRespuestaRecuperacion1(valor: String) {
+        uiState = uiState.copy(
+            recuperacionRespuesta1 = valor,
+            recuperacionValidada = false,
+            errorRecuperacion = null
+        )
+    }
+
+    fun actualizarRespuestaRecuperacion2(valor: String) {
+        uiState = uiState.copy(
+            recuperacionRespuesta2 = valor,
+            recuperacionValidada = false,
+            errorRecuperacion = null
+        )
+    }
+
+    fun validarRespuestasRecuperacion() {
+        repositorioAutenticacion.validarRespuestasRecuperacion(
+            identificador = uiState.recuperacionIdentificador,
+            respuesta1 = uiState.recuperacionRespuesta1,
+            respuesta2 = uiState.recuperacionRespuesta2
+        ).onSuccess {
+            uiState = uiState.copy(
+                recuperacionValidada = true,
+                errorRecuperacion = null,
+                mensajeRecuperacion = "Identidad validada. Ya puedes restablecer tu contrasena."
+            )
+        }.onFailure {
+            uiState = uiState.copy(
+                recuperacionValidada = false,
+                errorRecuperacion = it.message ?: "No se pudieron validar las respuestas",
+                mensajeRecuperacion = null
+            )
+        }
+    }
+
+    fun actualizarNuevaContrasenaRecuperacion(valor: String) {
+        uiState = uiState.copy(
+            nuevaContrasenaRecuperacion = valor,
+            errorRecuperacion = null
+        )
+    }
+
+    fun actualizarConfirmarContrasenaRecuperacion(valor: String) {
+        uiState = uiState.copy(
+            confirmarContrasenaRecuperacion = valor,
+            errorRecuperacion = null
+        )
+    }
+
+    fun restablecerContrasenaRecuperacion() {
+        repositorioAutenticacion.restablecerContrasenaRecuperacion(
+            identificador = uiState.recuperacionIdentificador,
+            respuesta1 = uiState.recuperacionRespuesta1,
+            respuesta2 = uiState.recuperacionRespuesta2,
+            nuevaContrasena = uiState.nuevaContrasenaRecuperacion,
+            confirmarContrasena = uiState.confirmarContrasenaRecuperacion
+        ).onSuccess {
+            uiState = uiState.copy(
+                recuperacionValidada = false,
+                recuperacionPreguntas = emptyList(),
+                recuperacionRespuesta1 = "",
+                recuperacionRespuesta2 = "",
+                nuevaContrasenaRecuperacion = "",
+                confirmarContrasenaRecuperacion = "",
+                errorRecuperacion = null,
+                mensajeRecuperacion = "Contrasena restablecida correctamente. Ya puedes iniciar sesion."
+            )
+        }.onFailure {
+            uiState = uiState.copy(
+                errorRecuperacion = it.message ?: "No se pudo restablecer la contrasena",
+                mensajeRecuperacion = null
+            )
+        }
+    }
+
+    fun limpiarEstadoRecuperacion() {
+        uiState = uiState.copy(
+            recuperacionPreguntas = emptyList(),
+            recuperacionRespuesta1 = "",
+            recuperacionRespuesta2 = "",
+            recuperacionValidada = false,
+            nuevaContrasenaRecuperacion = "",
+            confirmarContrasenaRecuperacion = "",
+            errorRecuperacion = null,
+            mensajeRecuperacion = null
+        )
     }
 }
 
@@ -156,6 +288,22 @@ class RegistroViewModel(
         actualizarRegistro(uiState.registro.copy(confirmarContrasena = valor))
     }
 
+    fun actualizarPreguntaSeguridad1(valor: String) {
+        actualizarRegistro(uiState.registro.copy(preguntaSeguridad1 = valor))
+    }
+
+    fun actualizarRespuestaSeguridad1(valor: String) {
+        actualizarRegistro(uiState.registro.copy(respuestaSeguridad1 = valor))
+    }
+
+    fun actualizarPreguntaSeguridad2(valor: String) {
+        actualizarRegistro(uiState.registro.copy(preguntaSeguridad2 = valor))
+    }
+
+    fun actualizarRespuestaSeguridad2(valor: String) {
+        actualizarRegistro(uiState.registro.copy(respuestaSeguridad2 = valor))
+    }
+
     fun registrarUsuario() {
         repositorioAutenticacion
             .registrarUsuario(uiState.registro)
@@ -170,6 +318,8 @@ class RegistroViewModel(
     fun consumirRegistroExitoso() {
         uiState = RegistroUiState()
     }
+
+    fun preguntasSeguridadDisponibles(): List<String> = PreguntasSeguridadCatalogo.opciones
 
     private fun actualizarRegistro(registro: RegistroPendiente) {
         uiState = uiState.copy(

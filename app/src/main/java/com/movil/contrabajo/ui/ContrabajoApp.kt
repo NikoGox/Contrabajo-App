@@ -41,8 +41,10 @@ import com.movil.contrabajo.ui.components.OverlayPantallaCarga
 import com.movil.contrabajo.ui.navigation.RutasApp
 import com.movil.contrabajo.ui.notificaciones.NotificacionesMensajes
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaLogin
+import com.movil.contrabajo.ui.screens.autenticacion.PantallaRecuperarCuenta
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoDireccion
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoDos
+import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoSeguridad
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoUno
 import com.movil.contrabajo.ui.screens.ajustes.PantallaAjustes
 import com.movil.contrabajo.ui.screens.ajustes.PantallaAjustesSeguridad
@@ -55,6 +57,7 @@ import com.movil.contrabajo.ui.screens.chats.PantallaCitaServicio
 import com.movil.contrabajo.ui.screens.chats.PantallaChats
 import com.movil.contrabajo.ui.screens.inicio.PantallaInicial
 import com.movil.contrabajo.ui.screens.perfil.PantallaPerfil
+import com.movil.contrabajo.ui.screens.perfil.PantallaValoracionesServicios
 import com.movil.contrabajo.ui.screens.principal.PantallaPrincipal
 import com.movil.contrabajo.ui.screens.servicio.PantallaDetalleServicio
 import com.movil.contrabajo.ui.screens.servicio.PantallaEditorServicio
@@ -199,7 +202,15 @@ fun ContrabajoApp(
                     onVolver = { navController.popBackStack() },
                     onLoginExitoso = abrirPrincipalConCarga,
                     onRegistrarse = { navController.navigate(RutasApp.RegistroPasoUno.ruta) },
+                    onRecuperarCuenta = { navController.navigate(RutasApp.RecuperarCuenta.ruta) },
                     viewModel = loginViewModel
+                )
+            }
+            composable(RutasApp.RecuperarCuenta.ruta) {
+                val loginViewModel: LoginViewModel = viewModel(factory = factory)
+                PantallaRecuperarCuenta(
+                    viewModel = loginViewModel,
+                    onVolver = { navController.popBackStack() }
                 )
             }
             composable(RutasApp.RegistroPasoUno.ruta) {
@@ -224,6 +235,13 @@ fun ContrabajoApp(
                 PantallaRegistroPasoDos(
                     viewModel = registroViewModel,
                     onVolver = { navController.popBackStack() },
+                    onContinuar = { navController.navigate(RutasApp.RegistroPasoSeguridad.ruta) }
+                )
+            }
+            composable(RutasApp.RegistroPasoSeguridad.ruta) {
+                PantallaRegistroPasoSeguridad(
+                    viewModel = registroViewModel,
+                    onVolver = { navController.popBackStack() },
                     onRegistroExitoso = abrirPrincipalConCarga
                 )
             }
@@ -233,10 +251,10 @@ fun ContrabajoApp(
                     chatsViewModel = chatsViewModel,
                     perfilViewModel = perfilViewModel,
                     onAbrirCrearServicio = {
-                        navController.navigate(RutasApp.ServicioEditor.crearRuta("crear"))
+                        navController.navigate(RutasApp.ServicioEditor.crearRuta("crear", 0L))
                     },
-                    onAbrirEditarServicio = {
-                        navController.navigate(RutasApp.ServicioEditor.crearRuta("editar"))
+                    onAbrirEditarServicio = { idOfertaServicio ->
+                        navController.navigate(RutasApp.ServicioEditor.crearRuta("editar", idOfertaServicio))
                     },
                     onAbrirServicio = abrirDetalleConCarga,
                     onAbrirChat = { idChat ->
@@ -245,9 +263,18 @@ fun ContrabajoApp(
                     onAbrirAjustes = {
                         navController.navigate(RutasApp.Ajustes.ruta)
                     },
+                    onAbrirValoraciones = {
+                        navController.navigate(RutasApp.ValoracionesServicios.ruta)
+                    },
                     onAbrirUbicacionRapida = {
                         navController.navigate(RutasApp.AjustesUbicacion.ruta)
                     }
+                )
+            }
+            composable(RutasApp.ValoracionesServicios.ruta) {
+                PantallaValoracionesServicios(
+                    viewModel = perfilViewModel,
+                    onVolver = { navController.popBackStack() }
                 )
             }
             composable(RutasApp.Ajustes.ruta) {
@@ -266,6 +293,7 @@ fun ContrabajoApp(
             }
             composable(RutasApp.AjustesSeguridad.ruta) {
                 PantallaAjustesSeguridad(
+                    viewModel = perfilViewModel,
                     onVolver = { navController.popBackStack() },
                     onAbrirVerificacion = { navController.navigate(RutasApp.AjustesVerificacion.ruta) },
                     onAbrirPreguntas = { navController.navigate(RutasApp.AjustesPreguntas.ruta) }
@@ -325,11 +353,16 @@ fun ContrabajoApp(
             }
             composable(
                 route = RutasApp.ServicioEditor.ruta,
-                arguments = listOf(navArgument("modo") { type = NavType.StringType })
+                arguments = listOf(
+                    navArgument("modo") { type = NavType.StringType },
+                    navArgument("idOfertaServicio") { type = NavType.LongType }
+                )
             ) { backStackEntry ->
                 val modo = backStackEntry.arguments?.getString("modo").orEmpty()
+                val idOfertaServicio = backStackEntry.arguments?.getLong("idOfertaServicio") ?: 0L
                 PantallaEditorServicio(
                     modo = modo,
+                    idOfertaServicio = idOfertaServicio,
                     viewModel = perfilViewModel,
                     onVolver = { navController.popBackStack() }
                 )
@@ -342,8 +375,8 @@ fun ContrabajoApp(
                 PantallaDetalleServicio(
                     idOfertaServicio = idOferta,
                     viewModel = detalleServicioViewModel,
-                    onEditarServicio = {
-                        navController.navigate(RutasApp.ServicioEditor.crearRuta("editar"))
+                    onEditarServicio = { idOfertaServicio ->
+                        navController.navigate(RutasApp.ServicioEditor.crearRuta("editar", idOfertaServicio))
                     },
                     onContactarServicio = abrirChatDesdeOferta,
                     onVolver = { navController.popBackStack() }
@@ -367,10 +400,11 @@ private fun ShellPrincipal(
     chatsViewModel: ChatsViewModel,
     perfilViewModel: PerfilViewModel,
     onAbrirCrearServicio: () -> Unit,
-    onAbrirEditarServicio: () -> Unit,
+    onAbrirEditarServicio: (Long) -> Unit,
     onAbrirServicio: (Long) -> Unit,
     onAbrirChat: (Long) -> Unit,
     onAbrirAjustes: () -> Unit,
+    onAbrirValoraciones: () -> Unit,
     onAbrirUbicacionRapida: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -472,6 +506,7 @@ private fun ShellPrincipal(
                         viewModel = perfilViewModel,
                         onAbrirCrearServicio = onAbrirCrearServicio,
                         onAbrirEditarServicio = onAbrirEditarServicio,
+                        onAbrirValoraciones = onAbrirValoraciones,
                         modifier = Modifier.padding(innerPadding)
                     )
 
@@ -565,7 +600,8 @@ private fun routeEsRegistro(route: String?): Boolean {
     val base = route?.substringBefore("/")
     return base == RutasApp.RegistroPasoUno.ruta ||
         base == RutasApp.RegistroPasoDireccion.ruta ||
-        base == RutasApp.RegistroPasoDos.ruta
+        base == RutasApp.RegistroPasoDos.ruta ||
+        base == RutasApp.RegistroPasoSeguridad.ruta
 }
 
 private fun routeEsServicio(route: String?): Boolean {

@@ -28,6 +28,7 @@ fun PantallaLogin(
     onVolver: () -> Unit,
     onLoginExitoso: () -> Unit,
     onRegistrarse: () -> Unit,
+    onRecuperarCuenta: () -> Unit,
     viewModel: LoginViewModel
 ) {
     val uiState = viewModel.uiState
@@ -77,6 +78,7 @@ fun PantallaLogin(
                 onClick = viewModel::iniciarSesion
             )
             BotonSecundario(texto = "Crear cuenta", onClick = onRegistrarse)
+            BotonSecundario(texto = "Recuperar cuenta", onClick = onRecuperarCuenta)
             Text(
                 text = "Usuario demo: vale@contrabajo.cl / 123456",
                 style = MaterialTheme.typography.bodySmall,
@@ -89,5 +91,102 @@ fun PantallaLogin(
             color = MaterialTheme.colorScheme.primary
         )
         BotonSecundario(texto = "Volver", onClick = onVolver)
+    }
+}
+
+@Composable
+fun PantallaRecuperarCuenta(
+    viewModel: LoginViewModel,
+    onVolver: () -> Unit
+) {
+    val uiState = viewModel.uiState
+    val preguntasOrdenadas = uiState.recuperacionPreguntas.sortedBy { it.indice }
+    val pregunta1 = preguntasOrdenadas.getOrNull(0)?.pregunta.orEmpty()
+    val pregunta2 = preguntasOrdenadas.getOrNull(1)?.pregunta.orEmpty()
+
+    LaunchedEffect(Unit) {
+        viewModel.limpiarEstadoRecuperacion()
+    }
+
+    PantallaBase(mostrarFondo = false) {
+        LogoContrabajo(modifier = Modifier.align(Alignment.CenterHorizontally), compacto = true)
+        TarjetaBase {
+            EncabezadoPantalla(
+                titulo = "Recuperar cuenta",
+                subtitulo = "Valida tus preguntas de seguridad para restablecer la contrasena."
+            )
+            CampoContrabajo(
+                valor = uiState.recuperacionIdentificador,
+                onValueChange = viewModel::actualizarIdentificadorRecuperacion,
+                etiqueta = "Usuario o correo"
+            )
+            BotonPrimario(
+                texto = "Buscar cuenta",
+                onClick = viewModel::cargarPreguntasRecuperacion
+            )
+
+            if (pregunta1.isNotBlank() && pregunta2.isNotBlank()) {
+                Text(
+                    text = "Pregunta 1: $pregunta1",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                CampoSecretoContrabajo(
+                    valor = uiState.recuperacionRespuesta1,
+                    onValueChange = viewModel::actualizarRespuestaRecuperacion1,
+                    etiqueta = "Respuesta 1"
+                )
+                Text(
+                    text = "Pregunta 2: $pregunta2",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                CampoSecretoContrabajo(
+                    valor = uiState.recuperacionRespuesta2,
+                    onValueChange = viewModel::actualizarRespuestaRecuperacion2,
+                    etiqueta = "Respuesta 2"
+                )
+                BotonPrimario(
+                    texto = "Validar respuestas",
+                    onClick = viewModel::validarRespuestasRecuperacion
+                )
+            }
+
+            if (uiState.recuperacionValidada) {
+                CampoSecretoContrabajo(
+                    valor = uiState.nuevaContrasenaRecuperacion,
+                    onValueChange = viewModel::actualizarNuevaContrasenaRecuperacion,
+                    etiqueta = "Nueva contrasena"
+                )
+                CampoSecretoContrabajo(
+                    valor = uiState.confirmarContrasenaRecuperacion,
+                    onValueChange = viewModel::actualizarConfirmarContrasenaRecuperacion,
+                    etiqueta = "Confirmar contrasena"
+                )
+                BotonPrimario(
+                    texto = "Restablecer contrasena",
+                    onClick = viewModel::restablecerContrasenaRecuperacion
+                )
+            }
+
+            if (uiState.errorRecuperacion != null) {
+                Text(
+                    text = uiState.errorRecuperacion.orEmpty(),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            if (uiState.mensajeRecuperacion != null) {
+                Text(
+                    text = uiState.mensajeRecuperacion.orEmpty(),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            BotonSecundario(
+                texto = "Volver al login",
+                onClick = onVolver
+            )
+        }
     }
 }

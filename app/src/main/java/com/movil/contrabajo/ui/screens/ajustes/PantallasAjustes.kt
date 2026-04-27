@@ -2,6 +2,7 @@ package com.movil.contrabajo.ui.screens.ajustes
 
 import android.Manifest
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -64,12 +65,16 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.movil.contrabajo.R
 import com.movil.contrabajo.domain.model.EscalaRango
+import com.movil.contrabajo.domain.model.PreguntasSeguridadCatalogo
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
 import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.ui.components.BotonPrimario
@@ -147,11 +152,21 @@ fun PantallaAjustes(
 
 @Composable
 fun PantallaAjustesSeguridad(
+    viewModel: PerfilViewModel,
     onVolver: () -> Unit,
     onAbrirVerificacion: () -> Unit,
     onAbrirPreguntas: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    var mostrarModalContrasena by rememberSaveable { mutableStateOf(false) }
+    var contrasenaInput by rememberSaveable { mutableStateOf("") }
+    var errorContrasena by rememberSaveable { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        viewModel.recargar()
+    }
+
     PantallaBase(modifier = modifier, mostrarFondo = false) {
         BarraSuperiorAjustes(titulo = "Seguridad y verificacion", onVolver = onVolver, iconoDerecha = Icons.Filled.Security)
 
@@ -163,10 +178,73 @@ fun PantallaAjustesSeguridad(
             )
             ItemAjuste(
                 titulo = "Configurar preguntas de seguridad",
-                subtitulo = "Configura 3 preguntas para recuperar tu cuenta",
-                onClick = onAbrirPreguntas
+                subtitulo = "Configura 2 preguntas para recuperar tu cuenta",
+                onClick = {
+                    solicitarAutenticacionPreguntasSeguridad(
+                        context = context,
+                        onAutenticado = onAbrirPreguntas,
+                        onRequiereFallbackContrasena = {
+                            contrasenaInput = ""
+                            errorContrasena = null
+                            mostrarModalContrasena = true
+                        }
+                    )
+                }
             )
         }
+    }
+
+    if (mostrarModalContrasena) {
+        AlertDialog(
+            onDismissRequest = { mostrarModalContrasena = false },
+            title = { Text("Validar con contrasena") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "No fue posible usar biometria. Ingresa la contrasena de tu cuenta para continuar.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    CampoSecretoContrabajo(
+                        valor = contrasenaInput,
+                        onValueChange = {
+                            contrasenaInput = it
+                            errorContrasena = null
+                        },
+                        etiqueta = "Contrasena de cuenta"
+                    )
+                    if (errorContrasena != null) {
+                        Text(
+                            text = errorContrasena.orEmpty(),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.validarContrasenaCuenta(contrasenaInput)
+                            .onSuccess {
+                                mostrarModalContrasena = false
+                                onAbrirPreguntas()
+                            }
+                            .onFailure {
+                                errorContrasena = it.message ?: "No se pudo validar la contrasena"
+                            }
+                    }
+                ) {
+                    Text("Continuar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarModalContrasena = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 
@@ -254,6 +332,7 @@ fun PantallaVerificarCuentaTrabajador(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaPreguntasSeguridad(
     viewModel: PerfilViewModel,
@@ -263,23 +342,30 @@ fun PantallaPreguntasSeguridad(
     LaunchedEffect(Unit) { viewModel.recargar() }
     val uiState = viewModel.uiState
     val preguntas = if (uiState.preguntasSeguridad.isEmpty()) {
-        (1..3).map { PreguntaSeguridadConfig(indice = it) }
+        (1..2).map { PreguntaSeguridadConfig(indice = it) }
     } else {
         uiState.preguntasSeguridad
     }
+    val catalogo = PreguntasSeguridadCatalogo.opciones
 
     var indiceEnEdicion by rememberSaveable { mutableIntStateOf(0) }
     var mostrarModal by rememberSaveable { mutableStateOf(false) }
     var preguntaInput by rememberSaveable { mutableStateOf("") }
     var respuestaInput by rememberSaveable { mutableStateOf("") }
+    var desplegarPreguntas by rememberSaveable { mutableStateOf(false) }
     var respuestasVisibles by rememberSaveable { mutableStateOf(setOf<Int>()) }
+    val preguntaAlterna = preguntas
+        .firstOrNull { it.indice != indiceEnEdicion }
+        ?.pregunta
+        .orEmpty()
+    val opcionesDisponibles = catalogo.filter { it == preguntaInput || it != preguntaAlterna }
 
     PantallaBase(modifier = modifier, mostrarFondo = false) {
         BarraSuperiorAjustes(titulo = "Preguntas de seguridad", onVolver = onVolver, iconoDerecha = Icons.Filled.Tune)
 
         TarjetaBase {
             Text(
-                text = "Configura tus 3 preguntas. Luego serviran para recuperar la cuenta.",
+                text = "Configura 2 preguntas. Luego serviran para recuperar la cuenta.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -297,6 +383,7 @@ fun PantallaPreguntasSeguridad(
                             indiceEnEdicion = item.indice
                             preguntaInput = item.pregunta
                             respuestaInput = item.respuesta
+                            desplegarPreguntas = false
                             mostrarModal = true
                             viewModel.limpiarMensajesPreguntasSeguridad()
                         }
@@ -380,11 +467,36 @@ fun PantallaPreguntasSeguridad(
             title = { Text("Configurar pregunta $indiceEnEdicion") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    CampoContrabajo(
-                        valor = preguntaInput,
-                        onValueChange = { preguntaInput = it },
-                        etiqueta = "Pregunta"
-                    )
+                    ExposedDropdownMenuBox(
+                        expanded = desplegarPreguntas,
+                        onExpandedChange = { desplegarPreguntas = !desplegarPreguntas }
+                    ) {
+                        OutlinedTextField(
+                            value = preguntaInput.ifBlank { "Seleccionar pregunta" },
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Pregunta") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegarPreguntas) },
+                            singleLine = true
+                        )
+                        DropdownMenu(
+                            expanded = desplegarPreguntas,
+                            onDismissRequest = { desplegarPreguntas = false }
+                        ) {
+                            opcionesDisponibles.forEach { opcion ->
+                                DropdownMenuItem(
+                                    text = { Text(opcion) },
+                                    onClick = {
+                                        preguntaInput = opcion
+                                        desplegarPreguntas = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                     CampoSecretoContrabajo(
                         valor = respuestaInput,
                         onValueChange = { respuestaInput = it },
@@ -933,6 +1045,65 @@ private fun ItemAjuste(
             )
         }
     }
+}
+
+private fun solicitarAutenticacionPreguntasSeguridad(
+    context: Context,
+    onAutenticado: () -> Unit,
+    onRequiereFallbackContrasena: () -> Unit
+) {
+    val activity = context.findFragmentActivity()
+    if (activity == null) {
+        Toast.makeText(context, "No fue posible iniciar autenticacion del dispositivo.", Toast.LENGTH_SHORT).show()
+        onRequiereFallbackContrasena()
+        return
+    }
+    val autenticadores = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+    val biometricManager = BiometricManager.from(activity)
+    val estado = biometricManager.canAuthenticate(autenticadores)
+    if (estado != BiometricManager.BIOMETRIC_SUCCESS) {
+        Toast.makeText(
+            context,
+            "Tu dispositivo no tiene autenticacion biometrica o credencial habilitada.",
+            Toast.LENGTH_SHORT
+        ).show()
+        onRequiereFallbackContrasena()
+        return
+    }
+    val executor = ContextCompat.getMainExecutor(activity)
+    val prompt = BiometricPrompt(
+        activity,
+        executor,
+        object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                onAutenticado()
+            }
+
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                val canceladoPorUsuario = errorCode == BiometricPrompt.ERROR_CANCELED ||
+                    errorCode == BiometricPrompt.ERROR_USER_CANCELED ||
+                    errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON
+                if (canceladoPorUsuario) {
+                    Toast.makeText(context, "Acceso cancelado.", Toast.LENGTH_SHORT).show()
+                } else {
+                    onRequiereFallbackContrasena()
+                }
+            }
+        }
+    )
+    val promptInfo = BiometricPrompt.PromptInfo.Builder()
+        .setTitle("Confirmar identidad")
+        .setSubtitle("Valida tu identidad para configurar preguntas de seguridad")
+        .setAllowedAuthenticators(autenticadores)
+        .build()
+    prompt.authenticate(promptInfo)
+}
+
+private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (this) {
+    is FragmentActivity -> this
+    is ContextWrapper -> baseContext.findFragmentActivity()
+    else -> null
 }
 
 private fun etiquetaPerfil(tipoPerfil: Int): String = when (tipoPerfil) {

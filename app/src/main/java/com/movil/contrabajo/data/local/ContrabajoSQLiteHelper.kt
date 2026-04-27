@@ -22,6 +22,7 @@ import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.domain.model.TipoPrecio
 import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
 import com.movil.contrabajo.domain.model.Usuario
+import com.movil.contrabajo.domain.model.Valoracion
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.random.Random
@@ -102,6 +103,8 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "tipo_precio INTEGER NOT NULL DEFAULT 0," +
                 "monto_base INTEGER NOT NULL DEFAULT 0," +
                 "disponible INTEGER NOT NULL DEFAULT 1," +
+                "eliminada INTEGER NOT NULL DEFAULT 0," +
+                "fecha_eliminacion TEXT," +
                 "fecha_publicacion TEXT NOT NULL," +
                 "id_categoria_servicio INTEGER NOT NULL," +
                 "id_trabajador INTEGER NOT NULL," +
@@ -152,7 +155,10 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "fecha_voto TEXT NOT NULL," +
                 "comentario TEXT NOT NULL," +
                 "id_trabajador INTEGER NOT NULL," +
-                "id_cliente INTEGER NOT NULL)"
+                "id_cliente INTEGER NOT NULL," +
+                "id_chat_cita INTEGER NOT NULL," +
+                "id_oferta_servicio INTEGER NOT NULL," +
+                "UNIQUE(id_chat_cita, id_cliente))"
         )
         db.execSQL(
             "CREATE TABLE sesiones_locales (" +
@@ -237,6 +243,26 @@ class ContrabajoSQLiteHelper(context: Context) :
         ).use { cursor ->
             return if (cursor.moveToFirst()) cursor.toUsuario() else null
         }
+    }
+
+    fun obtenerUsuarioPorIdentificador(identificador: String): Usuario? {
+        readableDatabase.rawQuery(
+            "SELECT * FROM usuarios WHERE correo = ? OR username = ? LIMIT 1",
+            arrayOf(identificador, identificador)
+        ).use { cursor ->
+            return if (cursor.moveToFirst()) cursor.toUsuario() else null
+        }
+    }
+
+    fun actualizarContrasenaUsuario(idUsuario: Long, contrasenaNueva: String) {
+        writableDatabase.update(
+            "usuarios",
+            ContentValues().apply {
+                put("contrasena_hash", contrasenaNueva.trim())
+            },
+            "id_usuario = ?",
+            arrayOf(idUsuario.toString())
+        )
     }
 
     fun insertarUsuario(usuario: Usuario): Long {
@@ -427,9 +453,9 @@ class ContrabajoSQLiteHelper(context: Context) :
     fun obtenerOfertasMarketplace(busqueda: String = ""): List<OfertaServicio> {
         val filtros = busqueda.trim()
         val where = if (filtros.isBlank()) {
-            " WHERE o.disponible = 1"
+            " WHERE o.disponible = 1 AND o.eliminada = 0"
         } else {
-            " WHERE o.disponible = 1 AND (" +
+            " WHERE o.disponible = 1 AND o.eliminada = 0 AND (" +
                 "o.titulo LIKE ? OR " +
                 "o.descripcion LIKE ? OR " +
                 "o.detalle LIKE ? OR " +
@@ -452,9 +478,12 @@ class ContrabajoSQLiteHelper(context: Context) :
         }
     }
 
-    fun obtenerOfertaPorId(idOfertaServicio: Long): OfertaServicio? {
+    fun obtenerOfertaPorId(idOfertaServicio: Long, incluirEliminadas: Boolean = false): OfertaServicio? {
+        val filtroEliminadas = if (incluirEliminadas) "" else " AND o.eliminada = 0 "
         readableDatabase.rawQuery(
-            consultaOfertaSelect + consultaOfertaJoins + " WHERE o.id_oferta_servicio = ? " + consultaOfertaGroupBy + " LIMIT 1",
+            consultaOfertaSelect + consultaOfertaJoins +
+                " WHERE o.id_oferta_servicio = ? $filtroEliminadas " +
+                consultaOfertaGroupBy + " LIMIT 1",
             arrayOf(idOfertaServicio.toString())
         ).use { cursor ->
             return if (cursor.moveToFirst()) cursor.toOfertaServicio() else null
@@ -463,20 +492,86 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     fun obtenerOfertaPorTrabajador(idTrabajador: Long): OfertaServicio? {
         readableDatabase.rawQuery(
-            consultaOfertaSelect + consultaOfertaJoins + " WHERE o.id_trabajador = ? " + consultaOfertaGroupBy + " ORDER BY o.id_oferta_servicio DESC LIMIT 1",
+            consultaOfertaSelect + consultaOfertaJoins +
+                " WHERE o.id_trabajador = ? AND o.eliminada = 0 " +
+                consultaOfertaGroupBy + " ORDER BY o.id_oferta_servicio DESC LIMIT 1",
             arrayOf(idTrabajador.toString())
         ).use { cursor ->
             return if (cursor.moveToFirst()) cursor.toOfertaServicio() else null
         }
     }
 
-    fun contarOfertasActivasPorTrabajador(idTrabajador: Long): Int {
+    fun obtenerOfertasPorTrabajador(idTrabajador: Long, incluirEliminadas: Boolean = false): List<OfertaServicio> {
+        val filtroEliminadas = if (incluirEliminadas) "" else " AND o.eliminada = 0 "
         readableDatabase.rawQuery(
-            "SELECT COUNT(*) AS total FROM ofertas_servicio WHERE id_trabajador = ? AND disponible = 1",
+            consultaOfertaSelect + consultaOfertaJoins +
+                " WHERE o.id_trabajador = ? $filtroEliminadas " +
+                consultaOfertaGroupBy + " ORDER BY o.id_oferta_servicio DESC",
+            arrayOf(idTrabajador.toString())
+        ).use { cursor ->
+            val ofertas = mutableListOf<OfertaServicio>()
+            while (cursor.moveToNext()) ofertas += cursor.toOfertaServicio()
+            return ofertas
+        }
+    }
+
+    fun contarOfertasPorTrabajador(idTrabajador: Long): Int {
+        readableDatabase.rawQuery(
+            "SELECT COUNT(*) AS total FROM ofertas_servicio WHERE id_trabajador = ? AND eliminada = 0",
             arrayOf(idTrabajador.toString())
         ).use { cursor ->
             if (!cursor.moveToFirst()) return 0
             return cursor.getInt(cursor.getColumnIndexOrThrow("total"))
+        }
+    }
+
+    fun contarOfertasActivasPorTrabajador(idTrabajador: Long): Int {
+        readableDatabase.rawQuery(
+            "SELECT COUNT(*) AS total FROM ofertas_servicio WHERE id_trabajador = ? AND disponible = 1 AND eliminada = 0",
+            arrayOf(idTrabajador.toString())
+        ).use { cursor ->
+            if (!cursor.moveToFirst()) return 0
+            return cursor.getInt(cursor.getColumnIndexOrThrow("total"))
+        }
+    }
+
+    fun contarOfertasActivasPorTrabajadorExcluyendo(
+        idTrabajador: Long,
+        idOfertaExcluir: Long
+    ): Int {
+        readableDatabase.rawQuery(
+            "SELECT COUNT(*) AS total FROM ofertas_servicio WHERE id_trabajador = ? AND disponible = 1 AND eliminada = 0 AND id_oferta_servicio <> ?",
+            arrayOf(idTrabajador.toString(), idOfertaExcluir.toString())
+        ).use { cursor ->
+            if (!cursor.moveToFirst()) return 0
+            return cursor.getInt(cursor.getColumnIndexOrThrow("total"))
+        }
+    }
+
+    fun obtenerIdsOfertasConTrabajoEnCursoPorTrabajador(idTrabajador: Long): List<Long> {
+        readableDatabase.rawQuery(
+            "SELECT DISTINCT c.id_oferta_servicio AS id_oferta_servicio " +
+                "FROM citas_servicio cs " +
+                "INNER JOIN chats_cita c ON c.id_chat_cita = cs.id_chat_cita " +
+                "WHERE c.id_trabajador = ? AND cs.estado_cita = ? AND c.id_oferta_servicio IS NOT NULL",
+            arrayOf(idTrabajador.toString(), EstadoCita.EN_PROCESO.toString())
+        ).use { cursor ->
+            val ids = mutableListOf<Long>()
+            while (cursor.moveToNext()) {
+                ids += cursor.getLong(cursor.getColumnIndexOrThrow("id_oferta_servicio"))
+            }
+            return ids
+        }
+    }
+
+    fun existeTrabajoEnCursoPorOferta(idOfertaServicio: Long): Boolean {
+        readableDatabase.rawQuery(
+            "SELECT 1 FROM citas_servicio cs " +
+                "INNER JOIN chats_cita c ON c.id_chat_cita = cs.id_chat_cita " +
+                "WHERE c.id_oferta_servicio = ? AND cs.estado_cita = ? LIMIT 1",
+            arrayOf(idOfertaServicio.toString(), EstadoCita.EN_PROCESO.toString())
+        ).use { cursor ->
+            return cursor.moveToFirst()
         }
     }
 
@@ -496,7 +591,7 @@ class ContrabajoSQLiteHelper(context: Context) :
             }
         }
 
-        return (1..3).map { indice ->
+        return (1..2).map { indice ->
             configuradas[indice] ?: PreguntaSeguridadConfig(indice = indice)
         }
     }
@@ -669,6 +764,8 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("tipo_precio", tipoPrecio)
             put("monto_base", montoNormalizado)
             put("disponible", formulario.disponible.toInt())
+            put("eliminada", 0)
+            putNull("fecha_eliminacion")
             put("fecha_publicacion", ahora())
             put("id_categoria_servicio", formulario.idCategoriaServicio)
             put("id_trabajador", idTrabajador)
@@ -709,7 +806,16 @@ class ContrabajoSQLiteHelper(context: Context) :
     }
 
     fun eliminarOfertaServicio(idOfertaServicio: Long) {
-        writableDatabase.delete("ofertas_servicio", "id_oferta_servicio = ?", arrayOf(idOfertaServicio.toString()))
+        writableDatabase.update(
+            "ofertas_servicio",
+            ContentValues().apply {
+                put("eliminada", 1)
+                put("disponible", 0)
+                put("fecha_eliminacion", ahora())
+            },
+            "id_oferta_servicio = ?",
+            arrayOf(idOfertaServicio.toString())
+        )
     }
 
     fun obtenerChatsParaUsuario(idUsuario: Long): List<ChatCita> {
@@ -792,7 +898,7 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     fun obtenerOfertaParaContacto(idOfertaServicio: Long): Pair<Long, Long>? {
         readableDatabase.rawQuery(
-            "SELECT id_trabajador, id_cliente FROM ofertas_servicio WHERE id_oferta_servicio = ? LIMIT 1",
+            "SELECT id_trabajador, id_cliente FROM ofertas_servicio WHERE id_oferta_servicio = ? AND eliminada = 0 LIMIT 1",
             arrayOf(idOfertaServicio.toString())
         ).use { cursor ->
             if (!cursor.moveToFirst()) return null
@@ -988,6 +1094,81 @@ class ContrabajoSQLiteHelper(context: Context) :
         return actualizadas > 0
     }
 
+    fun existeCitaEnProcesoTrabajador(idTrabajador: Long, idCitaExcluir: Long): Boolean {
+        readableDatabase.rawQuery(
+            "SELECT 1 FROM citas_servicio cs " +
+                "INNER JOIN chats_cita c ON c.id_chat_cita = cs.id_chat_cita " +
+                "WHERE c.id_trabajador = ? AND cs.estado_cita = ? AND cs.id_cita <> ? LIMIT 1",
+            arrayOf(idTrabajador.toString(), EstadoCita.EN_PROCESO.toString(), idCitaExcluir.toString())
+        ).use { cursor ->
+            return cursor.moveToFirst()
+        }
+    }
+
+    fun existeValoracionPorChatCliente(idChatCita: Long, idCliente: Long): Boolean {
+        readableDatabase.rawQuery(
+            "SELECT 1 FROM valoraciones WHERE id_chat_cita = ? AND id_cliente = ? LIMIT 1",
+            arrayOf(idChatCita.toString(), idCliente.toString())
+        ).use { cursor ->
+            return cursor.moveToFirst()
+        }
+    }
+
+    fun obtenerValoracionPorChat(idChatCita: Long, idCliente: Long): Valoracion? {
+        readableDatabase.rawQuery(
+            "SELECT * FROM valoraciones WHERE id_chat_cita = ? AND id_cliente = ? LIMIT 1",
+            arrayOf(idChatCita.toString(), idCliente.toString())
+        ).use { cursor ->
+            return if (cursor.moveToFirst()) cursor.toValoracion() else null
+        }
+    }
+
+    fun obtenerValoracionPorId(idValoracion: Long): Valoracion? {
+        readableDatabase.rawQuery(
+            "SELECT * FROM valoraciones WHERE id_valoracion = ? LIMIT 1",
+            arrayOf(idValoracion.toString())
+        ).use { cursor ->
+            return if (cursor.moveToFirst()) cursor.toValoracion() else null
+        }
+    }
+
+    fun obtenerValoracionesPorOferta(idOfertaServicio: Long): List<Valoracion> {
+        readableDatabase.rawQuery(
+            "SELECT v.*, " +
+                "uc.username AS username_cliente, " +
+                "cs.fecha_fin_trabajo AS fecha_finalizacion_cita " +
+                "FROM valoraciones v " +
+                "LEFT JOIN usuarios uc ON uc.id_usuario = v.id_cliente " +
+                "LEFT JOIN citas_servicio cs ON cs.id_chat_cita = v.id_chat_cita " +
+                "WHERE v.id_oferta_servicio = ? " +
+                "ORDER BY v.id_valoracion DESC",
+            arrayOf(idOfertaServicio.toString())
+        ).use { cursor ->
+            val valoraciones = mutableListOf<Valoracion>()
+            while (cursor.moveToNext()) valoraciones += cursor.toValoracion()
+            return valoraciones
+        }
+    }
+
+    fun insertarValoracion(
+        voto: Int,
+        comentario: String,
+        idTrabajador: Long,
+        idCliente: Long,
+        idChatCita: Long,
+        idOfertaServicio: Long
+    ): Long {
+        return writableDatabase.insert("valoraciones", null, ContentValues().apply {
+            put("voto", voto.coerceIn(1, 5))
+            put("fecha_voto", ahora())
+            put("comentario", comentario.ifBlank { "Sin comentarios" })
+            put("id_trabajador", idTrabajador)
+            put("id_cliente", idCliente)
+            put("id_chat_cita", idChatCita)
+            put("id_oferta_servicio", idOfertaServicio)
+        })
+    }
+
     private fun sembrarDatosIniciales(db: SQLiteDatabase) {
         listOf(
             listOf(101, "USR_ACTIVO", "Usuario activo", "Usuario habilitado para operar en la plataforma."),
@@ -1173,7 +1354,7 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("fecha_actualizacion", ahora())
         })
 
-        db.insert("ofertas_servicio", null, ContentValues().apply {
+        val ofertaPrincipalId = db.insert("ofertas_servicio", null, ContentValues().apply {
             put("titulo", "Mecanico a domicilio")
             put("descripcion", "Diagnostico y mantencion ligera en terreno")
             put("detalle", "Ofrezco servicio de mecanica automotriz a domicilio en la region metropolitana, con visita rapida, diagnostico inicial y presupuesto transparente.")
@@ -1181,6 +1362,8 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("tipo_precio", TipoPrecio.DESDE)
             put("monto_base", 25_000)
             put("disponible", 1)
+            put("eliminada", 0)
+            putNull("fecha_eliminacion")
             put("fecha_publicacion", ahora())
             put("id_categoria_servicio", 1)
             put("id_trabajador", trabajadorId)
@@ -1282,7 +1465,7 @@ class ContrabajoSQLiteHelper(context: Context) :
                 put("estado_sincronizacion", "sincronizada")
                 putNull("url_remota")
             })
-            db.insert("ofertas_servicio", null, ContentValues().apply {
+            val idOfertaDemo = db.insert("ofertas_servicio", null, ContentValues().apply {
                 put("titulo", publicacion[0])
                 put("descripcion", publicacion[1])
                 put("detalle", publicacion[1])
@@ -1302,6 +1485,8 @@ class ContrabajoSQLiteHelper(context: Context) :
                 put("tipo_precio", tipoPrecioDemo)
                 put("monto_base", montoDemo)
                 put("disponible", 1)
+                put("eliminada", 0)
+                putNull("fecha_eliminacion")
                 put("fecha_publicacion", ahora(index.toLong()))
                 put("id_categoria_servicio", (index % categoriasBase.size) + 1)
                 put("id_trabajador", trabajadorDemoId)
@@ -1313,6 +1498,8 @@ class ContrabajoSQLiteHelper(context: Context) :
                 put("comentario", "Servicio demo valorado para pruebas UI.")
                 put("id_trabajador", trabajadorDemoId)
                 put("id_cliente", clienteId)
+                put("id_chat_cita", -(index + 1).toLong())
+                put("id_oferta_servicio", idOfertaDemo)
             })
         }
 
@@ -1322,6 +1509,8 @@ class ContrabajoSQLiteHelper(context: Context) :
             put("comentario", "Trabajo rapido y muy ordenado")
             put("id_trabajador", trabajadorId)
             put("id_cliente", clienteId)
+            put("id_chat_cita", -1001L)
+            put("id_oferta_servicio", ofertaPrincipalId)
         })
 
         val chatId = db.insert("chats_cita", null, ContentValues().apply {
@@ -1426,7 +1615,9 @@ class ContrabajoSQLiteHelper(context: Context) :
         fotoNombreArchivo = getStringNullable("foto_nombre_archivo").orEmpty(),
         fotoMimeType = getStringNullable("foto_mime_type").orEmpty(),
         fotoPendienteSincronizacion = getStringNullable("foto_estado_sincronizacion") == "pendiente",
-        fotoPerfilTrabajador = getStringNullable("foto_perfil_trabajador").orEmpty()
+        fotoPerfilTrabajador = getStringNullable("foto_perfil_trabajador").orEmpty(),
+        eliminada = getIntNullable("eliminada") == 1,
+        fechaEliminacion = getStringNullable("fecha_eliminacion")
     )
 
     private fun Cursor.toChatCita(): ChatCita = ChatCita(
@@ -1479,6 +1670,19 @@ class ContrabajoSQLiteHelper(context: Context) :
         estado = getInt(getColumnIndexOrThrow("estado_cita"))
     )
 
+    private fun Cursor.toValoracion(): Valoracion = Valoracion(
+        idValoracion = getLong(getColumnIndexOrThrow("id_valoracion")),
+        voto = getInt(getColumnIndexOrThrow("voto")),
+        fechaVoto = getString(getColumnIndexOrThrow("fecha_voto")),
+        comentario = getString(getColumnIndexOrThrow("comentario")),
+        idTrabajador = getLong(getColumnIndexOrThrow("id_trabajador")),
+        idCliente = getLong(getColumnIndexOrThrow("id_cliente")),
+        idChatCita = getLong(getColumnIndexOrThrow("id_chat_cita")),
+        idOfertaServicio = getLong(getColumnIndexOrThrow("id_oferta_servicio")),
+        usernameCliente = getStringNullable("username_cliente").orEmpty(),
+        fechaFinalizacionCita = getStringNullable("fecha_finalizacion_cita")
+    )
+
     private fun Cursor.getStringNullable(column: String): String? {
         val index = getColumnIndex(column)
         return if (index >= 0 && !isNull(index)) getString(index) else null
@@ -1501,7 +1705,7 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     companion object {
         private const val DATABASE_NAME = "contrabajo_local.db"
-        private const val DATABASE_VERSION = 17
+        private const val DATABASE_VERSION = 18
         private const val SESION_EXPIRACION_MS = 30 * 60 * 1000L
         private const val VERIFICACION_TRABAJADOR_MS = 3 * 60 * 1000L
         private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
@@ -1529,6 +1733,8 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "COALESCE(f.mime_type, '') AS foto_mime_type, " +
                 "COALESCE(f.estado_sincronizacion, '') AS foto_estado_sincronizacion, " +
                 "COALESCE(u.foto_perfil, '') AS foto_perfil_trabajador, " +
+                "o.eliminada AS eliminada, " +
+                "o.fecha_eliminacion AS fecha_eliminacion, " +
                 "COALESCE(AVG(v.voto), 0) AS puntuacion_promedio "
         private val consultaOfertaJoins =
                 "FROM ofertas_servicio o " +
@@ -1536,7 +1742,7 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "INNER JOIN categorias_servicio cat ON cat.id_categoria_servicio = o.id_categoria_servicio " +
                 "LEFT JOIN ubicaciones_usuario uu ON uu.id_usuario = u.id_usuario " +
                 "LEFT JOIN fotos f ON f.id_foto = o.id_foto_portada " +
-                "LEFT JOIN valoraciones v ON v.id_trabajador = o.id_trabajador "
+                "LEFT JOIN valoraciones v ON v.id_oferta_servicio = o.id_oferta_servicio "
         private val consultaOfertaGroupBy = " GROUP BY o.id_oferta_servicio"
 
         private fun ahora(minutosRestar: Long = 0): String =

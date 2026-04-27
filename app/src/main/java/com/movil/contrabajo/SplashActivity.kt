@@ -188,7 +188,7 @@ private fun PantallaSplash(
                 modifier = Modifier.padding(top = 8.dp)
             )
             Text(
-                text = "v$versionApp",
+                text = "Version actual: $versionApp",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFF35656A),
                 modifier = Modifier.padding(top = 6.dp)

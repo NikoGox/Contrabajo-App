@@ -3,11 +3,13 @@ package com.movil.contrabajo.ui.screens.chats
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -21,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -81,6 +84,7 @@ fun PantallaDetalleChat(
     val idUsuarioActual = uiState.idUsuarioActual
     val esCliente = chat != null && idUsuarioActual != null && chat.idCliente == idUsuarioActual
     val esTrabajador = chat != null && idUsuarioActual != null && chat.idTrabajador == idUsuarioActual
+    val mostrarModalValoracion = uiState.mostrarModalValoracion && esCliente
 
     var mostrarModalCita by remember { mutableStateOf(false) }
     var mostrarMenuOpciones by remember { mutableStateOf(false) }
@@ -350,6 +354,31 @@ fun PantallaDetalleChat(
             }
         )
     }
+
+    if (mostrarModalValoracion && chat != null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                ) { }
+        ) {
+            ModalValoracionCierre(
+                nombreContacto = chat.nombreContacto,
+                voto = uiState.votoValoracion,
+                comentario = uiState.comentarioValoracion,
+                onCambiarVoto = viewModel::actualizarVotoValoracion,
+                onCambiarComentario = viewModel::actualizarComentarioValoracion,
+                onCerrar = viewModel::cerrarModalValoracion,
+                onGuardar = viewModel::guardarValoracionChat,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 12.dp, vertical = 14.dp)
+            )
+        }
+    }
 }
 
 @Composable
@@ -556,12 +585,6 @@ private fun ResumenCitaChat(
                         contentDescription = if (citaExpandida) "Contraer cita" else "Expandir cita",
                         tint = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(modifier = Modifier.weight(1f))
-                    Text(
-                        text = if (citaExpandida) "Contraer" else "Expandir",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
                 Spacer(modifier = Modifier.weight(0.05f))
                 EtiquetaEstado(
@@ -693,6 +716,77 @@ private fun AccionesCliente(
                 BotonPrimario(
                     texto = "Reenviar propuesta",
                     onClick = onReenviarPropuesta,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModalValoracionCierre(
+    nombreContacto: String,
+    voto: Int,
+    comentario: String,
+    onCambiarVoto: (Int) -> Unit,
+    onCambiarComentario: (String) -> Unit,
+    onCerrar: () -> Unit,
+    onGuardar: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 10.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "¿Que tal te parecio el contacto con \"$nombreContacto\"?",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                repeat(5) { indice ->
+                    val estrellas = indice + 1
+                    Icon(
+                        imageVector = Icons.Rounded.Star,
+                        contentDescription = "$estrellas estrellas",
+                        tint = if (estrellas <= voto) Color(0xFFFFC93C) else Color(0xFFB0B7BF),
+                        modifier = Modifier
+                            .padding(horizontal = 3.dp)
+                            .clickable { onCambiarVoto(estrellas) }
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = comentario,
+                onValueChange = onCambiarComentario,
+                label = { Text("Comentario (opcional)") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                maxLines = 4
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                BotonSecundario(
+                    texto = "Despues",
+                    onClick = onCerrar,
+                    modifier = Modifier.weight(1f)
+                )
+                BotonPrimario(
+                    texto = "Guardar",
+                    onClick = onGuardar,
                     modifier = Modifier.weight(1f)
                 )
             }

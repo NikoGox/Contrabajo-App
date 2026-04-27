@@ -108,7 +108,7 @@ import kotlin.math.sin
 fun PantallaDetalleServicio(
     idOfertaServicio: Long,
     viewModel: DetalleServicioViewModel,
-    onEditarServicio: () -> Unit,
+    onEditarServicio: (Long) -> Unit,
     onContactarServicio: (Long) -> Unit,
     onVolver: () -> Unit
 ) {
@@ -498,7 +498,7 @@ fun PantallaDetalleServicio(
         }
 
         val ofertaCta = uiState.ofertas.getOrNull(pagerState.currentPage) ?: uiState.ofertaActual
-        if (!saliendoPantalla && ofertaCta != null) {
+        if (!saliendoPantalla && ofertaCta != null && !ofertaCta.eliminada) {
             val esPublicacionPropia = ofertaCta.idTrabajador == uiState.idUsuarioActual
             AnimatedVisibility(
                 visible = mostrarCta,
@@ -520,12 +520,31 @@ fun PantallaDetalleServicio(
                     esPropia = esPublicacionPropia,
                     onClick = {
                         if (esPublicacionPropia) {
-                            onEditarServicio()
+                            onEditarServicio(ofertaCta.idOfertaServicio)
                         } else {
                             ofertaPendienteChatId = ofertaCta.idOfertaServicio
                             mostrarConfirmacionChat = true
                         }
                     }
+                )
+            }
+        }
+
+        if (!saliendoPantalla && ofertaCta?.eliminada == true) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.88f)
+            ) {
+                Text(
+                    text = "Fuera de servicio. Esta publicacion no admite nuevos contactos.",
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
@@ -657,6 +676,7 @@ private fun TarjetaDetalleOferta(
         ) {
             ImagenDetalleServicio(
                 referencia = oferta.fotoUrlReferencia,
+                fueraDeServicio = oferta.eliminada,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(282.dp)
@@ -668,6 +688,20 @@ private fun TarjetaDetalleOferta(
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
+            if (oferta.eliminada) {
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.74f)
+                ) {
+                    Text(
+                        text = "Fuera de servicio",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -719,11 +753,13 @@ private fun TarjetaDetalleOferta(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = "${calcularDistanciaKm(oferta)} km - ${oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" }}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (!oferta.eliminada) {
+                Text(
+                    text = "${calcularDistanciaKm(oferta)} km - ${oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" }}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Text(
                 text = "Descripcion:",
@@ -735,48 +771,56 @@ private fun TarjetaDetalleOferta(
                 style = MaterialTheme.typography.bodyLarge
             )
 
-            Text(
-                text = "Ubicacion:",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            val coordenadaVisual = construirCoordenadaVisualPrivada(
-                latitud = oferta.latitudReferencia ?: -33.4489,
-                longitud = oferta.longitudReferencia ?: -70.6693,
-                semilla = oferta.idOfertaServicio
-            )
-            if (modoLigero) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(132.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "Vista previa del mapa",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+            if (oferta.eliminada) {
+                Text(
+                    text = "Ubicacion no disponible para publicaciones eliminadas.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             } else {
-                MapaRangoOpenStreetMap(
-                    latitud = coordenadaVisual.first,
-                    longitud = coordenadaVisual.second,
-                    rangoM = oferta.rangoDisponibilidadM,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(132.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                Text(
+                    text = "Ubicacion:",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                val coordenadaVisual = construirCoordenadaVisualPrivada(
+                    latitud = oferta.latitudReferencia ?: -33.4489,
+                    longitud = oferta.longitudReferencia ?: -70.6693,
+                    semilla = oferta.idOfertaServicio
+                )
+                if (modoLigero) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(132.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "Vista previa del mapa",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    MapaRangoOpenStreetMap(
+                        latitud = coordenadaVisual.first,
+                        longitud = coordenadaVisual.second,
+                        rangoM = oferta.rangoDisponibilidadM,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(132.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                    )
+                }
+                Text(
+                    text = "Rango de disponibilidad: ${EscalaRango.formatear(oferta.rangoDisponibilidadM)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text(
-                text = "Rango de disponibilidad: ${EscalaRango.formatear(oferta.rangoDisponibilidadM)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
             if (modoLigero) {
                 Surface(
                     shape = RoundedCornerShape(14.dp),
@@ -822,6 +866,7 @@ private fun TarjetaDetallePrevisualizacion(
         ) {
             ImagenDetalleServicio(
                 referencia = oferta.fotoUrlReferencia,
+                fueraDeServicio = oferta.eliminada,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(282.dp)
@@ -832,6 +877,34 @@ private fun TarjetaDetallePrevisualizacion(
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
+            if (oferta.eliminada) {
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.74f)
+                ) {
+                    Text(
+                        text = "Fuera de servicio",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            if (oferta.eliminada) {
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.74f)
+                ) {
+                    Text(
+                        text = "Fuera de servicio",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -883,11 +956,13 @@ private fun TarjetaDetallePrevisualizacion(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = "${calcularDistanciaKm(oferta)} km - ${oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" }}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (!oferta.eliminada) {
+                Text(
+                    text = "${calcularDistanciaKm(oferta)} km - ${oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" }}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Text(
                 text = "Descripcion:",
                 style = MaterialTheme.typography.labelLarge,
@@ -898,30 +973,38 @@ private fun TarjetaDetallePrevisualizacion(
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 3
             )
-            Text(
-                text = "Ubicacion:",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            val coordenadaVisual = construirCoordenadaVisualPrivada(
-                latitud = oferta.latitudReferencia ?: -33.4489,
-                longitud = oferta.longitudReferencia ?: -70.6693,
-                semilla = oferta.idOfertaServicio
-            )
-            MapaRangoOpenStreetMap(
-                latitud = coordenadaVisual.first,
-                longitud = coordenadaVisual.second,
-                rangoM = oferta.rangoDisponibilidadM,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(132.dp)
-                    .clip(RoundedCornerShape(14.dp))
-            )
-            Text(
-                text = "Rango de disponibilidad: ${EscalaRango.formatear(oferta.rangoDisponibilidadM)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (oferta.eliminada) {
+                Text(
+                    text = "Ubicacion no disponible para publicaciones eliminadas.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    text = "Ubicacion:",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                val coordenadaVisual = construirCoordenadaVisualPrivada(
+                    latitud = oferta.latitudReferencia ?: -33.4489,
+                    longitud = oferta.longitudReferencia ?: -70.6693,
+                    semilla = oferta.idOfertaServicio
+                )
+                MapaRangoOpenStreetMap(
+                    latitud = coordenadaVisual.first,
+                    longitud = coordenadaVisual.second,
+                    rangoM = oferta.rangoDisponibilidadM,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(132.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                )
+                Text(
+                    text = "Rango de disponibilidad: ${EscalaRango.formatear(oferta.rangoDisponibilidadM)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             ResumenTrabajadorDetalle(
                 nombreTrabajador = oferta.nombreTrabajador,
                 usernameTrabajador = oferta.usernameTrabajador,
@@ -1002,8 +1085,30 @@ private fun FilaValoracionDetalle(valor: Double) {
 @Composable
 private fun ImagenDetalleServicio(
     referencia: String,
+    fueraDeServicio: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    if (fueraDeServicio) {
+        Box(
+            modifier = modifier.background(
+                Brush.linearGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.75f),
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
+                    )
+                )
+            ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Fuera de servicio",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        return
+    }
     var errorRemoto by remember(referencia) { mutableStateOf(false) }
     if ((referencia.startsWith("http://") || referencia.startsWith("https://")) && !errorRemoto) {
         AsyncImage(

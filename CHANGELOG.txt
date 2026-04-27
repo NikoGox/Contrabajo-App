@@ -1,3 +1,22 @@
+VERSION 0.6.0-Pre-Alpha
+───────
+├─• Se implementó edición real de servicios por id_oferta_servicio para evitar sobreescrituras incorrectas.
+├─• Se aplicó la regla de negocio 3/1 para trabajadores no premium: máximo 3 servicios y 1 activo.
+├─• Se bloqueó la activación de servicios cuando no hay cupo disponible (1/1 activo).
+├─• Se rediseñó Mis servicios con métricas operativas X/1 y Y/3 más mini listado por servicio.
+├─• Se reemplazó el switch de disponibilidad por estado En Curso cuando existe cita en EN_PROCESO.
+├─• Se agregó el 4º paso del registro con 2 preguntas de seguridad (sin repetición) y respuestas ocultables.
+├─• Se incorporó recuperación de cuenta por usuario/correo con validación de 2 respuestas y reset de contraseña.
+├─• Se ajustó el registro para evitar el flash de errores rojos al completar alta exitosa.
+├─• Se añadieron filtros de chats por categoría (contacto / trabajador) con modo combinado mostrando todos.
+├─• Se retiró el texto Expandir/Contraer en chat detalle, manteniendo interacción por flecha.
+├─• Se implementó modal de valoración al cerrar chat (1 a 5 estrellas + comentario opcional), una vez por chat.
+├─• Se habilitó pantalla de valoraciones por servicio incluyendo @usuario y fecha de finalización de cita.
+├─• Se estableció eliminación lógica de publicaciones para preservar trazabilidad de chats y valoraciones históricas.
+└─• Se añadió protección para cambiar preguntas de seguridad con biometría/credencial y fallback a contraseña de cuenta.
+
+
+
 VERSION 0.5.0-Pre-Alpha
 ───────
 ├─• Se consolidó un módulo de mensajería contextual por servicio, donde cada conversación queda ligada a una publicación específica.
@@ -15,8 +34,7 @@ VERSION 0.5.0-Pre-Alpha
 ├─• Se incorporó organización temporal del chat con separadores por día (Hoy, Ayer, fecha) y apertura automática en los últimos mensajes.
 ├─• Se reforzó la identidad visual del módulo de chat con contraste por rol, burbujas más legibles y diferenciación de conversaciones del trabajador.
 ├─• Se añadió cabecera de chat interactiva que permite abrir directamente el detalle del servicio asociado desde la misma conversación.
-├─• Se consolidó una matriz de estados transversal en formatos CSV/XLSX para estandarizar códigos operativos por dominio (usuarios, servicios, comunicaciones, citas/otros).
-└─• Se mantuvo el enfoque frontend-first con SQLite local, dejando la lógica lista para integración backend posterior sin romper el flujo funcional actual.
+└─• Se consolidó una matriz de estados transversal en formatos CSV/XLSX para estandarizar códigos operativos por dominio (usuarios, servicios, comunicaciones, citas/otros).
 
 
 

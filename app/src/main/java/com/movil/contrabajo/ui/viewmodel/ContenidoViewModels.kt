@@ -12,6 +12,7 @@ import com.movil.contrabajo.data.repository.RepositorioChats
 import com.movil.contrabajo.data.repository.RepositorioOfertas
 import com.movil.contrabajo.data.repository.RepositorioPerfil
 import com.movil.contrabajo.domain.model.ChatCita
+import com.movil.contrabajo.domain.model.EstadoCita
 import com.movil.contrabajo.domain.model.FotoServicioLocal
 import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
@@ -24,6 +25,8 @@ import com.movil.contrabajo.domain.model.TipoPrecio
 import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
 import com.movil.contrabajo.domain.model.Usuario
+import com.movil.contrabajo.domain.model.Valoracion
+import com.movil.contrabajo.domain.model.ValoracionesServicio
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.Normalizer
@@ -246,16 +249,32 @@ class PrincipalViewModel(
 data class ChatsUiState(
     val idUsuarioActual: Long? = null,
     val chats: List<ChatCita> = emptyList(),
+    val filtroChatsContacto: Boolean = false,
+    val filtroChatsTrabajador: Boolean = false,
     val totalMensajesNoLeidos: Int = 0,
     val idPrimerChatPendiente: Long? = null,
     val notificacionesPendientes: List<NotificacionMensajePendiente> = emptyList(),
     val chatActivo: ChatCita? = null,
     val mensajesActivos: List<MensajeChat> = emptyList(),
     val citaActiva: CitaServicio? = null,
+    val valoracionExistente: Valoracion? = null,
+    val mostrarModalValoracion: Boolean = false,
+    val votoValoracion: Int = 5,
+    val comentarioValoracion: String = "",
     val borradorMensaje: String = "",
     val mensajeSistema: String? = null,
     val error: String? = null
-)
+) {
+    val chatsFiltrados: List<ChatCita> get() {
+        if (!filtroChatsContacto && !filtroChatsTrabajador) return chats
+        val idActual = idUsuarioActual ?: return chats
+        return chats.filter { chat ->
+            val comoContacto = chat.idCliente == idActual
+            val comoTrabajador = chat.idTrabajador == idActual
+            (filtroChatsContacto && comoContacto) || (filtroChatsTrabajador && comoTrabajador)
+        }
+    }
+}
 
 class ChatsViewModel(
     private val repositorioChats: RepositorioChats
@@ -277,6 +296,14 @@ class ChatsViewModel(
             idPrimerChatPendiente = chatsActuales.firstOrNull { it.mensajesNoLeidos > 0 }?.idChatCita,
             notificacionesPendientes = notificacionesPendientes
         )
+    }
+
+    fun actualizarFiltroChatsContacto(activo: Boolean) {
+        uiState = uiState.copy(filtroChatsContacto = activo)
+    }
+
+    fun actualizarFiltroChatsTrabajador(activo: Boolean) {
+        uiState = uiState.copy(filtroChatsTrabajador = activo)
     }
 
     fun iniciarConversacionDesdeOferta(idOfertaServicio: Long): Result<ChatCita> {
@@ -303,10 +330,19 @@ class ChatsViewModel(
             uiState = uiState.copy(error = "No se pudo abrir el chat")
             return
         }
+        val valoracion = repositorioChats.obtenerValoracionPorChat(idChatCita)
+        val esCliente = chat.idCliente == repositorioChats.obtenerIdUsuarioActual()
+        val cita = repositorioChats.obtenerCitaPorChat(idChatCita)
+        val permiteValorar = cita?.estado in setOf(EstadoCita.FINALIZADO, EstadoCita.CERRADO)
+        val mostrarModalValoracion = chat.chatCerrado && esCliente && valoracion == null && permiteValorar
         uiState = uiState.copy(
             chatActivo = chat,
             mensajesActivos = repositorioChats.obtenerMensajes(idChatCita),
-            citaActiva = repositorioChats.obtenerCitaPorChat(idChatCita),
+            citaActiva = cita,
+            valoracionExistente = valoracion,
+            mostrarModalValoracion = mostrarModalValoracion,
+            votoValoracion = valoracion?.voto ?: 5,
+            comentarioValoracion = valoracion?.comentario.orEmpty(),
             borradorMensaje = "",
             idUsuarioActual = repositorioChats.obtenerIdUsuarioActual(),
             error = null
@@ -425,6 +461,37 @@ class ChatsViewModel(
             }
     }
 
+    fun actualizarVotoValoracion(voto: Int) {
+        uiState = uiState.copy(votoValoracion = voto.coerceIn(1, 5), error = null)
+    }
+
+    fun actualizarComentarioValoracion(comentario: String) {
+        uiState = uiState.copy(comentarioValoracion = comentario, error = null)
+    }
+
+    fun cerrarModalValoracion() {
+        uiState = uiState.copy(mostrarModalValoracion = false)
+    }
+
+    fun guardarValoracionChat() {
+        val chat = uiState.chatActivo ?: return
+        repositorioChats.guardarValoracionChat(
+            idChatCita = chat.idChatCita,
+            voto = uiState.votoValoracion,
+            comentario = uiState.comentarioValoracion
+        ).onSuccess { valoracion ->
+            uiState = uiState.copy(
+                valoracionExistente = valoracion,
+                mostrarModalValoracion = false,
+                mensajeSistema = "Gracias por tu valoracion.",
+                error = null
+            )
+            abrirChat(chat.idChatCita)
+        }.onFailure {
+            uiState = uiState.copy(error = it.message ?: "No se pudo guardar la valoracion")
+        }
+    }
+
     private fun procesarTransicionCita(
         accion: () -> Result<CitaServicio>,
         mensajeExito: String
@@ -458,10 +525,15 @@ class ChatsViewModel(
 data class PerfilUiState(
     val usuario: Usuario? = null,
     val sesionCerrada: Boolean = false,
-    val ofertaPropia: OfertaServicio? = null,
+    val ofertasPropias: List<OfertaServicio> = emptyList(),
     val categorias: List<CategoriaServicio> = emptyList(),
     val formularioServicio: FormularioServicio = FormularioServicio(),
     val mostrandoFormularioServicio: Boolean = false,
+    val idOfertaEditando: Long? = null,
+    val limiteServiciosActivos: Int = 1,
+    val limiteServiciosTotales: Int = 3,
+    val idsOfertasEnCurso: Set<Long> = emptySet(),
+    val valoracionesPorServicio: List<ValoracionesServicio> = emptyList(),
     val errorServicio: String? = null,
     val runVerificacion: String = "",
     val dvVerificacion: String = "",
@@ -491,18 +563,23 @@ class PerfilViewModel(
 
     fun recargar() {
         val usuario = repositorioPerfil.obtenerPerfilActual()
-        val ofertaPropia = repositorioOfertas.obtenerOfertaPropiaActual()
+        val ofertasPropias = repositorioOfertas.obtenerOfertasPropias()
         val categorias = repositorioOfertas.obtenerCategoriasServicio()
+        val idsOfertasEnCurso = repositorioOfertas.obtenerIdsOfertasConTrabajoEnCursoPropias()
+        val valoracionesPorServicio = repositorioOfertas.obtenerValoracionesPropiasPorServicio()
+        val ofertaPrincipal = ofertasPropias.firstOrNull()
         val formularioServicio = if (uiState.mostrandoFormularioServicio) {
             uiState.formularioServicio
         } else {
-            ofertaPropia.toFormularioServicio()
+            ofertaPrincipal.toFormularioServicio()
         }
 
         uiState = uiState.copy(
             usuario = usuario,
-            ofertaPropia = ofertaPropia,
+            ofertasPropias = ofertasPropias,
             categorias = categorias,
+            idsOfertasEnCurso = idsOfertasEnCurso,
+            valoracionesPorServicio = valoracionesPorServicio,
             formularioServicio = formularioServicio,
             runVerificacion = if (uiState.runVerificacion.isBlank()) usuario?.run.orEmpty() else uiState.runVerificacion,
             dvVerificacion = if (uiState.dvVerificacion.isBlank()) usuario?.dv.orEmpty() else uiState.dvVerificacion,
@@ -517,30 +594,45 @@ class PerfilViewModel(
             uiState = uiState.copy(errorServicio = "Debes verificarte como trabajador para publicar servicios")
             return
         }
+        if (uiState.ofertasPropias.size >= uiState.limiteServiciosTotales) {
+            uiState = uiState.copy(errorServicio = "Puedes tener hasta ${uiState.limiteServiciosTotales} servicios en total")
+            return
+        }
         uiState = uiState.copy(
             mostrandoFormularioServicio = true,
             formularioServicio = FormularioServicio(),
+            idOfertaEditando = null,
             errorServicio = null
         )
     }
 
-    fun mostrarFormularioEdicion() {
+    fun mostrarFormularioEdicion(idOfertaServicio: Long) {
         val usuario = uiState.usuario
         if (usuario == null || usuario.tipoPerfil !in listOf(TipoPerfil.TRABAJADOR, TipoPerfil.PREMIUM)) {
             uiState = uiState.copy(errorServicio = "Debes verificarte como trabajador para editar servicios")
             return
         }
+        val oferta = repositorioOfertas.obtenerOfertaPropiaPorId(idOfertaServicio)
+            ?: uiState.ofertasPropias.firstOrNull { it.idOfertaServicio == idOfertaServicio }
+        if (oferta == null) {
+            uiState = uiState.copy(errorServicio = "No se encontro el servicio a editar")
+            return
+        }
         uiState = uiState.copy(
             mostrandoFormularioServicio = true,
-            formularioServicio = uiState.ofertaPropia.toFormularioServicio(),
+            formularioServicio = oferta.toFormularioServicio(),
+            idOfertaEditando = oferta.idOfertaServicio,
             errorServicio = null
         )
     }
 
     fun cancelarFormularioServicio() {
+        val ofertaRecuperada = uiState.idOfertaEditando?.let { repositorioOfertas.obtenerOfertaPropiaPorId(it) }
+            ?: uiState.ofertasPropias.firstOrNull()
         uiState = uiState.copy(
             mostrandoFormularioServicio = false,
-            formularioServicio = uiState.ofertaPropia.toFormularioServicio(),
+            formularioServicio = ofertaRecuperada.toFormularioServicio(),
+            idOfertaEditando = null,
             errorServicio = null
         )
     }
@@ -596,14 +688,11 @@ class PerfilViewModel(
         )
     }
 
-    fun cambiarDisponibilidadServicioRapido(valor: Boolean) {
-        repositorioOfertas.actualizarDisponibilidadOfertaPropia(valor)
-            .onSuccess { oferta ->
-                uiState = uiState.copy(
-                    ofertaPropia = oferta,
-                    formularioServicio = oferta.toFormularioServicio(),
-                    errorServicio = null
-                )
+    fun cambiarDisponibilidadServicioRapido(idOfertaServicio: Long, valor: Boolean) {
+        repositorioOfertas.actualizarDisponibilidadOfertaPropia(idOfertaServicio, valor)
+            .onSuccess {
+                recargar()
+                uiState = uiState.copy(errorServicio = null)
             }
             .onFailure {
                 uiState = uiState.copy(errorServicio = it.message ?: "No se pudo actualizar disponibilidad")
@@ -642,12 +731,16 @@ class PerfilViewModel(
         viewModelScope.launch {
             uiState = uiState.copy(cargandoPantalla = true)
             delay(220)
-            repositorioOfertas.guardarOfertaPropia(uiState.formularioServicio)
+            repositorioOfertas.guardarOfertaPropia(
+                formulario = uiState.formularioServicio,
+                idOfertaServicio = uiState.idOfertaEditando
+            )
                 .onSuccess { oferta ->
+                    recargar()
                     uiState = uiState.copy(
-                        ofertaPropia = oferta,
                         formularioServicio = oferta.toFormularioServicio(),
                         mostrandoFormularioServicio = false,
+                        idOfertaEditando = null,
                         errorServicio = null
                     )
                 }
@@ -674,15 +767,21 @@ class PerfilViewModel(
     }
 
     fun eliminarServicio() {
+        val idOferta = uiState.idOfertaEditando
+        if (idOferta == null) {
+            uiState = uiState.copy(errorServicio = "No hay un servicio seleccionado para eliminar")
+            return
+        }
         viewModelScope.launch {
             uiState = uiState.copy(cargandoPantalla = true)
             delay(220)
-            repositorioOfertas.eliminarOfertaPropia()
+            repositorioOfertas.eliminarOfertaPropia(idOferta)
                 .onSuccess {
+                    recargar()
                     uiState = uiState.copy(
-                        ofertaPropia = null,
                         formularioServicio = FormularioServicio(),
                         mostrandoFormularioServicio = false,
+                        idOfertaEditando = null,
                         errorServicio = null
                     )
                 }
@@ -865,6 +964,20 @@ class PerfilViewModel(
         )
     }
 
+    fun validarContrasenaCuenta(contrasena: String): Result<Unit> {
+        val usuario = uiState.usuario ?: repositorioPerfil.obtenerPerfilActual()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val valor = contrasena.trim()
+        if (valor.isBlank()) {
+            return Result.failure(IllegalArgumentException("Ingresa tu contrasena de cuenta"))
+        }
+        return if (usuario.contrasenaHash == valor) {
+            Result.success(Unit)
+        } else {
+            Result.failure(IllegalArgumentException("Contrasena incorrecta"))
+        }
+    }
+
     fun solicitarVerificacionTrabajador() {
         if (uiState.runVerificacion.length != 8) {
             uiState = uiState.copy(errorVerificacion = "El RUN debe tener 8 digitos")
@@ -968,12 +1081,17 @@ class DetalleServicioViewModel(
         val ofertasContexto = ofertasContextoMarketplace?.takeIf { it.isNotEmpty() }
         val ofertas = ofertasContexto ?: repositorioOfertas.obtenerOfertasMarketplace()
         if (ofertas.isEmpty()) {
-            val oferta = repositorioOfertas.obtenerOfertaPorId(idOfertaServicio)
+            val oferta = repositorioOfertas.obtenerOfertaPorId(idOfertaServicio, incluirEliminadas = true)
             uiState = uiState.copy(ofertas = listOfNotNull(oferta), indiceActual = 0, idUsuarioActual = idUsuarioActual)
             return
         }
         val indice = ofertas.indexOfFirst { it.idOfertaServicio == idOfertaServicio }
         if (indice < 0) {
+            val ofertaEliminada = repositorioOfertas.obtenerOfertaPorId(idOfertaServicio, incluirEliminadas = true)
+            if (ofertaEliminada != null) {
+                uiState = uiState.copy(ofertas = listOf(ofertaEliminada), indiceActual = 0, idUsuarioActual = idUsuarioActual)
+                return
+            }
             if (ofertasContexto != null) {
                 uiState = uiState.copy(ofertas = ofertasContexto, indiceActual = 0, idUsuarioActual = idUsuarioActual)
             } else {

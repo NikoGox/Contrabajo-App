@@ -13,9 +13,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -69,6 +70,7 @@ fun PantallaRegistroPasoUno(
     val partesFecha = remember(registro.fechaNacimiento) { descomponerFecha(registro.fechaNacimiento) }
     val anioMinimo = 1926
     val anioMaximo = 2026
+    val scrollPasoUno = rememberScrollState()
 
     var diaSeleccionado by rememberSaveable(registro.fechaNacimiento) { mutableIntStateOf(partesFecha.first) }
     var mesSeleccionado by rememberSaveable(registro.fechaNacimiento) { mutableIntStateOf(partesFecha.second) }
@@ -146,122 +148,128 @@ fun PantallaRegistroPasoUno(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             llenarAlto = true
         ) {
-            IndicadorPasos(pasoActual = 1, totalPasos = 3)
-            EncabezadoPantalla(titulo = "Crear cuenta", subtitulo = "Datos personales")
-
-            CampoContrabajo(
-                valor = registro.nombre,
-                onValueChange = {
-                    desbloquearValidacionPaso()
-                    viewModel.actualizarNombre(it)
-                },
-                etiqueta = "Nombre"
-            )
-            if (intentoContinuar) TextoErrorCampo(errorNombre)
-
-            CampoContrabajo(
-                valor = registro.apellidoPaterno,
-                onValueChange = {
-                    desbloquearValidacionPaso()
-                    viewModel.actualizarApellidoPaterno(it)
-                },
-                etiqueta = "Apellido paterno"
-            )
-            if (intentoContinuar) TextoErrorCampo(errorApellidoPaterno)
-
-            CampoContrabajo(
-                valor = registro.apellidoMaterno,
-                onValueChange = {
-                    desbloquearValidacionPaso()
-                    viewModel.actualizarApellidoMaterno(it)
-                },
-                etiqueta = "Apellido materno"
-            )
-            if (intentoContinuar) TextoErrorCampo(if (registro.apellidoMaterno.isBlank()) "Ingresa tu apellido materno" else null)
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(scrollPasoUno),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                CampoContrabajo(
-                    valor = registro.run,
-                    onValueChange = {
-                        desbloquearValidacionPaso()
-                        viewModel.actualizarRun(it)
-                    },
-                    etiqueta = "RUN",
-                    modifier = Modifier.weight(1f),
-                    visualTransformation = FormatoRunVisualTransformation
-                )
-                Text(
-                    text = "-",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(0.08f)
-                )
-                CampoContrabajo(
-                    valor = registro.dv,
-                    onValueChange = {
-                        desbloquearValidacionPaso()
-                        viewModel.actualizarDv(it)
-                    },
-                    etiqueta = "DV",
-                    modifier = Modifier.weight(0.35f)
-                )
-            }
-            if (intentoContinuar) TextoErrorCampo(errorRun ?: errorDv)
+                IndicadorPasos(pasoActual = 1, totalPasos = 4)
+                EncabezadoPantalla(titulo = "Crear cuenta", subtitulo = "Datos personales")
 
-            CampoContrabajo(
-                valor = registro.telefono,
-                onValueChange = {
-                    desbloquearValidacionPaso()
-                    viewModel.actualizarTelefono(it)
-                },
-                etiqueta = "Telefono (+56)",
-                visualTransformation = FormatoTelefonoVisualTransformation
-            )
-            if (intentoContinuar) TextoErrorCampo(errorTelefono)
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ComboRegistro(
-                    etiqueta = "Dia",
-                    valor = diaSeleccionado.toString(),
-                    opciones = (1..31).map { it.toString() },
-                    modifier = Modifier.weight(0.30f)
-                ) { seleccionado ->
-                    desbloquearValidacionPaso()
-                    diaSeleccionado = seleccionado.toIntOrNull() ?: diaSeleccionado
-                    actualizarFechaDesdePartes()
-                }
-                ComboRegistro(
-                    etiqueta = "Mes",
-                    valor = mesLabel(mesSeleccionado),
-                    opciones = (1..12).map { mesLabel(it) },
-                    modifier = Modifier.weight(0.42f)
-                ) { seleccionado ->
-                    desbloquearValidacionPaso()
-                    mesSeleccionado = (1..12).firstOrNull { mesLabel(it) == seleccionado } ?: mesSeleccionado
-                    actualizarFechaDesdePartes()
-                }
                 CampoContrabajo(
-                    valor = anioInput,
+                    valor = registro.nombre,
                     onValueChange = {
                         desbloquearValidacionPaso()
-                        anioInput = it.filter { c -> c.isDigit() }.take(4)
+                        viewModel.actualizarNombre(it)
+                    },
+                    etiqueta = "Nombre"
+                )
+                if (intentoContinuar) TextoErrorCampo(errorNombre)
+
+                CampoContrabajo(
+                    valor = registro.apellidoPaterno,
+                    onValueChange = {
+                        desbloquearValidacionPaso()
+                        viewModel.actualizarApellidoPaterno(it)
+                    },
+                    etiqueta = "Apellido paterno"
+                )
+                if (intentoContinuar) TextoErrorCampo(errorApellidoPaterno)
+
+                CampoContrabajo(
+                    valor = registro.apellidoMaterno,
+                    onValueChange = {
+                        desbloquearValidacionPaso()
+                        viewModel.actualizarApellidoMaterno(it)
+                    },
+                    etiqueta = "Apellido materno"
+                )
+                if (intentoContinuar) TextoErrorCampo(if (registro.apellidoMaterno.isBlank()) "Ingresa tu apellido materno" else null)
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CampoContrabajo(
+                        valor = registro.run,
+                        onValueChange = {
+                            desbloquearValidacionPaso()
+                            viewModel.actualizarRun(it)
+                        },
+                        etiqueta = "RUN",
+                        modifier = Modifier.weight(1f),
+                        visualTransformation = FormatoRunVisualTransformation
+                    )
+                    Text(
+                        text = "-",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(0.08f)
+                    )
+                    CampoContrabajo(
+                        valor = registro.dv,
+                        onValueChange = {
+                            desbloquearValidacionPaso()
+                            viewModel.actualizarDv(it)
+                        },
+                        etiqueta = "DV",
+                        modifier = Modifier.weight(0.35f)
+                    )
+                }
+                if (intentoContinuar) TextoErrorCampo(errorRun ?: errorDv)
+
+                CampoContrabajo(
+                    valor = registro.telefono,
+                    onValueChange = {
+                        desbloquearValidacionPaso()
+                        viewModel.actualizarTelefono(it)
+                    },
+                    etiqueta = "Telefono (+56)",
+                    visualTransformation = FormatoTelefonoVisualTransformation
+                )
+                if (intentoContinuar) TextoErrorCampo(errorTelefono)
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ComboRegistro(
+                        etiqueta = "Dia",
+                        valor = diaSeleccionado.toString(),
+                        opciones = (1..31).map { it.toString() },
+                        modifier = Modifier.weight(0.30f)
+                    ) { seleccionado ->
+                        desbloquearValidacionPaso()
+                        diaSeleccionado = seleccionado.toIntOrNull() ?: diaSeleccionado
                         actualizarFechaDesdePartes()
-                    },
-                    etiqueta = "Año",
-                    modifier = Modifier.weight(0.28f)
-                )
+                    }
+                    ComboRegistro(
+                        etiqueta = "Mes",
+                        valor = mesLabel(mesSeleccionado),
+                        opciones = (1..12).map { mesLabel(it) },
+                        modifier = Modifier.weight(0.42f)
+                    ) { seleccionado ->
+                        desbloquearValidacionPaso()
+                        mesSeleccionado = (1..12).firstOrNull { mesLabel(it) == seleccionado } ?: mesSeleccionado
+                        actualizarFechaDesdePartes()
+                    }
+                    CampoContrabajo(
+                        valor = anioInput,
+                        onValueChange = {
+                            desbloquearValidacionPaso()
+                            anioInput = it.filter { c -> c.isDigit() }.take(4)
+                            actualizarFechaDesdePartes()
+                        },
+                        etiqueta = "Año",
+                        modifier = Modifier.weight(0.28f)
+                    )
+                }
+                if (intentoContinuar) TextoErrorCampo(errorFecha)
             }
-            if (intentoContinuar) TextoErrorCampo(errorFecha)
-
-            Spacer(modifier = Modifier.weight(1f))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -298,6 +306,7 @@ fun PantallaRegistroPasoDireccion(
 ) {
     val registro = viewModel.uiState.registro
     val context = LocalContext.current
+    val scrollPasoDireccion = rememberScrollState()
     var desplegarComunas by rememberSaveable { mutableStateOf(false) }
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
@@ -367,98 +376,105 @@ fun PantallaRegistroPasoDireccion(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             llenarAlto = true
         ) {
-            IndicadorPasos(pasoActual = 2, totalPasos = 3)
-            EncabezadoPantalla(titulo = "Crear cuenta", subtitulo = "Direccion (opcional)")
-
-            OutlinedTextField(
-                value = "Region Metropolitana",
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Region") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            ExposedDropdownMenuBox(
-                expanded = desplegarComunas,
-                onExpandedChange = { desplegarComunas = !desplegarComunas }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(scrollPasoDireccion),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                IndicadorPasos(pasoActual = 2, totalPasos = 4)
+                EncabezadoPantalla(titulo = "Crear cuenta", subtitulo = "Direccion (opcional)")
+
                 OutlinedTextField(
-                    value = registro.comuna.ifBlank { "Seleccionar comuna" },
+                    value = "Region Metropolitana",
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Comuna") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegarComunas) },
+                    label = { Text("Region") },
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                DropdownMenu(
+
+                ExposedDropdownMenuBox(
                     expanded = desplegarComunas,
-                    onDismissRequest = { desplegarComunas = false }
+                    onExpandedChange = { desplegarComunas = !desplegarComunas }
                 ) {
-                    COMUNAS_REGION_METROPOLITANA.forEach { comuna ->
-                        DropdownMenuItem(
-                            text = { Text(comuna) },
-                            onClick = {
-                                viewModel.actualizarComuna(comuna)
-                                desplegarComunas = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                CampoContrabajo(
-                    valor = registro.calle,
-                    onValueChange = viewModel::actualizarCalle,
-                    etiqueta = "Calle",
-                    modifier = Modifier.weight(1f)
-                )
-                CampoContrabajo(
-                    valor = registro.numeroDireccion,
-                    onValueChange = viewModel::actualizarNumeroDireccion,
-                    etiqueta = "N°",
-                    modifier = Modifier.weight(0.33f)
-                )
-            }
-
-            BotonPrimario(
-                texto = "Obtener ubicacion actual",
-                onClick = {
-                    val tieneFine = ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.ACCESS_FINE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED
-                    val tieneCoarse = ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED
-                    if (tieneFine || tieneCoarse) {
-                        actualizarUbicacionReal()
-                    } else {
-                        solicitudPermisosLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
+                    OutlinedTextField(
+                        value = registro.comuna.ifBlank { "Seleccionar comuna" },
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Comuna") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegarComunas) },
+                        singleLine = true
+                    )
+                    DropdownMenu(
+                        expanded = desplegarComunas,
+                        onDismissRequest = { desplegarComunas = false }
+                    ) {
+                        COMUNAS_REGION_METROPOLITANA.forEach { comuna ->
+                            DropdownMenuItem(
+                                text = { Text(comuna) },
+                                onClick = {
+                                    viewModel.actualizarComuna(comuna)
+                                    desplegarComunas = false
+                                }
                             )
-                        )
+                        }
                     }
                 }
-            )
 
-            Text(
-                text = "La direccion es opcional. Si no la ingresas, usaremos datos genericos para continuar.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CampoContrabajo(
+                        valor = registro.calle,
+                        onValueChange = viewModel::actualizarCalle,
+                        etiqueta = "Calle",
+                        modifier = Modifier.weight(1f)
+                    )
+                    CampoContrabajo(
+                        valor = registro.numeroDireccion,
+                        onValueChange = viewModel::actualizarNumeroDireccion,
+                        etiqueta = "N°",
+                        modifier = Modifier.weight(0.33f)
+                    )
+                }
 
-            Spacer(modifier = Modifier.weight(1f))
+                BotonPrimario(
+                    texto = "Obtener ubicacion actual",
+                    onClick = {
+                        val tieneFine = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                        val tieneCoarse = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (tieneFine || tieneCoarse) {
+                            actualizarUbicacionReal()
+                        } else {
+                            solicitudPermisosLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        }
+                    }
+                )
+
+                Text(
+                    text = "La direccion es opcional. Si no la ingresas, usaremos datos genericos para continuar.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -482,10 +498,11 @@ fun PantallaRegistroPasoDireccion(
 fun PantallaRegistroPasoDos(
     viewModel: RegistroViewModel,
     onVolver: () -> Unit,
-    onRegistroExitoso: () -> Unit
+    onContinuar: () -> Unit
 ) {
     val uiState = viewModel.uiState
     val registro = uiState.registro
+    val scrollPasoDos = rememberScrollState()
     var intentoRegistro by rememberSaveable { mutableStateOf(false) }
 
     val errorUsername = if (registro.username.isBlank()) "Ingresa un nombre de usuario" else null
@@ -499,8 +516,138 @@ fun PantallaRegistroPasoDos(
         errorConfirmacion
     ).all { it == null }
 
+    PantallaBase(
+        scrollable = false,
+        mostrarFondo = false
+    ) {
+        EncabezadoRegistroAnimado()
+        TarjetaBase(
+            modifier = Modifier.weight(1f),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            llenarAlto = true
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(scrollPasoDos),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                IndicadorPasos(pasoActual = 3, totalPasos = 4)
+                EncabezadoPantalla(
+                    titulo = "Crear cuenta",
+                    subtitulo = "Datos de la cuenta"
+                )
+
+                CampoContrabajo(
+                    registro.username,
+                    onValueChange = {
+                        intentoRegistro = false
+                        viewModel.actualizarUsername(it)
+                    },
+                    etiqueta = "Nombre de usuario"
+                )
+                if (intentoRegistro) {
+                    TextoErrorCampo(errorUsername)
+                }
+
+                CampoContrabajo(
+                    registro.correo,
+                    onValueChange = {
+                        intentoRegistro = false
+                        viewModel.actualizarCorreo(it)
+                    },
+                    etiqueta = "Correo electronico"
+                )
+                if (intentoRegistro) {
+                    TextoErrorCampo(errorCorreo)
+                }
+
+                CampoSecretoContrabajo(
+                    valor = registro.contrasena,
+                    onValueChange = {
+                        intentoRegistro = false
+                        viewModel.actualizarContrasena(it)
+                    },
+                    etiqueta = "Contrasena"
+                )
+                if (intentoRegistro) {
+                    TextoErrorCampo(errorContrasena)
+                }
+
+                CampoSecretoContrabajo(
+                    valor = registro.confirmarContrasena,
+                    onValueChange = {
+                        intentoRegistro = false
+                        viewModel.actualizarConfirmarContrasena(it)
+                    },
+                    etiqueta = "Confirmar contrasena"
+                )
+                if (intentoRegistro) {
+                    TextoErrorCampo(errorConfirmacion)
+                }
+
+                if (uiState.error != null) {
+                    Text(
+                        text = uiState.error.orEmpty(),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                BotonSecundario(
+                    texto = "Volver",
+                    onClick = onVolver,
+                    modifier = Modifier.weight(1f)
+                )
+                BotonPrimario(
+                    texto = "Siguiente",
+                    enabled = formularioPasoTresValido,
+                    onClick = {
+                        intentoRegistro = true
+                        if (formularioPasoTresValido) {
+                            onContinuar()
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PantallaRegistroPasoSeguridad(
+    viewModel: RegistroViewModel,
+    onVolver: () -> Unit,
+    onRegistroExitoso: () -> Unit
+) {
+    val uiState = viewModel.uiState
+    val registro = uiState.registro
+    val scrollPasoSeguridad = rememberScrollState()
+    var intentoRegistro by rememberSaveable { mutableStateOf(false) }
+    val preguntasCatalogo = viewModel.preguntasSeguridadDisponibles()
+    val opcionesPreguntaDos = preguntasCatalogo.filter { it != registro.preguntaSeguridad1 || it == registro.preguntaSeguridad2 }
+
+    val errorPregunta1 = if (registro.preguntaSeguridad1.isBlank()) "Selecciona la primera pregunta" else null
+    val errorRespuesta1 = if (registro.respuestaSeguridad1.isBlank()) "Ingresa la respuesta 1" else null
+    val errorPregunta2 = when {
+        registro.preguntaSeguridad2.isBlank() -> "Selecciona la segunda pregunta"
+        registro.preguntaSeguridad2 == registro.preguntaSeguridad1 -> "Las preguntas deben ser distintas"
+        else -> null
+    }
+    val errorRespuesta2 = if (registro.respuestaSeguridad2.isBlank()) "Ingresa la respuesta 2" else null
+    val formularioValido = listOf(errorPregunta1, errorRespuesta1, errorPregunta2, errorRespuesta2).all { it == null }
+
     LaunchedEffect(uiState.registroExitoso) {
         if (uiState.registroExitoso) {
+            intentoRegistro = false
             onRegistroExitoso()
             viewModel.consumirRegistroExitoso()
         }
@@ -516,50 +663,69 @@ fun PantallaRegistroPasoDos(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             llenarAlto = true
         ) {
-            IndicadorPasos(pasoActual = 3, totalPasos = 3)
-            EncabezadoPantalla(
-                titulo = "Crear cuenta",
-                subtitulo = "Datos de la cuenta"
-            )
-
-            CampoContrabajo(registro.username, viewModel::actualizarUsername, "Nombre de usuario")
-            if (intentoRegistro || registro.username.isNotBlank()) {
-                TextoErrorCampo(errorUsername)
-            }
-
-            CampoContrabajo(registro.correo, viewModel::actualizarCorreo, "Correo electronico")
-            if (intentoRegistro || registro.correo.isNotBlank()) {
-                TextoErrorCampo(errorCorreo)
-            }
-
-            CampoSecretoContrabajo(
-                valor = registro.contrasena,
-                onValueChange = viewModel::actualizarContrasena,
-                etiqueta = "Contrasena"
-            )
-            if (intentoRegistro || registro.contrasena.isNotBlank()) {
-                TextoErrorCampo(errorContrasena)
-            }
-
-            CampoSecretoContrabajo(
-                valor = registro.confirmarContrasena,
-                onValueChange = viewModel::actualizarConfirmarContrasena,
-                etiqueta = "Confirmar contrasena"
-            )
-            if (intentoRegistro || registro.confirmarContrasena.isNotBlank()) {
-                TextoErrorCampo(errorConfirmacion)
-            }
-
-            if (uiState.error != null) {
-                Text(
-                    text = uiState.error.orEmpty(),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(scrollPasoSeguridad),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                IndicadorPasos(pasoActual = 4, totalPasos = 4)
+                EncabezadoPantalla(
+                    titulo = "Crear cuenta",
+                    subtitulo = "Preguntas de seguridad"
                 )
+
+                ComboRegistro(
+                    etiqueta = "Pregunta 1",
+                    valor = registro.preguntaSeguridad1.ifBlank { "Seleccionar pregunta" },
+                    opciones = preguntasCatalogo
+                ) {
+                    intentoRegistro = false
+                    viewModel.actualizarPreguntaSeguridad1(it)
+                }
+                if (intentoRegistro) TextoErrorCampo(errorPregunta1)
+
+                CampoSecretoContrabajo(
+                    valor = registro.respuestaSeguridad1,
+                    onValueChange = {
+                        intentoRegistro = false
+                        viewModel.actualizarRespuestaSeguridad1(it)
+                    },
+                    etiqueta = "Respuesta 1"
+                )
+                if (intentoRegistro) TextoErrorCampo(errorRespuesta1)
+
+                ComboRegistro(
+                    etiqueta = "Pregunta 2",
+                    valor = registro.preguntaSeguridad2.ifBlank { "Seleccionar pregunta" },
+                    opciones = opcionesPreguntaDos
+                ) {
+                    intentoRegistro = false
+                    viewModel.actualizarPreguntaSeguridad2(it)
+                }
+                if (intentoRegistro) TextoErrorCampo(errorPregunta2)
+
+                CampoSecretoContrabajo(
+                    valor = registro.respuestaSeguridad2,
+                    onValueChange = {
+                        intentoRegistro = false
+                        viewModel.actualizarRespuestaSeguridad2(it)
+                    },
+                    etiqueta = "Respuesta 2"
+                )
+                if (intentoRegistro) TextoErrorCampo(errorRespuesta2)
+
+                if (uiState.error != null) {
+                    Text(
+                        text = uiState.error.orEmpty(),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -571,10 +737,10 @@ fun PantallaRegistroPasoDos(
                 )
                 BotonPrimario(
                     texto = "Registrarse",
-                    enabled = formularioPasoTresValido,
+                    enabled = formularioValido,
                     onClick = {
                         intentoRegistro = true
-                        if (formularioPasoTresValido) {
+                        if (formularioValido) {
                             viewModel.registrarUsuario()
                         }
                     },

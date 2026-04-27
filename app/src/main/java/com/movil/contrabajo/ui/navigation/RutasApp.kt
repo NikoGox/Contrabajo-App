@@ -6,6 +6,8 @@ sealed class RutasApp(val ruta: String) {
     data object RegistroPasoUno : RutasApp("registro_paso_uno")
     data object RegistroPasoDireccion : RutasApp("registro_paso_direccion")
     data object RegistroPasoDos : RutasApp("registro_paso_dos")
+    data object RegistroPasoSeguridad : RutasApp("registro_paso_seguridad")
+    data object RecuperarCuenta : RutasApp("recuperar_cuenta")
     data object PrincipalShell : RutasApp("principal_shell")
     data object Principal : RutasApp("principal")
     data object Chats : RutasApp("chats")
@@ -22,8 +24,9 @@ sealed class RutasApp(val ruta: String) {
     data object AjustesPreguntas : RutasApp("ajustes/seguridad/preguntas")
     data object AjustesCuenta : RutasApp("ajustes/cuenta")
     data object AjustesUbicacion : RutasApp("ajustes/ubicacion")
-    data object ServicioEditor : RutasApp("servicio_editor/{modo}") {
-        fun crearRuta(modo: String): String = "servicio_editor/$modo"
+    data object ValoracionesServicios : RutasApp("perfil/valoraciones")
+    data object ServicioEditor : RutasApp("servicio_editor/{modo}/{idOfertaServicio}") {
+        fun crearRuta(modo: String, idOfertaServicio: Long): String = "servicio_editor/$modo/$idOfertaServicio"
     }
     data object Servicio : RutasApp("servicio/{idOfertaServicio}") {
         fun crearRuta(idOfertaServicio: Long): String = "servicio/$idOfertaServicio"
