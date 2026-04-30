@@ -1,14 +1,25 @@
 package com.movil.contrabajo.ui.screens.autenticacion
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -32,6 +43,7 @@ fun PantallaLogin(
     viewModel: LoginViewModel
 ) {
     val uiState = viewModel.uiState
+    var menuAutorellenoAbierto by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(uiState.loginExitoso) {
         if (uiState.loginExitoso) {
@@ -43,6 +55,46 @@ fun PantallaLogin(
     PantallaBase(scrollable = false, mostrarFondo = false) {
         LogoContrabajo(modifier = Modifier.align(Alignment.CenterHorizontally), compacto = true)
         TarjetaBase {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box {
+                    IconButton(onClick = { menuAutorellenoAbierto = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "Autorrelleno demo"
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuAutorellenoAbierto,
+                        onDismissRequest = { menuAutorellenoAbierto = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Perfil cliente demo") },
+                            onClick = {
+                                menuAutorellenoAbierto = false
+                                viewModel.autocompletarPerfilDemo("cliente")
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Perfil trabajador demo") },
+                            onClick = {
+                                menuAutorellenoAbierto = false
+                                viewModel.autocompletarPerfilDemo("trabajador")
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Perfil moderador demo") },
+                            onClick = {
+                                menuAutorellenoAbierto = false
+                                viewModel.autocompletarPerfilDemo("moderador")
+                            }
+                        )
+                    }
+                }
+            }
             EncabezadoPantalla(
                 titulo = "Iniciar sesion",
                 subtitulo = "Accede a tu cuenta para ver publicaciones, mensajes y tu perfil de trabajo."

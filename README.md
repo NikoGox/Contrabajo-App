@@ -15,24 +15,25 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.6.0-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.7.0-Pre-Alpha
 
 
 
-> <br>• Se implementó edición real de servicios por id_oferta_servicio para evitar sobreescrituras incorrectas.
-> <br>• Se aplicó la regla de negocio 3/1 para trabajadores no premium: máximo 3 servicios y 1 activo.
-> <br>• Se bloqueó la activación de servicios cuando no hay cupo disponible (1/1 activo).
-> <br>• Se rediseñó Mis servicios con métricas operativas X/1 y Y/3 más mini listado por servicio.
-> <br>• Se reemplazó el switch de disponibilidad por estado En Curso cuando existe cita en EN_PROCESO.
-> <br>• Se agregó el 4º paso del registro con 2 preguntas de seguridad (sin repetición) y respuestas ocultables.
-> <br>• Se incorporó recuperación de cuenta por usuario/correo con validación de 2 respuestas y reset de contraseña.
-> <br>• Se ajustó el registro para evitar el flash de errores rojos al completar alta exitosa.
-> <br>• Se añadieron filtros de chats por categoría (contacto / trabajador) con modo combinado mostrando todos.
-> <br>• Se retiró el texto Expandir/Contraer en chat detalle, manteniendo interacción por flecha.
-> <br>• Se implementó modal de valoración al cerrar chat (1 a 5 estrellas + comentario opcional), una vez por chat.
-> <br>• Se habilitó pantalla de valoraciones por servicio incluyendo @usuario y fecha de finalización de cita.
-> <br>• Se estableció eliminación lógica de publicaciones para preservar trazabilidad de chats y valoraciones históricas.
-> <br>• Se añadió protección para cambiar preguntas de seguridad con biometría/credencial y fallback a contraseña de cuenta.
+> <br>• Se implementó el flujo de reportes desde detalle de servicio y chat detalle.
+> <br>• Se incorporó moderación parcial para desactivar o eliminar lógicamente servicios.
+> <br>• Se agregó edición de perfil limitada a correo, teléfono y foto.
+> <br>• Se creó el módulo local de reportes en SQLite con tipos, estados y trazabilidad.
+> <br>• Se agregaron vistas de lista y detalle de reporte para flujo moderador.
+> <br>• Se movió la acción de reportar al menú de 3 puntos en detalle de servicio.
+> <br>• Se estandarizó feedback de reportes con toasts de validación, éxito y error.
+> <br>• Se eliminó temporalmente el emblema visual de trabajador verificado en UI.
+> <br>• Se rediseñó la tarjeta de perfil con mejor jerarquía visual y rol por tipo de cuenta.
+> <br>• Se limitó la visibilidad de valoraciones solo a perfiles de trabajador/premium.
+> <br>• Se ajustó editar perfil para mostrar campos no editables en estado gris deshabilitado.
+> <br>• Se consolidó moderador con navbar reducido de 2 ítems: Perfil y Reportes.
+> <br>• Se sincronizó el navbar moderador y su estado inicial para evitar desalineaciones.
+> <br>• Se replicó en reportes el buscador animado con resplandor del marketplace.
+> <br>• Se recuperó acceso a ajustes desde reportes para habilitar cierre de sesión moderador.
 
 ---
 

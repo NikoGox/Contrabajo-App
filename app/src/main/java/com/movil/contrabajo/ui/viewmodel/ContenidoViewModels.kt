@@ -11,6 +11,8 @@ import com.movil.contrabajo.domain.model.CitaServicio
 import com.movil.contrabajo.data.repository.RepositorioChats
 import com.movil.contrabajo.data.repository.RepositorioOfertas
 import com.movil.contrabajo.data.repository.RepositorioPerfil
+import com.movil.contrabajo.data.repository.RepositorioReportes
+import com.movil.contrabajo.domain.model.AccionModeracion
 import com.movil.contrabajo.domain.model.ChatCita
 import com.movil.contrabajo.domain.model.EstadoCita
 import com.movil.contrabajo.domain.model.FotoServicioLocal
@@ -20,7 +22,9 @@ import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.domain.model.NotificacionMensajePendiente
 import com.movil.contrabajo.domain.model.PrecioUtils
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
+import com.movil.contrabajo.domain.model.Reporte
 import com.movil.contrabajo.domain.model.EscalaRango
+import com.movil.contrabajo.domain.model.TipoReporte
 import com.movil.contrabajo.domain.model.TipoPrecio
 import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
@@ -544,6 +548,10 @@ data class PerfilUiState(
     val preguntasSeguridad: List<PreguntaSeguridadConfig> = emptyList(),
     val errorPreguntasSeguridad: String? = null,
     val mensajePreguntasSeguridad: String? = null,
+    val correoPerfilInput: String = "",
+    val telefonoPerfilInput: String = "",
+    val errorPerfilEdicion: String? = null,
+    val mensajePerfilEdicion: String? = null,
     val errorVerificacion: String? = null,
     val mensajeVerificacion: String? = null,
     val cargandoPantalla: Boolean = false
@@ -583,6 +591,8 @@ class PerfilViewModel(
             formularioServicio = formularioServicio,
             runVerificacion = if (uiState.runVerificacion.isBlank()) usuario?.run.orEmpty() else uiState.runVerificacion,
             dvVerificacion = if (uiState.dvVerificacion.isBlank()) usuario?.dv.orEmpty() else uiState.dvVerificacion,
+            correoPerfilInput = if (uiState.correoPerfilInput.isBlank()) usuario?.correo.orEmpty() else uiState.correoPerfilInput,
+            telefonoPerfilInput = if (uiState.telefonoPerfilInput.isBlank()) usuario?.telefono.orEmpty() else uiState.telefonoPerfilInput,
             preguntasSeguridad = repositorioPerfil.obtenerPreguntasSeguridad(),
             ubicacionAjustes = repositorioPerfil.obtenerUbicacionAjustes()
         )
@@ -978,6 +988,54 @@ class PerfilViewModel(
         }
     }
 
+    fun actualizarCorreoPerfil(valor: String) {
+        uiState = uiState.copy(
+            correoPerfilInput = valor,
+            errorPerfilEdicion = null,
+            mensajePerfilEdicion = null
+        )
+    }
+
+    fun actualizarTelefonoPerfil(valor: String) {
+        uiState = uiState.copy(
+            telefonoPerfilInput = valor,
+            errorPerfilEdicion = null,
+            mensajePerfilEdicion = null
+        )
+    }
+
+    fun guardarEdicionPerfil() {
+        viewModelScope.launch {
+            uiState = uiState.copy(cargandoPantalla = true)
+            delay(180)
+            repositorioPerfil.actualizarContactoPerfil(
+                correo = uiState.correoPerfilInput,
+                telefono = uiState.telefonoPerfilInput
+            ).onSuccess { usuarioActualizado ->
+                uiState = uiState.copy(
+                    usuario = usuarioActualizado,
+                    correoPerfilInput = usuarioActualizado.correo,
+                    telefonoPerfilInput = usuarioActualizado.telefono,
+                    errorPerfilEdicion = null,
+                    mensajePerfilEdicion = "Perfil actualizado correctamente."
+                )
+            }.onFailure {
+                uiState = uiState.copy(
+                    errorPerfilEdicion = it.message ?: "No se pudo actualizar el perfil",
+                    mensajePerfilEdicion = null
+                )
+            }
+            uiState = uiState.copy(cargandoPantalla = false)
+        }
+    }
+
+    fun limpiarMensajesPerfilEdicion() {
+        uiState = uiState.copy(
+            errorPerfilEdicion = null,
+            mensajePerfilEdicion = null
+        )
+    }
+
     fun solicitarVerificacionTrabajador() {
         if (uiState.runVerificacion.length != 8) {
             uiState = uiState.copy(errorVerificacion = "El RUN debe tener 8 digitos")
@@ -999,7 +1057,7 @@ class PerfilViewModel(
             uiState = uiState.copy(
                 usuario = usuarioActualizado,
                 errorVerificacion = null,
-                mensajeVerificacion = "Solicitud enviada. En 3 minutos tu perfil se validara automaticamente."
+                mensajeVerificacion = "Cuenta verificada. Tu perfil ahora esta habilitado como trabajador."
             )
         }.onFailure {
             uiState = uiState.copy(
@@ -1049,6 +1107,148 @@ class PerfilViewModel(
 
     private fun String.valorUbicacionPorDefecto(defecto: String): String {
         return trim().ifBlank { defecto }
+    }
+}
+
+data class ReportesUiState(
+    val tiposReporte: List<TipoReporte> = emptyList(),
+    val reportes: List<Reporte> = emptyList(),
+    val reporteActivo: Reporte? = null,
+    val busqueda: String = "",
+    val filtroTipoReporteId: Long? = null,
+    val filtroEstadoRevision: String? = null,
+    val ordenarRecientes: Boolean = true,
+    val cargando: Boolean = false,
+    val mensajeSistema: String? = null,
+    val error: String? = null
+)
+
+class ReportesViewModel(
+    private val repositorioReportes: RepositorioReportes
+) : ViewModel() {
+    var uiState by mutableStateOf(ReportesUiState())
+        private set
+
+    init {
+        recargar()
+    }
+
+    fun recargar() {
+        uiState = uiState.copy(
+            tiposReporte = repositorioReportes.obtenerTiposReporte(),
+            reportes = repositorioReportes.obtenerReportesModeracion(
+                busqueda = uiState.busqueda,
+                idTipoReporte = uiState.filtroTipoReporteId,
+                estadoRevision = uiState.filtroEstadoRevision,
+                ordenarRecientes = uiState.ordenarRecientes
+            )
+        )
+    }
+
+    fun actualizarBusqueda(valor: String) {
+        uiState = uiState.copy(busqueda = valor, error = null)
+        recargar()
+    }
+
+    fun actualizarFiltroTipo(idTipo: Long?) {
+        uiState = uiState.copy(filtroTipoReporteId = idTipo, error = null)
+        recargar()
+    }
+
+    fun actualizarFiltroEstado(estado: String?) {
+        uiState = uiState.copy(filtroEstadoRevision = estado, error = null)
+        recargar()
+    }
+
+    fun actualizarOrdenRecientes(recientes: Boolean) {
+        uiState = uiState.copy(ordenarRecientes = recientes)
+        recargar()
+    }
+
+    fun abrirDetalle(idReporte: Long) {
+        val detalle = repositorioReportes.obtenerDetalleReporte(idReporte)
+        if (detalle == null) {
+            uiState = uiState.copy(error = "No se pudo cargar el detalle del reporte")
+            return
+        }
+        uiState = uiState.copy(reporteActivo = detalle, error = null)
+    }
+
+    fun cerrarDetalle() {
+        uiState = uiState.copy(reporteActivo = null)
+    }
+
+    fun crearReporteDesdeOferta(
+        idOfertaServicio: Long,
+        idTipoReporte: Long,
+        comentario: String
+    ): Result<Reporte> {
+        val resultado = repositorioReportes.crearReporteDesdeOferta(
+            idOfertaServicio = idOfertaServicio,
+            idTipoReporte = idTipoReporte,
+            comentario = comentario
+        )
+        resultado.onSuccess {
+            uiState = uiState.copy(
+                mensajeSistema = "Reporte enviado correctamente.",
+                error = null
+            )
+            recargar()
+        }.onFailure {
+            uiState = uiState.copy(error = it.message ?: "No se pudo enviar el reporte")
+        }
+        return resultado
+    }
+
+    fun crearReporteDesdeChat(
+        idChatCita: Long,
+        idTipoReporte: Long,
+        comentario: String
+    ): Result<Reporte> {
+        val resultado = repositorioReportes.crearReporteDesdeChat(
+            idChatCita = idChatCita,
+            idTipoReporte = idTipoReporte,
+            comentario = comentario
+        )
+        resultado.onSuccess {
+            uiState = uiState.copy(
+                mensajeSistema = "Reporte enviado correctamente.",
+                error = null
+            )
+            recargar()
+        }.onFailure {
+            uiState = uiState.copy(error = it.message ?: "No se pudo enviar el reporte")
+        }
+        return resultado
+    }
+
+    fun aplicarMedidaModeracion(idReporte: Long, accion: String) {
+        viewModelScope.launch {
+            uiState = uiState.copy(cargando = true)
+            delay(120)
+            repositorioReportes.aplicarMedidaModeracion(idReporte, accion)
+                .onSuccess { actualizado ->
+                    val etiquetaAccion = when (accion) {
+                        AccionModeracion.DESACTIVAR_SERVICIO -> "Servicio desactivado y reporte resuelto."
+                        AccionModeracion.ELIMINAR_SERVICIO -> "Servicio eliminado logicamente y reporte resuelto."
+                        else -> "Reporte resuelto."
+                    }
+                    recargar()
+                    uiState = uiState.copy(
+                        reporteActivo = actualizado,
+                        mensajeSistema = etiquetaAccion,
+                        error = null
+                    )
+                }
+                .onFailure {
+                    uiState = uiState.copy(error = it.message ?: "No se pudo aplicar la medida")
+                }
+            uiState = uiState.copy(cargando = false)
+        }
+    }
+
+    fun consumirMensajes() {
+        uiState = uiState.copy(mensajeSistema = null, error = null)
     }
 }
 

@@ -2,6 +2,7 @@ package com.movil.contrabajo.ui.screens.chats
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +60,7 @@ import com.movil.contrabajo.ui.components.EtiquetaEstado
 import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaBase
 import com.movil.contrabajo.ui.viewmodel.ChatsViewModel
+import com.movil.contrabajo.ui.viewmodel.ReportesViewModel
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -70,6 +73,7 @@ import java.util.Locale
 fun PantallaDetalleChat(
     idChatCita: Long,
     viewModel: ChatsViewModel,
+    reportesViewModel: ReportesViewModel,
     onVolver: () -> Unit,
     onAbrirCita: (Long) -> Unit,
     onAbrirServicioAsociado: (Long) -> Unit,
@@ -77,6 +81,9 @@ fun PantallaDetalleChat(
 ) {
     LaunchedEffect(idChatCita) {
         viewModel.abrirChat(idChatCita)
+        if (reportesViewModel.uiState.tiposReporte.isEmpty()) {
+            reportesViewModel.recargar()
+        }
     }
 
     val uiState = viewModel.uiState
@@ -94,6 +101,10 @@ fun PantallaDetalleChat(
     var comentarioInput by rememberSaveable(chat?.idChatCita) { mutableStateOf("") }
     var mostrarErroresCita by rememberSaveable(chat?.idChatCita) { mutableStateOf(false) }
     var citaResumenExpandida by rememberSaveable(chat?.idChatCita) { mutableStateOf(false) }
+    var mostrarModalReporte by rememberSaveable(chat?.idChatCita) { mutableStateOf(false) }
+    var menuTipoReporteAbierto by rememberSaveable(chat?.idChatCita) { mutableStateOf(false) }
+    var idTipoReporteSeleccionado by rememberSaveable(chat?.idChatCita) { mutableStateOf<Long?>(null) }
+    var comentarioReporte by rememberSaveable(chat?.idChatCita) { mutableStateOf("") }
     val estadoListaMensajes = rememberLazyListState()
     val context = LocalContext.current
 
@@ -122,6 +133,7 @@ fun PantallaDetalleChat(
             menuAbierto = mostrarMenuOpciones,
             onCambiarMenu = { mostrarMenuOpciones = it },
             onFinalizarChat = { confirmarCerrarChat = true },
+            onReportarChat = { mostrarModalReporte = true },
             onAbrirServicioAsociado = {
                 val idOferta = chat?.idOfertaServicio
                 if (idOferta != null) onAbrirServicioAsociado(idOferta)
@@ -379,6 +391,86 @@ fun PantallaDetalleChat(
             )
         }
     }
+
+    if (mostrarModalReporte && chat != null) {
+        val tiposReporte = reportesViewModel.uiState.tiposReporte
+        val tipoSeleccionado = tiposReporte.firstOrNull { it.idTipoReporte == idTipoReporteSeleccionado }
+        AlertDialog(
+            onDismissRequest = { mostrarModalReporte = false },
+            title = { Text("Reportar contacto") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box {
+                        OutlinedButton(
+                            onClick = { menuTipoReporteAbierto = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(tipoSeleccionado?.nombre ?: "Selecciona tipo de reporte")
+                        }
+                        DropdownMenu(
+                            expanded = menuTipoReporteAbierto,
+                            onDismissRequest = { menuTipoReporteAbierto = false }
+                        ) {
+                            tiposReporte.forEach { tipo ->
+                                DropdownMenuItem(
+                                    text = { Text(tipo.nombre) },
+                                    onClick = {
+                                        idTipoReporteSeleccionado = tipo.idTipoReporte
+                                        menuTipoReporteAbierto = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = comentarioReporte,
+                        onValueChange = { comentarioReporte = it },
+                        label = { Text("Describe el incidente") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val idTipo = idTipoReporteSeleccionado
+                        if (idTipo == null || comentarioReporte.trim().isBlank()) {
+                            Toast.makeText(
+                                context,
+                                "Debes seleccionar un tipo y escribir la descripcion.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            return@TextButton
+                        }
+                        reportesViewModel.crearReporteDesdeChat(
+                            idChatCita = chat.idChatCita,
+                            idTipoReporte = idTipo,
+                            comentario = comentarioReporte
+                        ).onSuccess {
+                            Toast.makeText(context, "Reporte enviado correctamente.", Toast.LENGTH_SHORT).show()
+                            comentarioReporte = ""
+                            idTipoReporteSeleccionado = null
+                            mostrarModalReporte = false
+                        }.onFailure {
+                            Toast.makeText(
+                                context,
+                                it.message ?: "No se pudo enviar el reporte",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                ) {
+                    Text("Enviar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarModalReporte = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -388,6 +480,7 @@ private fun CabeceraChat(
     menuAbierto: Boolean,
     onCambiarMenu: (Boolean) -> Unit,
     onFinalizarChat: () -> Unit,
+    onReportarChat: () -> Unit,
     onAbrirServicioAsociado: () -> Unit
 ) {
     Row(
@@ -445,6 +538,13 @@ private fun CabeceraChat(
                     onClick = {
                         onCambiarMenu(false)
                         onFinalizarChat()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Reportar contacto") },
+                    onClick = {
+                        onCambiarMenu(false)
+                        onReportarChat()
                     }
                 )
             }

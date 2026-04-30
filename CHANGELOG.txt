@@ -1,3 +1,23 @@
+VERSION 0.7.0-Pre-Alpha
+───────
+├─• Se implementó el flujo de reportes desde detalle de servicio y chat detalle.
+├─• Se incorporó moderación parcial para desactivar o eliminar lógicamente servicios.
+├─• Se agregó edición de perfil limitada a correo, teléfono y foto.
+├─• Se creó el módulo local de reportes en SQLite con tipos, estados y trazabilidad.
+├─• Se agregaron vistas de lista y detalle de reporte para flujo moderador.
+├─• Se movió la acción de reportar al menú de 3 puntos en detalle de servicio.
+├─• Se estandarizó feedback de reportes con toasts de validación, éxito y error.
+├─• Se eliminó temporalmente el emblema visual de trabajador verificado en UI.
+├─• Se rediseñó la tarjeta de perfil con mejor jerarquía visual y rol por tipo de cuenta.
+├─• Se limitó la visibilidad de valoraciones solo a perfiles de trabajador/premium.
+├─• Se ajustó editar perfil para mostrar campos no editables en estado gris deshabilitado.
+├─• Se consolidó moderador con navbar reducido de 2 ítems: Perfil y Reportes.
+├─• Se sincronizó el navbar moderador y su estado inicial para evitar desalineaciones.
+├─• Se replicó en reportes el buscador animado con resplandor del marketplace.
+└─• Se recuperó acceso a ajustes desde reportes para habilitar cierre de sesión moderador.
+
+
+
 VERSION 0.6.0-Pre-Alpha
 ───────
 ├─• Se implementó edición real de servicios por id_oferta_servicio para evitar sobreescrituras incorrectas.

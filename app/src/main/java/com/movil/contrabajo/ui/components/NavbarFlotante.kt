@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.ChatBubble
 import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -58,6 +59,7 @@ val PaddingNavbarFlotante = PaddingValues(bottom = 112.dp)
 fun ContenedorConNavbarFlotante(
     actual: String,
     alNavegar: (String) -> Unit,
+    modoModerador: Boolean = false,
     modifier: Modifier = Modifier,
     content: @Composable (PaddingValues) -> Unit
 ) {
@@ -66,6 +68,7 @@ fun ContenedorConNavbarFlotante(
         NavbarFlotante(
             actual = actual,
             alNavegar = alNavegar,
+            modoModerador = modoModerador,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .zIndex(2f)
@@ -77,13 +80,21 @@ fun ContenedorConNavbarFlotante(
 fun NavbarFlotante(
     actual: String,
     alNavegar: (String) -> Unit,
+    modoModerador: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val items = listOf(
-        ItemNavbar(RutasApp.Perfil.ruta, "Perfil", Icons.Outlined.AccountCircle),
-        ItemNavbar(RutasApp.Principal.ruta, "Marketplace", Icons.Outlined.Storefront),
-        ItemNavbar(RutasApp.Chats.ruta, "Mensajes", Icons.Outlined.ChatBubble)
-    )
+    val items = if (modoModerador) {
+        listOf(
+            ItemNavbar(RutasApp.Perfil.ruta, "Perfil", Icons.Outlined.AccountCircle),
+            ItemNavbar(RutasApp.ReportesModerador.ruta, "Reportes", Icons.Outlined.WarningAmber)
+        )
+    } else {
+        listOf(
+            ItemNavbar(RutasApp.Perfil.ruta, "Perfil", Icons.Outlined.AccountCircle),
+            ItemNavbar(RutasApp.Principal.ruta, "Marketplace", Icons.Outlined.Storefront),
+            ItemNavbar(RutasApp.Chats.ruta, "Mensajes", Icons.Outlined.ChatBubble)
+        )
+    }
     val indiceSeleccionado = items.indexOfFirst { it.ruta == actual }.coerceAtLeast(0)
 
     Box(

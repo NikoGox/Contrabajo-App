@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.rounded.Star
@@ -303,7 +302,9 @@ fun CampoContrabajo(
     onValueChange: (String) -> Unit,
     etiqueta: String,
     modifier: Modifier = Modifier,
-    visualTransformation: VisualTransformation = VisualTransformation.None
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    readOnly: Boolean = false,
+    enabled: Boolean = true
 ) {
     OutlinedTextField(
         value = valor,
@@ -315,10 +316,16 @@ fun CampoContrabajo(
         colors = OutlinedTextFieldDefaults.colors(
             unfocusedContainerColor = Color.White.copy(alpha = 0.92f),
             focusedContainerColor = Color.White,
+            disabledContainerColor = Color(0xFFF1F3F5),
             unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
-            focusedBorderColor = MaterialTheme.colorScheme.primary
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.28f),
+            disabledTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
         ),
-        singleLine = true
+        singleLine = true,
+        readOnly = readOnly,
+        enabled = enabled
     )
 }
 
@@ -653,14 +660,6 @@ fun TarjetaMarketplaceCompacta(
                         valor = oferta.puntuacionPromedio,
                         tamanoEstrella = 16.dp
                     )
-                    if (oferta.trabajadorVerificado) {
-                        Icon(
-                            imageVector = Icons.Filled.Verified,
-                            contentDescription = "Trabajador verificado",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
                 }
                 Text(
                     text = formatearFechaPublicacionCompacta(oferta.fechaPublicacion),

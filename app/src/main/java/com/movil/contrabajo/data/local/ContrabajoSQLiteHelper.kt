@@ -18,11 +18,14 @@ import com.movil.contrabajo.domain.model.NotificacionMensajePendiente
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.domain.model.PrecioUtils
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
+import com.movil.contrabajo.domain.model.Reporte
 import com.movil.contrabajo.domain.model.TipoPerfil
+import com.movil.contrabajo.domain.model.TipoReporte
 import com.movil.contrabajo.domain.model.TipoPrecio
 import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
 import com.movil.contrabajo.domain.model.Usuario
 import com.movil.contrabajo.domain.model.Valoracion
+import com.movil.contrabajo.domain.model.EstadoReporte
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.random.Random
@@ -161,6 +164,28 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "UNIQUE(id_chat_cita, id_cliente))"
         )
         db.execSQL(
+            "CREATE TABLE tipos_reporte (" +
+                "id_tipo_reporte INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "nombre TEXT NOT NULL UNIQUE," +
+                "descripcion TEXT NOT NULL DEFAULT '')"
+        )
+        db.execSQL(
+            "CREATE TABLE reportes (" +
+                "id_reporte INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "id_emisor INTEGER NOT NULL," +
+                "id_usuario_reportado INTEGER," +
+                "id_oferta_servicio INTEGER," +
+                "id_chat_cita INTEGER," +
+                "id_tipo_reporte INTEGER NOT NULL," +
+                "comentario TEXT NOT NULL," +
+                "fecha_creacion TEXT NOT NULL," +
+                "estado_revision TEXT NOT NULL DEFAULT 'PENDIENTE'," +
+                "id_moderador_revisor INTEGER," +
+                "fecha_revision TEXT," +
+                "medida_aplicada TEXT," +
+                "CHECK (id_usuario_reportado IS NOT NULL OR id_oferta_servicio IS NOT NULL))"
+        )
+        db.execSQL(
             "CREATE TABLE sesiones_locales (" +
                 "id_sesion_local INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "id_usuario INTEGER NOT NULL," +
@@ -225,6 +250,7 @@ class ContrabajoSQLiteHelper(context: Context) :
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         listOf(
             "filtros_marketplace", "ubicaciones_usuario", "preguntas_seguridad", "configuraciones_app", "sesiones_locales", "valoraciones", "mensajes_chat",
+            "reportes", "tipos_reporte",
             "citas_servicio", "chats_cita", "ofertas_servicio", "fotos", "direcciones", "coordenadas",
             "estados", "categorias_servicio", "usuarios"
         ).forEach { db.execSQL("DROP TABLE IF EXISTS $it") }
@@ -298,6 +324,129 @@ class ContrabajoSQLiteHelper(context: Context) :
             "id_usuario = ?",
             arrayOf(idUsuario.toString())
         )
+    }
+
+    fun actualizarPerfilContactoUsuario(
+        idUsuario: Long,
+        correo: String,
+        telefono: String
+    ) {
+        writableDatabase.update(
+            "usuarios",
+            ContentValues().apply {
+                put("correo", correo.trim())
+                put("telefono", telefono.trim())
+            },
+            "id_usuario = ?",
+            arrayOf(idUsuario.toString())
+        )
+    }
+
+    fun existeCorreoEnOtroUsuario(correo: String, idUsuarioExcluir: Long): Boolean {
+        readableDatabase.rawQuery(
+            "SELECT id_usuario FROM usuarios WHERE correo = ? AND id_usuario <> ? LIMIT 1",
+            arrayOf(correo.trim(), idUsuarioExcluir.toString())
+        ).use { cursor ->
+            return cursor.moveToFirst()
+        }
+    }
+
+    fun obtenerTiposReporte(): List<TipoReporte> {
+        readableDatabase.rawQuery(
+            "SELECT * FROM tipos_reporte ORDER BY nombre ASC",
+            emptyArray()
+        ).use { cursor ->
+            val tipos = mutableListOf<TipoReporte>()
+            while (cursor.moveToNext()) tipos += cursor.toTipoReporte()
+            return tipos
+        }
+    }
+
+    fun insertarReporte(
+        idEmisor: Long,
+        idUsuarioReportado: Long?,
+        idOfertaServicio: Long?,
+        idChatCita: Long?,
+        idTipoReporte: Long,
+        comentario: String
+    ): Long {
+        return writableDatabase.insert("reportes", null, ContentValues().apply {
+            put("id_emisor", idEmisor)
+            if (idUsuarioReportado == null) putNull("id_usuario_reportado") else put("id_usuario_reportado", idUsuarioReportado)
+            if (idOfertaServicio == null) putNull("id_oferta_servicio") else put("id_oferta_servicio", idOfertaServicio)
+            if (idChatCita == null) putNull("id_chat_cita") else put("id_chat_cita", idChatCita)
+            put("id_tipo_reporte", idTipoReporte)
+            put("comentario", comentario.trim())
+            put("fecha_creacion", ahora())
+            put("estado_revision", EstadoReporte.PENDIENTE)
+            putNull("id_moderador_revisor")
+            putNull("fecha_revision")
+            putNull("medida_aplicada")
+        })
+    }
+
+    fun obtenerReportePorId(idReporte: Long): Reporte? {
+        readableDatabase.rawQuery(
+            consultaReportesSelect + consultaReportesJoins +
+                " WHERE r.id_reporte = ? LIMIT 1",
+            arrayOf(idReporte.toString())
+        ).use { cursor ->
+            return if (cursor.moveToFirst()) cursor.toReporte() else null
+        }
+    }
+
+    fun obtenerReportesModeracion(
+        busqueda: String = "",
+        idTipoReporte: Long? = null,
+        estadoRevision: String? = null,
+        ordenarRecientes: Boolean = true
+    ): List<Reporte> {
+        val where = mutableListOf<String>()
+        val args = mutableListOf<String>()
+        val busquedaLimpia = busqueda.trim()
+        if (busquedaLimpia.isNotBlank()) {
+            where += "(tr.nombre LIKE ? OR ur.username LIKE ? OR os.titulo LIKE ? OR r.comentario LIKE ?)"
+            val patron = "%$busquedaLimpia%"
+            repeat(4) { args += patron }
+        }
+        if (idTipoReporte != null) {
+            where += "r.id_tipo_reporte = ?"
+            args += idTipoReporte.toString()
+        }
+        if (!estadoRevision.isNullOrBlank()) {
+            where += "r.estado_revision = ?"
+            args += estadoRevision
+        }
+        val whereSql = if (where.isEmpty()) "" else " WHERE ${where.joinToString(" AND ")}"
+        val ordenSql = if (ordenarRecientes) " ORDER BY r.id_reporte DESC" else " ORDER BY r.id_reporte ASC"
+        readableDatabase.rawQuery(
+            consultaReportesSelect + consultaReportesJoins + whereSql + ordenSql,
+            args.toTypedArray()
+        ).use { cursor ->
+            val reportes = mutableListOf<Reporte>()
+            while (cursor.moveToNext()) reportes += cursor.toReporte()
+            return reportes
+        }
+    }
+
+    fun actualizarEstadoRevisionReporte(
+        idReporte: Long,
+        estadoRevision: String,
+        idModeradorRevisor: Long?,
+        medidaAplicada: String?
+    ): Boolean {
+        val actualizados = writableDatabase.update(
+            "reportes",
+            ContentValues().apply {
+                put("estado_revision", estadoRevision)
+                if (idModeradorRevisor == null) putNull("id_moderador_revisor") else put("id_moderador_revisor", idModeradorRevisor)
+                put("fecha_revision", ahora())
+                if (medidaAplicada.isNullOrBlank()) putNull("medida_aplicada") else put("medida_aplicada", medidaAplicada)
+            },
+            "id_reporte = ?",
+            arrayOf(idReporte.toString())
+        )
+        return actualizados > 0
     }
 
     fun existeUsuario(correo: String, username: String): Boolean {
@@ -405,8 +554,10 @@ class ContrabajoSQLiteHelper(context: Context) :
             "usuarios",
             ContentValues().apply {
                 put("numero_documento_identidad", documentoNormalizado)
-                put("verificacion_trabajador_pendiente", 1)
-                put("fecha_solicitud_verificacion_ms", System.currentTimeMillis())
+                put("verificacion_trabajador_pendiente", 0)
+                putNull("fecha_solicitud_verificacion_ms")
+                put("tipo_perfil", TipoPerfil.TRABAJADOR)
+                put("verificado", 1)
             },
             "id_usuario = ?",
             arrayOf(idUsuario.toString())
@@ -1150,6 +1301,15 @@ class ContrabajoSQLiteHelper(context: Context) :
         }
     }
 
+    fun obtenerUsuarioPorUsername(username: String): Usuario? {
+        readableDatabase.rawQuery(
+            "SELECT * FROM usuarios WHERE username = ? LIMIT 1",
+            arrayOf(username.trim())
+        ).use { cursor ->
+            return if (cursor.moveToFirst()) cursor.toUsuario() else null
+        }
+    }
+
     fun insertarValoracion(
         voto: Int,
         comentario: String,
@@ -1227,6 +1387,19 @@ class ContrabajoSQLiteHelper(context: Context) :
         )
         categoriasBase.forEach { nombre ->
             db.insert("categorias_servicio", null, ContentValues().apply { put("nombre", nombre) })
+        }
+        listOf(
+            "Servicio falso" to "Publicacion que ofrece un servicio inexistente o engañoso.",
+            "Falta de profesionalidad" to "Trato deficiente, incumplimiento de buenas practicas o conducta impropia.",
+            "Contenido inapropiado" to "Texto, imagen o mensajes ofensivos o fuera de norma.",
+            "Cobro abusivo o enganoso" to "Cobro no acordado, sobreprecio sin justificacion o informacion confusa.",
+            "Incumplimiento de horario" to "No respeta la fecha/hora pactada o no informa retrasos relevantes.",
+            "Suplantacion o perfil sospechoso" to "Identidad dudosa, datos inconsistentes o comportamiento fraudulento."
+        ).forEach { (nombre, descripcion) ->
+            db.insert("tipos_reporte", null, ContentValues().apply {
+                put("nombre", nombre)
+                put("descripcion", descripcion)
+            })
         }
 
         db.insert("coordenadas", null, ContentValues().apply {
@@ -1683,6 +1856,33 @@ class ContrabajoSQLiteHelper(context: Context) :
         fechaFinalizacionCita = getStringNullable("fecha_finalizacion_cita")
     )
 
+    private fun Cursor.toTipoReporte(): TipoReporte = TipoReporte(
+        idTipoReporte = getLong(getColumnIndexOrThrow("id_tipo_reporte")),
+        nombre = getString(getColumnIndexOrThrow("nombre")),
+        descripcion = getString(getColumnIndexOrThrow("descripcion"))
+    )
+
+    private fun Cursor.toReporte(): Reporte = Reporte(
+        idReporte = getLong(getColumnIndexOrThrow("id_reporte")),
+        idEmisor = getLong(getColumnIndexOrThrow("id_emisor")),
+        idUsuarioReportado = getLongNullable("id_usuario_reportado"),
+        idOfertaServicio = getLongNullable("id_oferta_servicio"),
+        idChatCita = getLongNullable("id_chat_cita"),
+        idTipoReporte = getLong(getColumnIndexOrThrow("id_tipo_reporte")),
+        comentario = getString(getColumnIndexOrThrow("comentario")),
+        fechaCreacion = getString(getColumnIndexOrThrow("fecha_creacion")),
+        estadoRevision = getString(getColumnIndexOrThrow("estado_revision")),
+        idModeradorRevisor = getLongNullable("id_moderador_revisor"),
+        fechaRevision = getStringNullable("fecha_revision"),
+        medidaAplicada = getStringNullable("medida_aplicada"),
+        tipoReporteNombre = getStringNullable("tipo_reporte_nombre").orEmpty(),
+        emisorUsername = getStringNullable("emisor_username").orEmpty(),
+        usuarioReportadoUsername = getStringNullable("usuario_reportado_username").orEmpty(),
+        usuarioReportadoNombre = getStringNullable("usuario_reportado_nombre").orEmpty(),
+        servicioTitulo = getStringNullable("servicio_titulo").orEmpty(),
+        servicioFotoUrl = getStringNullable("servicio_foto_url").orEmpty()
+    )
+
     private fun Cursor.getStringNullable(column: String): String? {
         val index = getColumnIndex(column)
         return if (index >= 0 && !isNull(index)) getString(index) else null
@@ -1705,7 +1905,7 @@ class ContrabajoSQLiteHelper(context: Context) :
 
     companion object {
         private const val DATABASE_NAME = "contrabajo_local.db"
-        private const val DATABASE_VERSION = 18
+        private const val DATABASE_VERSION = 19
         private const val SESION_EXPIRACION_MS = 30 * 60 * 1000L
         private const val VERIFICACION_TRABAJADOR_MS = 3 * 60 * 1000L
         private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
@@ -1744,6 +1944,21 @@ class ContrabajoSQLiteHelper(context: Context) :
                 "LEFT JOIN fotos f ON f.id_foto = o.id_foto_portada " +
                 "LEFT JOIN valoraciones v ON v.id_oferta_servicio = o.id_oferta_servicio "
         private val consultaOfertaGroupBy = " GROUP BY o.id_oferta_servicio"
+        private val consultaReportesSelect =
+            "SELECT r.*, " +
+                "tr.nombre AS tipo_reporte_nombre, " +
+                "ue.username AS emisor_username, " +
+                "ur.username AS usuario_reportado_username, " +
+                "TRIM(COALESCE(ur.nombre, '') || ' ' || COALESCE(ur.apellido_paterno, '')) AS usuario_reportado_nombre, " +
+                "COALESCE(os.titulo, '') AS servicio_titulo, " +
+                "COALESCE(f.enlace, '') AS servicio_foto_url "
+        private val consultaReportesJoins =
+            "FROM reportes r " +
+                "INNER JOIN tipos_reporte tr ON tr.id_tipo_reporte = r.id_tipo_reporte " +
+                "INNER JOIN usuarios ue ON ue.id_usuario = r.id_emisor " +
+                "LEFT JOIN usuarios ur ON ur.id_usuario = r.id_usuario_reportado " +
+                "LEFT JOIN ofertas_servicio os ON os.id_oferta_servicio = r.id_oferta_servicio " +
+                "LEFT JOIN fotos f ON f.id_foto = os.id_foto_portada "
 
         private fun ahora(minutosRestar: Long = 0): String =
             LocalDateTime.now().minusMinutes(minutosRestar).format(formatter)

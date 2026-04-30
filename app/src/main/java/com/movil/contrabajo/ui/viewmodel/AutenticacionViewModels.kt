@@ -80,6 +80,20 @@ class LoginViewModel(
             }
     }
 
+    fun autocompletarPerfilDemo(perfil: String) {
+        val (identificador, contrasena) = when (perfil) {
+            "trabajador" -> "jose@contrabajo.cl" to "123456"
+            "moderador" -> "moderador@contrabajo.cl" to "123456"
+            else -> "vale@contrabajo.cl" to "123456"
+        }
+        uiState = uiState.copy(
+            identificador = identificador,
+            contrasena = contrasena,
+            recordarme = true,
+            error = null
+        )
+    }
+
     fun consumirNavegacionExitosa() {
         uiState = uiState.copy(loginExitoso = false)
     }

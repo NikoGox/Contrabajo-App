@@ -10,4 +10,5 @@ class ProveedorRepositorios(context: Context) {
     val perfil: RepositorioPerfil = RepositorioPerfilLocal(db)
     val ofertas: RepositorioOfertas = RepositorioOfertasLocal(db)
     val chats: RepositorioChats = RepositorioChatsLocal(db)
+    val reportes: RepositorioReportes = RepositorioReportesLocal(db)
 }

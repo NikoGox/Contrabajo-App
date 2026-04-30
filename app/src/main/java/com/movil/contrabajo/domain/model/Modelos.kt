@@ -193,6 +193,44 @@ data class Valoracion(
     val fechaFinalizacionCita: String? = null
 )
 
+data class TipoReporte(
+    val idTipoReporte: Long = 0,
+    val nombre: String,
+    val descripcion: String
+)
+
+data class Reporte(
+    val idReporte: Long = 0,
+    val idEmisor: Long,
+    val idUsuarioReportado: Long? = null,
+    val idOfertaServicio: Long? = null,
+    val idChatCita: Long? = null,
+    val idTipoReporte: Long,
+    val comentario: String,
+    val fechaCreacion: String,
+    val estadoRevision: String = EstadoReporte.PENDIENTE,
+    val idModeradorRevisor: Long? = null,
+    val fechaRevision: String? = null,
+    val medidaAplicada: String? = null,
+    val tipoReporteNombre: String = "",
+    val emisorUsername: String = "",
+    val usuarioReportadoUsername: String = "",
+    val usuarioReportadoNombre: String = "",
+    val servicioTitulo: String = "",
+    val servicioFotoUrl: String = ""
+)
+
+object EstadoReporte {
+    const val PENDIENTE = "PENDIENTE"
+    const val EN_REVISION = "EN_REVISION"
+    const val RESUELTO = "RESUELTO"
+}
+
+object AccionModeracion {
+    const val DESACTIVAR_SERVICIO = "DESACTIVAR_SERVICIO"
+    const val ELIMINAR_SERVICIO = "ELIMINAR_SERVICIO"
+}
+
 data class SesionLocal(
     val idSesionLocal: Long = 0,
     val idUsuario: Long,

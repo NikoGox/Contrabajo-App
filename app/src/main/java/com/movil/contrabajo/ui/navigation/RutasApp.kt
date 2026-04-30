@@ -10,6 +10,10 @@ sealed class RutasApp(val ruta: String) {
     data object RecuperarCuenta : RutasApp("recuperar_cuenta")
     data object PrincipalShell : RutasApp("principal_shell")
     data object Principal : RutasApp("principal")
+    data object ReportesModerador : RutasApp("reportes_moderador")
+    data object ReporteDetalle : RutasApp("reporte_detalle/{idReporte}") {
+        fun crearRuta(idReporte: Long): String = "reporte_detalle/$idReporte"
+    }
     data object Chats : RutasApp("chats")
     data object ChatDetalle : RutasApp("chat_detalle/{idChatCita}") {
         fun crearRuta(idChatCita: Long): String = "chat_detalle/$idChatCita"
@@ -18,6 +22,7 @@ sealed class RutasApp(val ruta: String) {
         fun crearRuta(idChatCita: Long): String = "cita_detalle/$idChatCita"
     }
     data object Perfil : RutasApp("perfil")
+    data object PerfilEditar : RutasApp("perfil/editar")
     data object Ajustes : RutasApp("ajustes")
     data object AjustesSeguridad : RutasApp("ajustes/seguridad")
     data object AjustesVerificacion : RutasApp("ajustes/seguridad/verificacion")
@@ -36,6 +41,7 @@ sealed class RutasApp(val ruta: String) {
         private val rutasPrincipales = listOf(
             Perfil.ruta,
             Principal.ruta,
+            ReportesModerador.ruta,
             Chats.ruta
         )
 

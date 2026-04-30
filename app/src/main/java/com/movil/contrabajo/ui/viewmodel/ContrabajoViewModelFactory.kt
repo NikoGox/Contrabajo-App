@@ -41,6 +41,9 @@ class ContrabajoViewModelFactory(
                 repositorioPerfil = repositorios.perfil
             ) as T
 
+        modelClass.isAssignableFrom(ReportesViewModel::class.java) ->
+            ReportesViewModel(repositorioReportes = repositorios.reportes) as T
+
         else -> throw IllegalArgumentException("ViewModel no soportado: ${modelClass.name}")
     }
 }

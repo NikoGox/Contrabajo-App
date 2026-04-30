@@ -57,8 +57,11 @@ import com.movil.contrabajo.ui.screens.chats.PantallaCitaServicio
 import com.movil.contrabajo.ui.screens.chats.PantallaChats
 import com.movil.contrabajo.ui.screens.inicio.PantallaInicial
 import com.movil.contrabajo.ui.screens.perfil.PantallaPerfil
+import com.movil.contrabajo.ui.screens.perfil.PantallaEditarPerfil
 import com.movil.contrabajo.ui.screens.perfil.PantallaValoracionesServicios
 import com.movil.contrabajo.ui.screens.principal.PantallaPrincipal
+import com.movil.contrabajo.ui.screens.reportes.PantallaDetalleReporteModerador
+import com.movil.contrabajo.ui.screens.reportes.PantallaReportesModerador
 import com.movil.contrabajo.ui.screens.servicio.PantallaDetalleServicio
 import com.movil.contrabajo.ui.screens.servicio.PantallaEditorServicio
 import com.movil.contrabajo.ui.viewmodel.ChatsViewModel
@@ -69,6 +72,8 @@ import com.movil.contrabajo.ui.viewmodel.LoginViewModel
 import com.movil.contrabajo.ui.viewmodel.PerfilViewModel
 import com.movil.contrabajo.ui.viewmodel.PrincipalViewModel
 import com.movil.contrabajo.ui.viewmodel.RegistroViewModel
+import com.movil.contrabajo.ui.viewmodel.ReportesViewModel
+import com.movil.contrabajo.domain.model.TipoPerfil
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -87,6 +92,7 @@ fun ContrabajoApp(
     val principalViewModel: PrincipalViewModel = viewModel(factory = factory)
     val chatsViewModel: ChatsViewModel = viewModel(factory = factory)
     val perfilViewModel: PerfilViewModel = viewModel(factory = factory)
+    val reportesViewModel: ReportesViewModel = viewModel(factory = factory)
     val detalleServicioViewModel: DetalleServicioViewModel = viewModel(factory = factory)
     var mostrarCargaGlobal by rememberSaveable { mutableStateOf(false) }
     var mensajeCargaGlobal by rememberSaveable { mutableStateOf("Cargando...") }
@@ -124,6 +130,11 @@ fun ContrabajoApp(
                 mensajeCargaGlobal = "Cargando perfil..."
                 progresoCargaGlobal = 0.70f
                 perfilViewModel.recargar()
+
+                delay(80)
+                mensajeCargaGlobal = "Cargando reportes..."
+                progresoCargaGlobal = 0.78f
+                reportesViewModel.recargar()
 
                 delay(80)
                 mensajeCargaGlobal = "Preparando inicio..."
@@ -250,6 +261,7 @@ fun ContrabajoApp(
                     principalViewModel = principalViewModel,
                     chatsViewModel = chatsViewModel,
                     perfilViewModel = perfilViewModel,
+                    reportesViewModel = reportesViewModel,
                     onAbrirCrearServicio = {
                         navController.navigate(RutasApp.ServicioEditor.crearRuta("crear", 0L))
                     },
@@ -266,14 +278,37 @@ fun ContrabajoApp(
                     onAbrirValoraciones = {
                         navController.navigate(RutasApp.ValoracionesServicios.ruta)
                     },
+                    onAbrirEditarPerfil = {
+                        navController.navigate(RutasApp.PerfilEditar.ruta)
+                    },
+                    onAbrirDetalleReporte = { idReporte ->
+                        navController.navigate(RutasApp.ReporteDetalle.crearRuta(idReporte))
+                    },
                     onAbrirUbicacionRapida = {
                         navController.navigate(RutasApp.AjustesUbicacion.ruta)
                     }
                 )
             }
+            composable(RutasApp.PerfilEditar.ruta) {
+                PantallaEditarPerfil(
+                    viewModel = perfilViewModel,
+                    onVolver = { navController.popBackStack() }
+                )
+            }
             composable(RutasApp.ValoracionesServicios.ruta) {
                 PantallaValoracionesServicios(
                     viewModel = perfilViewModel,
+                    onVolver = { navController.popBackStack() }
+                )
+            }
+            composable(
+                route = RutasApp.ReporteDetalle.ruta,
+                arguments = listOf(navArgument("idReporte") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val idReporte = backStackEntry.arguments?.getLong("idReporte") ?: 0L
+                PantallaDetalleReporteModerador(
+                    idReporte = idReporte,
+                    viewModel = reportesViewModel,
                     onVolver = { navController.popBackStack() }
                 )
             }
@@ -331,6 +366,7 @@ fun ContrabajoApp(
                 PantallaDetalleChat(
                     idChatCita = idChat,
                     viewModel = chatsViewModel,
+                    reportesViewModel = reportesViewModel,
                     onVolver = { navController.popBackStack() },
                     onAbrirCita = { idChatCita ->
                         navController.navigate(RutasApp.CitaDetalle.crearRuta(idChatCita))
@@ -375,6 +411,7 @@ fun ContrabajoApp(
                 PantallaDetalleServicio(
                     idOfertaServicio = idOferta,
                     viewModel = detalleServicioViewModel,
+                    reportesViewModel = reportesViewModel,
                     onEditarServicio = { idOfertaServicio ->
                         navController.navigate(RutasApp.ServicioEditor.crearRuta("editar", idOfertaServicio))
                     },
@@ -399,25 +436,49 @@ private fun ShellPrincipal(
     principalViewModel: PrincipalViewModel,
     chatsViewModel: ChatsViewModel,
     perfilViewModel: PerfilViewModel,
+    reportesViewModel: ReportesViewModel,
     onAbrirCrearServicio: () -> Unit,
     onAbrirEditarServicio: (Long) -> Unit,
     onAbrirServicio: (Long) -> Unit,
     onAbrirChat: (Long) -> Unit,
     onAbrirAjustes: () -> Unit,
     onAbrirValoraciones: () -> Unit,
+    onAbrirEditarPerfil: () -> Unit,
+    onAbrirDetalleReporte: (Long) -> Unit,
     onAbrirUbicacionRapida: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var rutaContenido by rememberSaveable { mutableStateOf(RutasApp.Principal.ruta) }
+    val esModerador = perfilViewModel.uiState.usuario?.tipoPerfil == TipoPerfil.MODERADOR
+    var rutaContenido by rememberSaveable(esModerador) {
+        mutableStateOf(if (esModerador) RutasApp.ReportesModerador.ruta else RutasApp.Principal.ruta)
+    }
     var desplazamientoHorizontal by remember { mutableStateOf(0f) }
-    val rutasSwipe = remember { listOf(RutasApp.Perfil.ruta, RutasApp.Principal.ruta, RutasApp.Chats.ruta) }
+    val rutaCentral = if (esModerador) RutasApp.ReportesModerador.ruta else RutasApp.Principal.ruta
+    val rutasSwipe = remember(esModerador) {
+        if (esModerador) {
+            listOf(RutasApp.Perfil.ruta, RutasApp.ReportesModerador.ruta)
+        } else {
+            listOf(RutasApp.Perfil.ruta, rutaCentral, RutasApp.Chats.ruta)
+        }
+    }
+
+    LaunchedEffect(esModerador) {
+        if (rutaContenido == RutasApp.Principal.ruta && esModerador) {
+            rutaContenido = RutasApp.ReportesModerador.ruta
+        } else if (rutaContenido == RutasApp.Chats.ruta && esModerador) {
+            rutaContenido = RutasApp.ReportesModerador.ruta
+        } else if (rutaContenido == RutasApp.ReportesModerador.ruta && !esModerador) {
+            rutaContenido = RutasApp.Principal.ruta
+        }
+    }
 
     LaunchedEffect(rutaContenido) {
         when (rutaContenido) {
             RutasApp.Principal.ruta -> chatsViewModel.recargar()
             RutasApp.Chats.ruta -> chatsViewModel.recargar()
             RutasApp.Perfil.ruta -> perfilViewModel.recargar()
+            RutasApp.ReportesModerador.ruta -> reportesViewModel.recargar()
         }
     }
 
@@ -435,6 +496,7 @@ private fun ShellPrincipal(
                 rutaContenido = nuevaRuta
             }
         },
+        modoModerador = esModerador,
         modifier = modifier
     ) { innerPadding ->
         Box(
@@ -496,17 +558,27 @@ private fun ShellPrincipal(
                         modifier = Modifier.padding(innerPadding)
                     )
 
-                    RutasApp.Chats.ruta -> PantallaChats(
-                        viewModel = chatsViewModel,
-                        onAbrirChat = onAbrirChat,
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    RutasApp.Chats.ruta -> {
+                        PantallaChats(
+                            viewModel = chatsViewModel,
+                            onAbrirChat = onAbrirChat,
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
 
                     RutasApp.Perfil.ruta -> PantallaPerfil(
                         viewModel = perfilViewModel,
                         onAbrirCrearServicio = onAbrirCrearServicio,
                         onAbrirEditarServicio = onAbrirEditarServicio,
                         onAbrirValoraciones = onAbrirValoraciones,
+                        onEditarPerfil = onAbrirEditarPerfil,
+                        modifier = Modifier.padding(innerPadding)
+                    )
+
+                    RutasApp.ReportesModerador.ruta -> PantallaReportesModerador(
+                        viewModel = reportesViewModel,
+                        onAbrirDetalleReporte = onAbrirDetalleReporte,
+                        onAbrirAjustes = onAbrirAjustes,
                         modifier = Modifier.padding(innerPadding)
                     )
 

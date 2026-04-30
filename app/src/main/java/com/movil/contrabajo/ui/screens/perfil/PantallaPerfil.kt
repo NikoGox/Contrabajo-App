@@ -20,7 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -36,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -54,9 +54,13 @@ fun PantallaPerfil(
     onAbrirCrearServicio: () -> Unit,
     onAbrirEditarServicio: (Long) -> Unit,
     onAbrirValoraciones: () -> Unit,
+    onEditarPerfil: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState = viewModel.uiState
+    val usuario = uiState.usuario
+    val esModerador = usuario?.tipoPerfil == TipoPerfil.MODERADOR
+    val esTrabajador = usuario?.tipoPerfil == TipoPerfil.TRABAJADOR || usuario?.tipoPerfil == TipoPerfil.PREMIUM
     val context = LocalContext.current
     val serviciosActivos = uiState.ofertasPropias.count { it.disponible }
     val totalServicios = uiState.ofertasPropias.size
@@ -89,266 +93,338 @@ fun PantallaPerfil(
         mostrarFondo = false
     ) {
         TarjetaBase {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Box {
-                    Surface(
-                        modifier = Modifier.size(68.dp),
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                    ) {
-                        val fotoPerfil = uiState.usuario?.fotoPerfilUrl.orEmpty()
-                        if (fotoPerfil.isBlank()) {
-                            LogoContrabajo(compacto = true)
-                        } else {
-                            AsyncImage(
-                                model = fotoPerfil,
-                                contentDescription = "Foto de perfil",
-                                modifier = Modifier.fillMaxWidth(),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                    }
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(26.dp)
-                            .clickable { selectorFotoPerfilLauncher.launch(arrayOf("image/*")) },
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        color = MaterialTheme.colorScheme.primary
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Filled.PhotoCamera,
-                                contentDescription = "Cambiar foto de perfil",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (uiState.usuario == null) {
-                            "Mi perfil"
-                        } else {
-                            "${uiState.usuario.nombre} ${uiState.usuario.apellidoPaterno} ${uiState.usuario.apellidoMaterno}"
-                        },
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (uiState.usuario != null) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    Box {
+                        Surface(
+                            modifier = Modifier.size(98.dp),
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                         ) {
-                            Text(
-                                text = "@${uiState.usuario.username}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            if (uiState.usuario.verificado) {
+                            val fotoPerfil = usuario?.fotoPerfilUrl.orEmpty()
+                            if (fotoPerfil.isBlank()) {
+                                LogoContrabajo(compacto = true)
+                            } else {
+                                AsyncImage(
+                                    model = fotoPerfil,
+                                    contentDescription = "Foto de perfil",
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .size(30.dp)
+                                .clickable { selectorFotoPerfilLauncher.launch(arrayOf("image/*")) },
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = MaterialTheme.colorScheme.primary
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = Icons.Filled.Verified,
-                                    contentDescription = "Verificado",
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    imageVector = Icons.Filled.PhotoCamera,
+                                    contentDescription = "Cambiar foto de perfil",
+                                    tint = MaterialTheme.colorScheme.onPrimary,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
                     }
-                }
-                ValoracionPerfil(
-                    valor = promedioPerfil,
-                    onClick = onAbrirValoraciones
-                )
-            }
-        }
-
-        TarjetaBase {
-            Text(
-                text = "Mis servicios",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ResumenCupo(
-                    titulo = "Servicios disponibles",
-                    valor = "$serviciosActivos/${uiState.limiteServiciosActivos}",
-                    modifier = Modifier.weight(1f)
-                )
-                ResumenCupo(
-                    titulo = "Total de servicios",
-                    valor = "$totalServicios/${uiState.limiteServiciosTotales}",
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            if (uiState.ofertasPropias.isEmpty()) {
-                Text(
-                    text = if (uiState.usuario?.tipoPerfil == TipoPerfil.USUARIO_BASE) {
-                        "Tu perfil actual no puede publicar servicios aun."
-                    } else {
-                        "Aun no has creado tu primer servicio."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (uiState.usuario?.tipoPerfil != TipoPerfil.USUARIO_BASE) {
-                    BotonPrimario(
-                        texto = "Crear servicio",
-                        onClick = onAbrirCrearServicio
-                    )
-                }
-            } else {
-                if (totalServicios < uiState.limiteServiciosTotales) {
-                    OutlinedButton(
-                        onClick = onAbrirCrearServicio,
-                        modifier = Modifier.fillMaxWidth()
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                        Text(
+                            text = if (usuario == null) {
+                                "Mi perfil"
+                            } else {
+                                "${usuario.nombre} ${usuario.apellidoPaterno}"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Crear servicio")
-                    }
-                }
-
-                uiState.ofertasPropias.forEach { oferta ->
-                    val enCurso = uiState.idsOfertasEnCurso.contains(oferta.idOfertaServicio)
-                    val bloqueadoPorCupo = !oferta.disponible && serviciosActivos >= uiState.limiteServiciosActivos
-                    Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Surface(
-                                        modifier = Modifier
-                                            .size(72.dp)
-                                            .height(72.dp),
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.surface
-                                    ) {
-                                        if (oferta.fotoUrlReferencia.isBlank()) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Build,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(34.dp)
-                                                )
-                                            }
-                                        } else {
-                                            AsyncImage(
-                                                model = oferta.fotoUrlReferencia,
-                                                contentDescription = oferta.titulo,
-                                                modifier = Modifier.fillMaxWidth(),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        }
-                                    }
-                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                        Text(
-                                            text = oferta.titulo,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = oferta.precioTexto,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                                if (enCurso) {
-                                    EstadoServicioEnCurso()
-                                } else {
-                                    Switch(
-                                        checked = oferta.disponible,
-                                        onCheckedChange = { valor ->
-                                            viewModel.cambiarDisponibilidadServicioRapido(
-                                                idOfertaServicio = oferta.idOfertaServicio,
-                                                valor = valor
-                                            )
-                                        },
-                                        enabled = !bloqueadoPorCupo,
-                                        modifier = Modifier.alpha(if (bloqueadoPorCupo) 0.35f else 1f)
-                                    )
-                                }
-                            }
-
+                        if (usuario != null) {
                             Text(
-                                text = oferta.descripcion,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" },
+                                text = "@${usuario.username}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            OutlinedButton(
-                                onClick = { onAbrirEditarServicio(oferta.idOfertaServicio) },
-                                modifier = Modifier.fillMaxWidth()
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Edit,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+                                Text(
+                                    text = when (usuario.tipoPerfil) {
+                                        TipoPerfil.MODERADOR -> "Moderador"
+                                        TipoPerfil.TRABAJADOR, TipoPerfil.PREMIUM -> "Trabajador"
+                                        else -> "Cliente"
+                                    },
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Editar servicio")
                             }
                         }
                     }
                 }
 
-                if (serviciosActivos >= uiState.limiteServiciosActivos) {
-                    Text(
-                        text = "Es necesario tener cupo disponible para activar un servicio.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        InfoPerfilFila(
+                            etiqueta = "Correo",
+                            valor = usuario?.correo.orEmpty()
+                        )
+                        InfoPerfilFila(
+                            etiqueta = "Telefono",
+                            valor = usuario?.telefono.orEmpty()
+                        )
+                    }
+                }
+
+                if (esTrabajador) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onAbrirValoraciones() },
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Valoraciones",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            ValoracionPerfil(valor = promedioPerfil, onClick = onAbrirValoraciones)
+                        }
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = onEditarPerfil,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Editar perfil")
                 }
             }
+        }
 
-            if (uiState.errorServicio != null) {
+        if (!esModerador) {
+            TarjetaBase {
                 Text(
-                    text = uiState.errorServicio,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
+                    text = "Mis servicios",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
                 )
-            }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ResumenCupo(
+                        titulo = "Servicios disponibles",
+                        valor = "$serviciosActivos/${uiState.limiteServiciosActivos}",
+                        modifier = Modifier.weight(1f)
+                    )
+                    ResumenCupo(
+                        titulo = "Total de servicios",
+                        valor = "$totalServicios/${uiState.limiteServiciosTotales}",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
 
-            if (uiState.usuario?.tipoPerfil == TipoPerfil.USUARIO_BASE) {
-                EtiquetaEstado("Para verificarte ve a Ajustes > Seguridad y verificacion")
+                if (uiState.ofertasPropias.isEmpty()) {
+                    Text(
+                        text = if (uiState.usuario?.tipoPerfil == TipoPerfil.USUARIO_BASE) {
+                            "Tu perfil actual no puede publicar servicios aun."
+                        } else {
+                            "Aun no has creado tu primer servicio."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (uiState.usuario?.tipoPerfil != TipoPerfil.USUARIO_BASE) {
+                        BotonPrimario(
+                            texto = "Crear servicio",
+                            onClick = onAbrirCrearServicio
+                        )
+                    }
+                } else {
+                    if (totalServicios < uiState.limiteServiciosTotales) {
+                        OutlinedButton(
+                            onClick = onAbrirCrearServicio,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Crear servicio")
+                        }
+                    }
+
+                    uiState.ofertasPropias.forEach { oferta ->
+                        val enCurso = uiState.idsOfertasEnCurso.contains(oferta.idOfertaServicio)
+                        val bloqueadoPorCupo = !oferta.disponible && serviciosActivos >= uiState.limiteServiciosActivos
+                        Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Surface(
+                                            modifier = Modifier
+                                                .size(72.dp)
+                                                .height(72.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.surface
+                                        ) {
+                                            if (oferta.fotoUrlReferencia.isBlank()) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Build,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(34.dp)
+                                                    )
+                                                }
+                                            } else {
+                                                AsyncImage(
+                                                    model = oferta.fotoUrlReferencia,
+                                                    contentDescription = oferta.titulo,
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            }
+                                        }
+                                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                            Text(
+                                                text = oferta.titulo,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            Text(
+                                                text = oferta.precioTexto,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    if (enCurso) {
+                                        EstadoServicioEnCurso()
+                                    } else {
+                                        Switch(
+                                            checked = oferta.disponible,
+                                            onCheckedChange = { valor ->
+                                                viewModel.cambiarDisponibilidadServicioRapido(
+                                                    idOfertaServicio = oferta.idOfertaServicio,
+                                                    valor = valor
+                                                )
+                                            },
+                                            enabled = !bloqueadoPorCupo,
+                                            modifier = Modifier.alpha(if (bloqueadoPorCupo) 0.35f else 1f)
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = oferta.descripcion,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                OutlinedButton(
+                                    onClick = { onAbrirEditarServicio(oferta.idOfertaServicio) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Edit,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Editar servicio")
+                                }
+                            }
+                        }
+                    }
+
+                    if (serviciosActivos >= uiState.limiteServiciosActivos) {
+                        Text(
+                            text = "Es necesario tener cupo disponible para activar un servicio.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                if (uiState.errorServicio != null) {
+                    Text(
+                        text = uiState.errorServicio,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                if (uiState.usuario?.tipoPerfil == TipoPerfil.USUARIO_BASE) {
+                    EtiquetaEstado("Para verificarte ve a Ajustes > Seguridad y verificacion")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 
@@ -356,6 +432,31 @@ fun PantallaPerfil(
         visible = uiState.cargandoPantalla,
         mensaje = "Actualizando perfil..."
     )
+}
+
+@Composable
+private fun InfoPerfilFila(
+    etiqueta: String,
+    valor: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = etiqueta,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = valor.ifBlank { "-" },
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 @Composable

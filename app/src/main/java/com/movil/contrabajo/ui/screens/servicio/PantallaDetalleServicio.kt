@@ -1,6 +1,7 @@
 package com.movil.contrabajo.ui.screens.servicio
 
 import android.content.Context
+import android.widget.Toast
 import android.widget.ImageView
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -39,14 +40,16 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -89,6 +92,7 @@ import com.movil.contrabajo.R
 import com.movil.contrabajo.domain.model.EscalaRango
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.ui.viewmodel.DetalleServicioViewModel
+import com.movil.contrabajo.ui.viewmodel.ReportesViewModel
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -108,6 +112,7 @@ import kotlin.math.sin
 fun PantallaDetalleServicio(
     idOfertaServicio: Long,
     viewModel: DetalleServicioViewModel,
+    reportesViewModel: ReportesViewModel,
     onEditarServicio: (Long) -> Unit,
     onContactarServicio: (Long) -> Unit,
     onVolver: () -> Unit
@@ -129,6 +134,11 @@ fun PantallaDetalleServicio(
     var swipeEnfriamiento by rememberSaveable { mutableStateOf(false) }
     var mostrarConfirmacionChat by rememberSaveable { mutableStateOf(false) }
     var ofertaPendienteChatId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var mostrarModalReporte by rememberSaveable { mutableStateOf(false) }
+    var menuTipoReporteAbierto by remember { mutableStateOf(false) }
+    var menuOpcionesAbierto by rememberSaveable { mutableStateOf(false) }
+    var idTipoReporteSeleccionado by rememberSaveable { mutableStateOf<Long?>(null) }
+    var comentarioReporte by rememberSaveable { mutableStateOf("") }
     val paginasListas = remember { mutableStateMapOf<Int, Boolean>() }
     var direccionSwipeActiva by rememberSaveable { mutableIntStateOf(0) } // 1 avance, -1 retroceso
     val comportamientoFlingPager = PagerDefaults.flingBehavior(
@@ -155,6 +165,9 @@ fun PantallaDetalleServicio(
 
     LaunchedEffect(idOfertaServicio) {
         viewModel.cargarOferta(idOfertaServicio)
+        if (reportesViewModel.uiState.tiposReporte.isEmpty()) {
+            reportesViewModel.recargar()
+        }
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -276,6 +289,9 @@ fun PantallaDetalleServicio(
         actualLista &&
         anteriorLista &&
         siguienteLista
+    val ofertaBarra = uiState.ofertas.getOrNull(pagerState.currentPage) ?: uiState.ofertaActual
+    val esPropiaBarra = ofertaBarra?.idTrabajador == uiState.idUsuarioActual
+    val puedeReportarBarra = ofertaBarra != null && !ofertaBarra.eliminada && !esPropiaBarra
 
     Box(
         modifier = Modifier
@@ -299,7 +315,13 @@ fun PantallaDetalleServicio(
                     .statusBarsPadding()
                     .padding(horizontal = 18.dp, vertical = 12.dp)
             ) {
-                BarraSuperiorDetalle(onVolver = volverConScroll)
+                BarraSuperiorDetalle(
+                    onVolver = volverConScroll,
+                    menuAbierto = menuOpcionesAbierto,
+                    onCambiarMenu = { menuOpcionesAbierto = it },
+                    mostrarAccionReportar = puedeReportarBarra,
+                    onReportar = { mostrarModalReporte = true }
+                )
 
                 val oferta = uiState.ofertaActual
                 if (oferta == null) {
@@ -528,6 +550,7 @@ fun PantallaDetalleServicio(
                     }
                 )
             }
+
         }
 
         if (!saliendoPantalla && ofertaCta?.eliminada == true) {
@@ -578,11 +601,105 @@ fun PantallaDetalleServicio(
                 }
             )
         }
+
+        if (mostrarModalReporte && ofertaCta != null) {
+            val tiposReporte = reportesViewModel.uiState.tiposReporte
+            val tipoSeleccionado = tiposReporte.firstOrNull { it.idTipoReporte == idTipoReporteSeleccionado }
+            AlertDialog(
+                onDismissRequest = { mostrarModalReporte = false },
+                title = { Text("Reportar publicacion") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Box {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { menuTipoReporteAbierto = true },
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            ) {
+                                Text(
+                                    text = tipoSeleccionado?.nombre ?: "Selecciona un tipo de reporte",
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = menuTipoReporteAbierto,
+                                onDismissRequest = { menuTipoReporteAbierto = false }
+                            ) {
+                                tiposReporte.forEach { tipo ->
+                                    DropdownMenuItem(
+                                        text = { Text(tipo.nombre) },
+                                        onClick = {
+                                            idTipoReporteSeleccionado = tipo.idTipoReporte
+                                            menuTipoReporteAbierto = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        OutlinedTextField(
+                            value = comentarioReporte,
+                            onValueChange = { comentarioReporte = it },
+                            label = { Text("Describe el incidente") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 3
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val idTipo = idTipoReporteSeleccionado
+                            if (idTipo == null || comentarioReporte.trim().isBlank()) {
+                                Toast.makeText(
+                                    context,
+                                    "Debes seleccionar un tipo y escribir la descripcion.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                return@TextButton
+                            }
+                            reportesViewModel.crearReporteDesdeOferta(
+                                idOfertaServicio = ofertaCta.idOfertaServicio,
+                                idTipoReporte = idTipo,
+                                comentario = comentarioReporte
+                            ).onSuccess {
+                                Toast.makeText(context, "Reporte enviado correctamente.", Toast.LENGTH_SHORT).show()
+                                comentarioReporte = ""
+                                idTipoReporteSeleccionado = null
+                                mostrarModalReporte = false
+                            }.onFailure {
+                                Toast.makeText(
+                                    context,
+                                    it.message ?: "No se pudo enviar el reporte",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    ) {
+                        Text("Enviar")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { mostrarModalReporte = false }) {
+                        Text("Cancelar")
+                    }
+                }
+            )
+        }
+
     }
 }
 
 @Composable
-private fun BarraSuperiorDetalle(onVolver: () -> Unit) {
+private fun BarraSuperiorDetalle(
+    onVolver: () -> Unit,
+    menuAbierto: Boolean,
+    onCambiarMenu: (Boolean) -> Unit,
+    mostrarAccionReportar: Boolean,
+    onReportar: () -> Unit
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.primary,
@@ -604,12 +721,28 @@ private fun BarraSuperiorDetalle(onVolver: () -> Unit) {
                     tint = MaterialTheme.colorScheme.onPrimary
                 )
             }
-            IconButton(onClick = {}) {
-                Icon(
-                    imageVector = Icons.Filled.MoreVert,
-                    contentDescription = "Opciones",
-                    tint = MaterialTheme.colorScheme.onPrimary
-                )
+            Box {
+                IconButton(onClick = { onCambiarMenu(true) }) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = "Opciones",
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuAbierto,
+                    onDismissRequest = { onCambiarMenu(false) }
+                ) {
+                    if (mostrarAccionReportar) {
+                        DropdownMenuItem(
+                            text = { Text("Reportar servicio") },
+                            onClick = {
+                                onCambiarMenu(false)
+                                onReportar()
+                            }
+                        )
+                    }
+                }
             }
         }
     }
@@ -707,31 +840,11 @@ private fun TarjetaDetalleOferta(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (oferta.trabajadorVerificado) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Verified,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "Trabajador verificado",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                } else {
-                    Text(
-                        text = "Trabajador",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = "Trabajador",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 if (oferta.puntuacionPromedio <= 0.0) {
                     Text(
                         text = "Sin valoraciones todavia",
@@ -837,8 +950,7 @@ private fun TarjetaDetalleOferta(
                 ResumenTrabajadorDetalle(
                     nombreTrabajador = oferta.nombreTrabajador,
                     usernameTrabajador = oferta.usernameTrabajador,
-                    fotoPerfilTrabajador = oferta.fotoPerfilTrabajador,
-                    verificado = oferta.trabajadorVerificado
+                    fotoPerfilTrabajador = oferta.fotoPerfilTrabajador
                 )
             }
         }
@@ -910,31 +1022,11 @@ private fun TarjetaDetallePrevisualizacion(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (oferta.trabajadorVerificado) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Verified,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "Trabajador verificado",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                } else {
-                    Text(
-                        text = "Trabajador",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = "Trabajador",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 if (oferta.puntuacionPromedio <= 0.0) {
                     Text(
                         text = "Sin valoraciones todavia",
@@ -1008,8 +1100,7 @@ private fun TarjetaDetallePrevisualizacion(
             ResumenTrabajadorDetalle(
                 nombreTrabajador = oferta.nombreTrabajador,
                 usernameTrabajador = oferta.usernameTrabajador,
-                fotoPerfilTrabajador = oferta.fotoPerfilTrabajador,
-                verificado = oferta.trabajadorVerificado
+                fotoPerfilTrabajador = oferta.fotoPerfilTrabajador
             )
         }
     }
@@ -1240,8 +1331,7 @@ private fun calcularZoomPorRangoM(rangoM: Int): Int = when {
 private fun ResumenTrabajadorDetalle(
     nombreTrabajador: String,
     usernameTrabajador: String,
-    fotoPerfilTrabajador: String,
-    verificado: Boolean
+    fotoPerfilTrabajador: String
 ) {
     val usernameVisible = usernameTrabajador.trim().ifBlank {
         nombreTrabajador
@@ -1287,24 +1377,11 @@ private fun ResumenTrabajadorDetalle(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = nombreTrabajador,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    if (verificado) {
-                        Icon(
-                            imageVector = Icons.Filled.Verified,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
+                Text(
+                    text = nombreTrabajador,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
                 Text(
                     text = "@$usernameVisible",
                     style = MaterialTheme.typography.bodySmall,

@@ -13,6 +13,8 @@ import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.domain.model.PrecioUtils
 import com.movil.contrabajo.domain.model.PreguntasSeguridadCatalogo
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
+import com.movil.contrabajo.domain.model.Reporte
+import com.movil.contrabajo.domain.model.TipoReporte
 import com.movil.contrabajo.domain.model.RegistroPendiente
 import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.domain.model.TipoPrecio
@@ -20,6 +22,8 @@ import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
 import com.movil.contrabajo.domain.model.Usuario
 import com.movil.contrabajo.domain.model.Valoracion
 import com.movil.contrabajo.domain.model.ValoracionesServicio
+import com.movil.contrabajo.domain.model.AccionModeracion
+import com.movil.contrabajo.domain.model.EstadoReporte
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeParseException
@@ -52,6 +56,21 @@ interface RepositorioPerfil {
     fun guardarFiltrosMarketplace(config: FiltroMarketplaceConfig): Result<FiltroMarketplaceConfig>
     fun limpiarFiltrosMarketplace(): Result<FiltroMarketplaceConfig>
     fun actualizarFotoPerfil(uriLocal: String): Result<Usuario>
+    fun actualizarContactoPerfil(correo: String, telefono: String): Result<Usuario>
+}
+
+interface RepositorioReportes {
+    fun obtenerTiposReporte(): List<TipoReporte>
+    fun crearReporteDesdeOferta(idOfertaServicio: Long, idTipoReporte: Long, comentario: String): Result<Reporte>
+    fun crearReporteDesdeChat(idChatCita: Long, idTipoReporte: Long, comentario: String): Result<Reporte>
+    fun obtenerReportesModeracion(
+        busqueda: String = "",
+        idTipoReporte: Long? = null,
+        estadoRevision: String? = null,
+        ordenarRecientes: Boolean = true
+    ): List<Reporte>
+    fun obtenerDetalleReporte(idReporte: Long): Reporte?
+    fun aplicarMedidaModeracion(idReporte: Long, accion: String): Result<Reporte>
 }
 
 interface RepositorioOfertas {
@@ -421,7 +440,153 @@ class RepositorioPerfilLocal(
         return Result.success(db.obtenerUsuarioPorId(usuario.idUsuario) ?: usuario)
     }
 
+    override fun actualizarContactoPerfil(correo: String, telefono: String): Result<Usuario> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val correoNormalizado = correo.trim().lowercase()
+        val telefonoNormalizado = telefono.trim()
+        if (correoNormalizado.isBlank() || !correoNormalizado.contains("@")) {
+            return Result.failure(IllegalArgumentException("Ingresa un correo valido"))
+        }
+        val digitos = telefonoNormalizado.filter { it.isDigit() }.let {
+            if (it.startsWith("56")) it.drop(2) else it
+        }
+        if (digitos.length != 9) {
+            return Result.failure(IllegalArgumentException("Ingresa un telefono valido de 9 digitos"))
+        }
+        if (db.existeCorreoEnOtroUsuario(correoNormalizado, usuario.idUsuario)) {
+            return Result.failure(IllegalArgumentException("Ese correo ya esta registrado por otro usuario"))
+        }
+
+        db.actualizarPerfilContactoUsuario(
+            idUsuario = usuario.idUsuario,
+            correo = correoNormalizado,
+            telefono = telefonoNormalizado
+        )
+        return Result.success(db.obtenerUsuarioPorId(usuario.idUsuario) ?: usuario)
+    }
+
     private fun limpiarRun(run: String): String = run.filter { it.isDigit() }
+}
+
+class RepositorioReportesLocal(
+    private val db: ContrabajoSQLiteHelper
+) : RepositorioReportes {
+
+    override fun obtenerTiposReporte(): List<TipoReporte> = db.obtenerTiposReporte()
+
+    override fun crearReporteDesdeOferta(
+        idOfertaServicio: Long,
+        idTipoReporte: Long,
+        comentario: String
+    ): Result<Reporte> {
+        val emisor = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val oferta = db.obtenerOfertaPorId(idOfertaServicio, incluirEliminadas = true)
+            ?: return Result.failure(IllegalArgumentException("No se encontro la publicacion a reportar"))
+        val comentarioLimpio = comentario.trim()
+        if (comentarioLimpio.isBlank()) {
+            return Result.failure(IllegalArgumentException("Debes ingresar una descripcion del incidente"))
+        }
+        if (db.obtenerTiposReporte().none { it.idTipoReporte == idTipoReporte }) {
+            return Result.failure(IllegalArgumentException("Selecciona un tipo de reporte valido"))
+        }
+        val idReportado = if (oferta.idTrabajador != emisor.idUsuario) oferta.idTrabajador else null
+        if (idReportado == null && oferta.idOfertaServicio <= 0L) {
+            return Result.failure(IllegalStateException("No fue posible identificar la entidad reportada"))
+        }
+
+        val idReporte = db.insertarReporte(
+            idEmisor = emisor.idUsuario,
+            idUsuarioReportado = idReportado,
+            idOfertaServicio = oferta.idOfertaServicio,
+            idChatCita = null,
+            idTipoReporte = idTipoReporte,
+            comentario = comentarioLimpio
+        )
+        if (idReporte <= 0) return Result.failure(IllegalStateException("No se pudo registrar el reporte"))
+        return db.obtenerReportePorId(idReporte)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("No se pudo recuperar el reporte registrado"))
+    }
+
+    override fun crearReporteDesdeChat(
+        idChatCita: Long,
+        idTipoReporte: Long,
+        comentario: String
+    ): Result<Reporte> {
+        val emisor = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val chat = db.obtenerChatPorId(idChatCita, emisor.idUsuario)
+            ?: return Result.failure(IllegalArgumentException("No se encontro el chat a reportar"))
+        val comentarioLimpio = comentario.trim()
+        if (comentarioLimpio.isBlank()) {
+            return Result.failure(IllegalArgumentException("Debes ingresar una descripcion del incidente"))
+        }
+        if (db.obtenerTiposReporte().none { it.idTipoReporte == idTipoReporte }) {
+            return Result.failure(IllegalArgumentException("Selecciona un tipo de reporte valido"))
+        }
+        val idReportado = if (chat.idCliente == emisor.idUsuario) chat.idTrabajador else chat.idCliente
+
+        val idReporte = db.insertarReporte(
+            idEmisor = emisor.idUsuario,
+            idUsuarioReportado = idReportado,
+            idOfertaServicio = chat.idOfertaServicio,
+            idChatCita = chat.idChatCita,
+            idTipoReporte = idTipoReporte,
+            comentario = comentarioLimpio
+        )
+        if (idReporte <= 0) return Result.failure(IllegalStateException("No se pudo registrar el reporte"))
+        return db.obtenerReportePorId(idReporte)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("No se pudo recuperar el reporte registrado"))
+    }
+
+    override fun obtenerReportesModeracion(
+        busqueda: String,
+        idTipoReporte: Long?,
+        estadoRevision: String?,
+        ordenarRecientes: Boolean
+    ): List<Reporte> {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return emptyList()
+        if (usuario.tipoPerfil != TipoPerfil.MODERADOR) return emptyList()
+        return db.obtenerReportesModeracion(
+            busqueda = busqueda,
+            idTipoReporte = idTipoReporte,
+            estadoRevision = estadoRevision,
+            ordenarRecientes = ordenarRecientes
+        )
+    }
+
+    override fun obtenerDetalleReporte(idReporte: Long): Reporte? {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return null
+        if (usuario.tipoPerfil != TipoPerfil.MODERADOR) return null
+        return db.obtenerReportePorId(idReporte)
+    }
+
+    override fun aplicarMedidaModeracion(idReporte: Long, accion: String): Result<Reporte> {
+        val moderador = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        if (moderador.tipoPerfil != TipoPerfil.MODERADOR) {
+            return Result.failure(IllegalStateException("Solo un moderador puede aplicar medidas"))
+        }
+        val reporte = db.obtenerReportePorId(idReporte)
+            ?: return Result.failure(IllegalArgumentException("No se encontro el reporte"))
+        val idOferta = reporte.idOfertaServicio
+            ?: return Result.failure(IllegalStateException("El reporte no tiene un servicio asociado"))
+        when (accion) {
+            AccionModeracion.DESACTIVAR_SERVICIO -> db.actualizarDisponibilidadOferta(idOferta, false)
+            AccionModeracion.ELIMINAR_SERVICIO -> db.eliminarOfertaServicio(idOferta)
+            else -> return Result.failure(IllegalArgumentException("Accion de moderacion invalida"))
+        }
+        val ok = db.actualizarEstadoRevisionReporte(
+            idReporte = idReporte,
+            estadoRevision = EstadoReporte.RESUELTO,
+            idModeradorRevisor = moderador.idUsuario,
+            medidaAplicada = accion
+        )
+        if (!ok) return Result.failure(IllegalStateException("No se pudo actualizar el estado del reporte"))
+        return db.obtenerReportePorId(idReporte)?.let { Result.success(it) }
+            ?: Result.failure(IllegalStateException("No se pudo recuperar el reporte actualizado"))
+    }
 }
 
 class RepositorioOfertasLocal(
