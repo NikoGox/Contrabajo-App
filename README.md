@@ -15,25 +15,27 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.7.0-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.8.0-Pre-Alpha
 
 
 
-> <br>• Se implementó el flujo de reportes desde detalle de servicio y chat detalle.
-> <br>• Se incorporó moderación parcial para desactivar o eliminar lógicamente servicios.
-> <br>• Se agregó edición de perfil limitada a correo, teléfono y foto.
-> <br>• Se creó el módulo local de reportes en SQLite con tipos, estados y trazabilidad.
-> <br>• Se agregaron vistas de lista y detalle de reporte para flujo moderador.
-> <br>• Se movió la acción de reportar al menú de 3 puntos en detalle de servicio.
-> <br>• Se estandarizó feedback de reportes con toasts de validación, éxito y error.
-> <br>• Se eliminó temporalmente el emblema visual de trabajador verificado en UI.
-> <br>• Se rediseñó la tarjeta de perfil con mejor jerarquía visual y rol por tipo de cuenta.
-> <br>• Se limitó la visibilidad de valoraciones solo a perfiles de trabajador/premium.
-> <br>• Se ajustó editar perfil para mostrar campos no editables en estado gris deshabilitado.
-> <br>• Se consolidó moderador con navbar reducido de 2 ítems: Perfil y Reportes.
-> <br>• Se sincronizó el navbar moderador y su estado inicial para evitar desalineaciones.
-> <br>• Se replicó en reportes el buscador animado con resplandor del marketplace.
-> <br>• Se recuperó acceso a ajustes desde reportes para habilitar cierre de sesión moderador.
+> <br>• Se inició la integración real del frontend con el backend de Contrabajo para la épica de Acceso y Cuenta.
+> <br>• Se descartó el selector Online/Offline y se definió una migración progresiva de funcionalidades locales hacia backend.
+> <br>• Se conectó el registro de usuarios con el backend, incluyendo datos personales, cuenta, dirección y preguntas de seguridad.
+> <br>• Se habilitó login contra backend usando nombre de usuario como identificador principal.
+> <br>• Se incorporó sesión persistente con token JWT y validación de sesión al reabrir la app.
+> <br>• Se conectó el cierre de sesión con backend y limpieza local de la sesión activa.
+> <br>• Se conectó recuperación de cuenta con validación de preguntas de seguridad y cambio de contraseña según los endpoints disponibles.
+> <br>• Se conectó lectura de perfil desde backend para mantener la identidad de cuenta integrada.
+> <br>• Se habilitó edición de correo y teléfono de perfil con backend, reflejando en pantalla los datos realmente guardados.
+> <br>• Se mantuvo el username visible pero no editable hasta que backend soporte edición de nombre de usuario.
+> <br>• Se dejó foto de perfil como dato local temporal porque backend aún no expone endpoint remoto para imagen de perfil.
+> <br>• Se corrigió el registro de RUN para aceptar personas con RUN de 7 u 8 dígitos antes del DV.
+> <br>• Se corrigió el formato visual de RUN para representar correctamente casos como 1.234.567 y 12.345.678.
+> <br>• Se reforzó la contraseña de registro con mínimo 8 caracteres, 1 mayúscula, 1 número y 1 símbolo.
+> <br>• Se agregó texto de ayuda bajo confirmar contraseña para explicar los requisitos antes de registrar.
+> <br>• Se configuró el cliente REST Android con Retrofit, OkHttp y Gson apuntando al backend local desde emulador.
+> <br>• Se mantuvieron servicios, marketplace, chats y reportes en repositorios locales/legacy para integrarlos en iteraciones siguientes.
 
 ---
 

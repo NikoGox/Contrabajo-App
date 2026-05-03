@@ -170,7 +170,8 @@ fun PantallaEditarPerfil(
                         valor = uiState.telefonoPerfilInput,
                         onValueChange = viewModel::actualizarTelefonoPerfil,
                         etiqueta = "Telefono",
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        prefijo = "+56 9"
                     )
                     CampoContrabajo(
                         valor = "${usuario.run}-${usuario.dv}",

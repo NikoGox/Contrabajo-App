@@ -1,3 +1,26 @@
+VERSION 0.8.0-Pre-Alpha
+───────
+├─• Se inició la integración real del frontend con el backend de Contrabajo para la épica de Acceso y Cuenta.
+├─• Se descartó el selector Online/Offline y se definió una migración progresiva de funcionalidades locales hacia backend.
+├─• Se conectó el registro de usuarios con el backend, incluyendo datos personales, cuenta, dirección y preguntas de seguridad.
+├─• Se habilitó login contra backend usando nombre de usuario como identificador principal.
+├─• Se incorporó sesión persistente con token JWT y validación de sesión al reabrir la app.
+├─• Se conectó el cierre de sesión con backend y limpieza local de la sesión activa.
+├─• Se conectó recuperación de cuenta con validación de preguntas de seguridad y cambio de contraseña según los endpoints disponibles.
+├─• Se conectó lectura de perfil desde backend para mantener la identidad de cuenta integrada.
+├─• Se habilitó edición de correo y teléfono de perfil con backend, reflejando en pantalla los datos realmente guardados.
+├─• Se mantuvo el username visible pero no editable hasta que backend soporte edición de nombre de usuario.
+├─• Se dejó foto de perfil como dato local temporal porque backend aún no expone endpoint remoto para imagen de perfil.
+├─• Se ajustó teléfono móvil para mostrar +56 9 como prefijo fijo y solicitar solo los 8 dígitos restantes.
+├─• Se corrigió el registro de RUN para aceptar personas con RUN de 7 u 8 dígitos antes del DV.
+├─• Se corrigió el formato visual de RUN para representar correctamente casos como 1.234.567 y 12.345.678.
+├─• Se reforzó la contraseña de registro con mínimo 8 caracteres, 1 mayúscula, 1 número y 1 símbolo.
+├─• Se agregó texto de ayuda bajo confirmar contraseña para explicar los requisitos antes de registrar.
+├─• Se configuró el cliente REST Android con Retrofit, OkHttp y Gson apuntando al backend local desde emulador.
+└─• Se mantuvieron servicios, marketplace, chats y reportes en repositorios locales/legacy para integrarlos en iteraciones siguientes.
+
+
+
 VERSION 0.7.0-Pre-Alpha
 ───────
 ├─• Se implementó el flujo de reportes desde detalle de servicio y chat detalle.

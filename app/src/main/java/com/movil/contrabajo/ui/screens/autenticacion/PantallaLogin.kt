@@ -102,7 +102,7 @@ fun PantallaLogin(
             CampoContrabajo(
                 valor = uiState.identificador,
                 onValueChange = viewModel::actualizarIdentificador,
-                etiqueta = "Correo o usuario"
+                etiqueta = "Nombre de usuario"
             )
             CampoSecretoContrabajo(
                 valor = uiState.contrasena,
@@ -132,7 +132,7 @@ fun PantallaLogin(
             BotonSecundario(texto = "Crear cuenta", onClick = onRegistrarse)
             BotonSecundario(texto = "Recuperar cuenta", onClick = onRecuperarCuenta)
             Text(
-                text = "Usuario demo: vale@contrabajo.cl / 123456",
+                text = "Usuario demo: cliente_demo / 123456",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -170,7 +170,7 @@ fun PantallaRecuperarCuenta(
             CampoContrabajo(
                 valor = uiState.recuperacionIdentificador,
                 onValueChange = viewModel::actualizarIdentificadorRecuperacion,
-                etiqueta = "Usuario o correo"
+                etiqueta = "Nombre de usuario"
             )
             BotonPrimario(
                 texto = "Buscar cuenta",

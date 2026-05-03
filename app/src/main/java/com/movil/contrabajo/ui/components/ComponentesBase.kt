@@ -304,12 +304,14 @@ fun CampoContrabajo(
     modifier: Modifier = Modifier,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     readOnly: Boolean = false,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    prefijo: String? = null
 ) {
     OutlinedTextField(
         value = valor,
         onValueChange = onValueChange,
         label = { Text(etiqueta) },
+        prefix = prefijo?.let { texto -> { Text(texto) } },
         modifier = modifier.fillMaxWidth(),
         visualTransformation = visualTransformation,
         shape = RoundedCornerShape(12.dp),

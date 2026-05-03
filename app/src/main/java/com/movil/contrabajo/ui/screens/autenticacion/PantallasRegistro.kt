@@ -115,13 +115,13 @@ fun PantallaRegistroPasoUno(
     val errorNombre = if (registro.nombre.isBlank()) "Ingresa tu nombre" else null
     val errorApellidoPaterno = if (registro.apellidoPaterno.isBlank()) "Ingresa tu apellido paterno" else null
     val errorRun = when {
-        registro.run.length != 8 -> "El RUN debe tener 8 digitos"
+        registro.run.length !in 7..8 -> "El RUN debe tener 7 u 8 digitos"
         registro.dv.isBlank() -> null
         !validarRut(registro.run, registro.dv) -> "El RUN no es valido"
         else -> null
     }
     val errorDv = if (registro.dv.isBlank()) "Ingresa el DV" else null
-    val errorTelefono = if (registro.telefono.length != 9) "Ingresa un telefono valido de 9 digitos" else null
+    val errorTelefono = if (registro.telefono.length != 8) "Ingresa los 8 digitos restantes del celular" else null
     val errorFecha = validarFechaNacimientoRegistro(
         fechaTexto = registro.fechaNacimiento,
         anioTexto = anioInput,
@@ -228,7 +228,8 @@ fun PantallaRegistroPasoUno(
                         viewModel.actualizarTelefono(it)
                     },
                     etiqueta = "Telefono (+56)",
-                    visualTransformation = FormatoTelefonoVisualTransformation
+                    visualTransformation = FormatoTelefonoVisualTransformation,
+                    prefijo = "+56 9"
                 )
                 if (intentoContinuar) TextoErrorCampo(errorTelefono)
 
@@ -507,7 +508,7 @@ fun PantallaRegistroPasoDos(
 
     val errorUsername = if (registro.username.isBlank()) "Ingresa un nombre de usuario" else null
     val errorCorreo = if (registro.correo.isBlank() || !registro.correo.contains("@")) "Ingresa un correo valido" else null
-    val errorContrasena = if (registro.contrasena.length < 6) "La contrasena debe tener al menos 6 caracteres" else null
+    val errorContrasena = validarContrasenaRegistro(registro.contrasena)
     val errorConfirmacion = if (registro.contrasena != registro.confirmarContrasena) "Las contrasenas no coinciden" else null
     val formularioPasoTresValido = listOf(
         errorUsername,
@@ -582,6 +583,11 @@ fun PantallaRegistroPasoDos(
                         viewModel.actualizarConfirmarContrasena(it)
                     },
                     etiqueta = "Confirmar contrasena"
+                )
+                Text(
+                    text = "La contrasena debe tener minimo 8 caracteres, 1 mayuscula, 1 numero y 1 simbolo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (intentoRegistro) {
                     TextoErrorCampo(errorConfirmacion)
@@ -887,7 +893,7 @@ private fun obtenerMaximoDiaDelMes(anio: Int, mes: Int): Int {
 
 private fun validarRut(runRaw: String, dvRaw: String): Boolean {
     val run = runRaw.filter { it.isDigit() }.take(8)
-    if (run.length != 8) return false
+    if (run.length !in 7..8) return false
     val dv = dvRaw.trim().uppercase()
     if (dv.isBlank()) return false
 
@@ -904,6 +910,16 @@ private fun validarRut(runRaw: String, dvRaw: String): Boolean {
         else -> resto.toString()
     }
     return dv == esperado
+}
+
+private fun validarContrasenaRegistro(contrasena: String): String? {
+    return when {
+        contrasena.length < 8 -> "La contrasena debe tener al menos 8 caracteres"
+        contrasena.none { it.isUpperCase() } -> "La contrasena debe incluir al menos 1 mayuscula"
+        contrasena.none { it.isDigit() } -> "La contrasena debe incluir al menos 1 numero"
+        contrasena.none { !it.isLetterOrDigit() } -> "La contrasena debe incluir al menos 1 simbolo"
+        else -> null
+    }
 }
 
 private object FormatoRunVisualTransformation : VisualTransformation {
@@ -923,23 +939,19 @@ private object FormatoRunVisualTransformation : VisualTransformation {
 
 private object FormatoTelefonoVisualTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
-        val digitos = text.text.filter { it.isDigit() }.take(9)
-        val prefijo = "+56 "
-        val primeraParte = digitos.take(1)
-        val segundaParte = digitos.drop(1).take(4)
-        val terceraParte = digitos.drop(5).take(4)
+        val digitos = text.text.filter { it.isDigit() }.take(8)
+        val primeraParte = digitos.take(4)
+        val segundaParte = digitos.drop(4).take(4)
         val formateado = buildString {
-            append(prefijo)
             append(primeraParte)
             if (segundaParte.isNotBlank()) append(" $segundaParte")
-            if (terceraParte.isNotBlank()) append(" $terceraParte")
         }
         val offsetMapping = object : OffsetMapping {
             override fun originalToTransformed(offset: Int): Int =
-                mapOriginalATransformado(digitos, formateado, offset, prefijo.length)
+                mapOriginalATransformado(digitos, formateado, offset, 0)
 
             override fun transformedToOriginal(offset: Int): Int =
-                mapTransformadoAOriginal(digitos, formateado, offset, prefijo.length)
+                mapTransformadoAOriginal(digitos, formateado, offset, 0)
         }
         return TransformedText(AnnotatedString(formateado), offsetMapping)
     }
@@ -947,14 +959,10 @@ private object FormatoTelefonoVisualTransformation : VisualTransformation {
 
 private fun formatearRunVisual(digitos: String): String {
     if (digitos.isBlank()) return ""
-    val primera = digitos.take(2)
-    val segunda = digitos.drop(2).take(3)
-    val tercera = digitos.drop(5).take(3)
-    return buildString {
-        append(primera)
-        if (segunda.isNotBlank()) append(".$segunda")
-        if (tercera.isNotBlank()) append(".$tercera")
-    }
+    return digitos.reversed()
+        .chunked(3)
+        .joinToString(".")
+        .reversed()
 }
 
 private fun mapOriginalATransformado(

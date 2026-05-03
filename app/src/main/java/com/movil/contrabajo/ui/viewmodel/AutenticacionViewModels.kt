@@ -4,11 +4,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.movil.contrabajo.data.repository.RepositorioAutenticacion
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
 import com.movil.contrabajo.domain.model.PreguntasSeguridadCatalogo
 import com.movil.contrabajo.domain.model.RegistroPendiente
 import com.movil.contrabajo.domain.model.TipoPerfil
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class InicioUiState(
     val revisandoSesion: Boolean = true,
@@ -27,15 +31,20 @@ class InicioViewModel(
         if (sesionRevisada) return
         sesionRevisada = true
 
-        uiState = uiState.copy(
-            revisandoSesion = false,
-            sesionActivaDetectada = repositorioAutenticacion.obtenerSesionActiva() != null
-        )
+        viewModelScope.launch {
+            val sesionActiva = withContext(Dispatchers.IO) {
+                repositorioAutenticacion.obtenerSesionActiva() != null
+            }
+            uiState = uiState.copy(
+                revisandoSesion = false,
+                sesionActivaDetectada = sesionActiva
+            )
+        }
     }
 }
 
 data class LoginUiState(
-    val identificador: String = "vale@contrabajo.cl",
+    val identificador: String = "cliente_demo",
     val contrasena: String = "123456",
     val recordarme: Boolean = true,
     val error: String? = null,
@@ -70,21 +79,28 @@ class LoginViewModel(
     }
 
     fun iniciarSesion() {
-        repositorioAutenticacion
-            .iniciarSesion(uiState.identificador, uiState.contrasena, uiState.recordarme)
+        val identificador = uiState.identificador
+        val contrasena = uiState.contrasena
+        val recordarme = uiState.recordarme
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioAutenticacion.iniciarSesion(identificador, contrasena, recordarme)
+            }
+            resultado
             .onSuccess {
                 uiState = uiState.copy(error = null, loginExitoso = true)
             }
             .onFailure {
                 uiState = uiState.copy(error = it.message, loginExitoso = false)
             }
+        }
     }
 
     fun autocompletarPerfilDemo(perfil: String) {
         val (identificador, contrasena) = when (perfil) {
-            "trabajador" -> "jose@contrabajo.cl" to "123456"
-            "moderador" -> "moderador@contrabajo.cl" to "123456"
-            else -> "vale@contrabajo.cl" to "123456"
+            "trabajador" -> "trabajador_demo" to "123456"
+            "moderador" -> "moderador_demo" to "123456"
+            else -> "cliente_demo" to "123456"
         }
         uiState = uiState.copy(
             identificador = identificador,
@@ -109,10 +125,14 @@ class LoginViewModel(
     fun cargarPreguntasRecuperacion() {
         val identificador = uiState.recuperacionIdentificador.trim()
         if (identificador.isBlank()) {
-            uiState = uiState.copy(errorRecuperacion = "Ingresa tu usuario o correo")
+            uiState = uiState.copy(errorRecuperacion = "Ingresa tu nombre de usuario")
             return
         }
-        repositorioAutenticacion.obtenerPreguntasRecuperacion(identificador)
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioAutenticacion.obtenerPreguntasRecuperacion(identificador)
+            }
+            resultado
             .onSuccess { preguntas ->
                 uiState = uiState.copy(
                     recuperacionPreguntas = preguntas,
@@ -128,6 +148,7 @@ class LoginViewModel(
             .onFailure {
                 uiState = uiState.copy(errorRecuperacion = it.message, mensajeRecuperacion = null)
             }
+        }
     }
 
     fun actualizarRespuestaRecuperacion1(valor: String) {
@@ -147,11 +168,18 @@ class LoginViewModel(
     }
 
     fun validarRespuestasRecuperacion() {
-        repositorioAutenticacion.validarRespuestasRecuperacion(
-            identificador = uiState.recuperacionIdentificador,
-            respuesta1 = uiState.recuperacionRespuesta1,
-            respuesta2 = uiState.recuperacionRespuesta2
-        ).onSuccess {
+        val identificador = uiState.recuperacionIdentificador
+        val respuesta1 = uiState.recuperacionRespuesta1
+        val respuesta2 = uiState.recuperacionRespuesta2
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioAutenticacion.validarRespuestasRecuperacion(
+                    identificador = identificador,
+                    respuesta1 = respuesta1,
+                    respuesta2 = respuesta2
+                )
+            }
+            resultado.onSuccess {
             uiState = uiState.copy(
                 recuperacionValidada = true,
                 errorRecuperacion = null,
@@ -163,6 +191,7 @@ class LoginViewModel(
                 errorRecuperacion = it.message ?: "No se pudieron validar las respuestas",
                 mensajeRecuperacion = null
             )
+            }
         }
     }
 
@@ -181,13 +210,22 @@ class LoginViewModel(
     }
 
     fun restablecerContrasenaRecuperacion() {
-        repositorioAutenticacion.restablecerContrasenaRecuperacion(
-            identificador = uiState.recuperacionIdentificador,
-            respuesta1 = uiState.recuperacionRespuesta1,
-            respuesta2 = uiState.recuperacionRespuesta2,
-            nuevaContrasena = uiState.nuevaContrasenaRecuperacion,
-            confirmarContrasena = uiState.confirmarContrasenaRecuperacion
-        ).onSuccess {
+        val identificador = uiState.recuperacionIdentificador
+        val respuesta1 = uiState.recuperacionRespuesta1
+        val respuesta2 = uiState.recuperacionRespuesta2
+        val nueva = uiState.nuevaContrasenaRecuperacion
+        val confirmar = uiState.confirmarContrasenaRecuperacion
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioAutenticacion.restablecerContrasenaRecuperacion(
+                    identificador = identificador,
+                    respuesta1 = respuesta1,
+                    respuesta2 = respuesta2,
+                    nuevaContrasena = nueva,
+                    confirmarContrasena = confirmar
+                )
+            }
+            resultado.onSuccess {
             uiState = uiState.copy(
                 recuperacionValidada = false,
                 recuperacionPreguntas = emptyList(),
@@ -203,6 +241,7 @@ class LoginViewModel(
                 errorRecuperacion = it.message ?: "No se pudo restablecer la contrasena",
                 mensajeRecuperacion = null
             )
+            }
         }
     }
 
@@ -258,7 +297,7 @@ class RegistroViewModel(
     }
 
     fun actualizarTelefono(valor: String) {
-        val digitos = valor.filter { it.isDigit() }.take(9)
+        val digitos = normalizarTelefonoMovilSinPrefijo(valor)
         actualizarRegistro(uiState.registro.copy(telefono = digitos))
     }
 
@@ -319,14 +358,19 @@ class RegistroViewModel(
     }
 
     fun registrarUsuario() {
-        repositorioAutenticacion
-            .registrarUsuario(uiState.registro)
+        val registro = uiState.registro
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioAutenticacion.registrarUsuario(registro)
+            }
+            resultado
             .onSuccess {
                 uiState = uiState.copy(error = null, registroExitoso = true)
             }
             .onFailure {
                 uiState = uiState.copy(error = it.message, registroExitoso = false)
             }
+        }
     }
 
     fun consumirRegistroExitoso() {
@@ -348,5 +392,12 @@ class RegistroViewModel(
                 caracter.isLetter() || caracter == ' ' || caracter == '\'' || caracter == '-'
             }
             .take(60)
+    }
+
+    private fun normalizarTelefonoMovilSinPrefijo(valor: String): String {
+        val digitos = valor.filter { it.isDigit() }
+            .let { if (it.startsWith("56")) it.drop(2) else it }
+            .let { if (it.length == 9 && it.startsWith("9")) it.drop(1) else it }
+        return digitos.take(8)
     }
 }

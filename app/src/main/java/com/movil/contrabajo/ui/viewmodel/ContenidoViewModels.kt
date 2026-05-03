@@ -31,8 +31,10 @@ import com.movil.contrabajo.domain.model.UbicacionAjustesConfig
 import com.movil.contrabajo.domain.model.Usuario
 import com.movil.contrabajo.domain.model.Valoracion
 import com.movil.contrabajo.domain.model.ValoracionesServicio
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.Normalizer
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -592,7 +594,11 @@ class PerfilViewModel(
             runVerificacion = if (uiState.runVerificacion.isBlank()) usuario?.run.orEmpty() else uiState.runVerificacion,
             dvVerificacion = if (uiState.dvVerificacion.isBlank()) usuario?.dv.orEmpty() else uiState.dvVerificacion,
             correoPerfilInput = if (uiState.correoPerfilInput.isBlank()) usuario?.correo.orEmpty() else uiState.correoPerfilInput,
-            telefonoPerfilInput = if (uiState.telefonoPerfilInput.isBlank()) usuario?.telefono.orEmpty() else uiState.telefonoPerfilInput,
+            telefonoPerfilInput = if (uiState.telefonoPerfilInput.isBlank()) {
+                usuario?.telefono.orEmpty().normalizarTelefonoMovilSinPrefijo()
+            } else {
+                uiState.telefonoPerfilInput
+            },
             preguntasSeguridad = repositorioPerfil.obtenerPreguntasSeguridad(),
             ubicacionAjustes = repositorioPerfil.obtenerUbicacionAjustes()
         )
@@ -765,7 +771,9 @@ class PerfilViewModel(
         viewModelScope.launch {
             uiState = uiState.copy(cargandoPantalla = true)
             delay(180)
-            repositorioPerfil.actualizarFotoPerfil(uriLocal)
+            withContext(Dispatchers.IO) {
+                repositorioPerfil.actualizarFotoPerfil(uriLocal)
+            }
                 .onSuccess { usuarioActualizado ->
                     uiState = uiState.copy(usuario = usuarioActualizado, errorServicio = null)
                 }
@@ -888,7 +896,9 @@ class PerfilViewModel(
         viewModelScope.launch {
             uiState = uiState.copy(cargandoPantalla = true)
             delay(180)
-            repositorioPerfil.guardarUbicacionAjustes(normalizada)
+            withContext(Dispatchers.IO) {
+                repositorioPerfil.guardarUbicacionAjustes(normalizada)
+            }
                 .onSuccess { guardada ->
                     uiState = uiState.copy(
                         ubicacionAjustes = guardada,
@@ -928,7 +938,9 @@ class PerfilViewModel(
         viewModelScope.launch {
             uiState = uiState.copy(cargandoPantalla = true)
             delay(180)
-            repositorioPerfil.guardarUbicacionAjustes(normalizada)
+            withContext(Dispatchers.IO) {
+                repositorioPerfil.guardarUbicacionAjustes(normalizada)
+            }
                 .onSuccess { guardada ->
                     uiState = uiState.copy(
                         ubicacionAjustes = guardada,
@@ -998,7 +1010,7 @@ class PerfilViewModel(
 
     fun actualizarTelefonoPerfil(valor: String) {
         uiState = uiState.copy(
-            telefonoPerfilInput = valor,
+            telefonoPerfilInput = valor.normalizarTelefonoMovilSinPrefijo(),
             errorPerfilEdicion = null,
             mensajePerfilEdicion = null
         )
@@ -1008,10 +1020,12 @@ class PerfilViewModel(
         viewModelScope.launch {
             uiState = uiState.copy(cargandoPantalla = true)
             delay(180)
-            repositorioPerfil.actualizarContactoPerfil(
-                correo = uiState.correoPerfilInput,
-                telefono = uiState.telefonoPerfilInput
-            ).onSuccess { usuarioActualizado ->
+            withContext(Dispatchers.IO) {
+                repositorioPerfil.actualizarContactoPerfil(
+                    correo = uiState.correoPerfilInput,
+                    telefono = uiState.telefonoPerfilInput
+                )
+            }.onSuccess { usuarioActualizado ->
                 uiState = uiState.copy(
                     usuario = usuarioActualizado,
                     correoPerfilInput = usuarioActualizado.correo,
@@ -1068,12 +1082,23 @@ class PerfilViewModel(
     }
 
     fun cerrarSesion() {
-        repositorioAutenticacion.cerrarSesion()
-        uiState = uiState.copy(sesionCerrada = true)
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                repositorioAutenticacion.cerrarSesion()
+            }
+            uiState = uiState.copy(sesionCerrada = true)
+        }
     }
 
     fun consumirCierreSesion() {
         uiState = uiState.copy(sesionCerrada = false)
+    }
+
+    private fun String.normalizarTelefonoMovilSinPrefijo(): String {
+        val digitos = filter { it.isDigit() }
+            .let { if (it.startsWith("56")) it.drop(2) else it }
+            .let { if (it.length == 9 && it.startsWith("9")) it.drop(1) else it }
+        return digitos.take(8)
     }
 
     private fun OfertaServicio?.toFormularioServicio(): FormularioServicio = if (this == null) {
