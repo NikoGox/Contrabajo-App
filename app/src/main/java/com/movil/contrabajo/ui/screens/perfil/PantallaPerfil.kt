@@ -198,6 +198,18 @@ fun PantallaPerfil(
                             etiqueta = "Telefono",
                             valor = usuario?.telefono.orEmpty()
                         )
+                        InfoPerfilFila(
+                            etiqueta = "RUN",
+                            valor = usuario?.let { "${it.run}-${it.dv}" }.orEmpty()
+                        )
+                        InfoPerfilFila(
+                            etiqueta = "Direccion",
+                            valor = usuario?.let {
+                                listOf(it.direccionCalle, it.direccionNumero).filter { parte -> parte.isNotBlank() }
+                                    .joinToString(" ")
+                                    .ifBlank { "Sin direccion" }
+                            }.orEmpty()
+                        )
                     }
                 }
 

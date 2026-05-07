@@ -23,12 +23,12 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -73,6 +73,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.movil.contrabajo.R
+import com.movil.contrabajo.domain.model.ComunaCatalogo
 import com.movil.contrabajo.domain.model.EscalaRango
 import com.movil.contrabajo.domain.model.PreguntasSeguridadCatalogo
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
@@ -159,6 +160,8 @@ fun PantallaAjustesSeguridad(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val tipoPerfil = viewModel.uiState.usuario?.tipoPerfil
+    val puedeVerificar = tipoPerfil == TipoPerfil.USUARIO_BASE
     var mostrarModalContrasena by rememberSaveable { mutableStateOf(false) }
     var contrasenaInput by rememberSaveable { mutableStateOf("") }
     var errorContrasena by rememberSaveable { mutableStateOf<String?>(null) }
@@ -171,11 +174,13 @@ fun PantallaAjustesSeguridad(
         BarraSuperiorAjustes(titulo = "Seguridad y verificacion", onVolver = onVolver, iconoDerecha = Icons.Filled.Security)
 
         TarjetaBase {
-            ItemAjuste(
-                titulo = "Verificar cuenta trabajador",
-                subtitulo = "Ingresa RUN y numero de documento",
-                onClick = onAbrirVerificacion
-            )
+            if (puedeVerificar) {
+                ItemAjuste(
+                    titulo = "Verificar cuenta trabajador",
+                    subtitulo = "Ingresa RUN y numero de documento",
+                    onClick = onAbrirVerificacion
+                )
+            }
             ItemAjuste(
                 titulo = "Configurar preguntas de seguridad",
                 subtitulo = "Configura 2 preguntas para recuperar tu cuenta",
@@ -255,12 +260,33 @@ fun PantallaVerificarCuentaTrabajador(
     modifier: Modifier = Modifier
 ) {
     val uiState = viewModel.uiState
+    val tipoPerfil = uiState.usuario?.tipoPerfil
+    val puedeVerificar = tipoPerfil == null || tipoPerfil == TipoPerfil.USUARIO_BASE
+    var cuentaRegresivaCierre by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(Unit) { viewModel.recargar() }
+    LaunchedEffect(uiState.mensajeVerificacion) {
+        if (uiState.mensajeVerificacion != null) {
+            cuentaRegresivaCierre = 5
+            while (cuentaRegresivaCierre > 0) {
+                kotlinx.coroutines.delay(1_000)
+                cuentaRegresivaCierre -= 1
+            }
+            viewModel.cerrarSesion()
+        }
+    }
 
     PantallaBase(modifier = modifier, mostrarFondo = false) {
         BarraSuperiorAjustes(titulo = "Verificar cuenta trabajador", onVolver = onVolver, iconoDerecha = Icons.Filled.Security)
 
         TarjetaBase {
+            if (!puedeVerificar) {
+                Text(
+                    text = "Esta cuenta no requiere verificacion de trabajador.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                return@TarjetaBase
+            }
             Text(
                 text = "Tu tipo de perfil se actualiza automaticamente despues de la validacion.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -273,10 +299,12 @@ fun PantallaVerificarCuentaTrabajador(
             ) {
                 CampoContrabajo(
                     valor = uiState.runVerificacion,
-                    onValueChange = viewModel::actualizarRunVerificacion,
-                    etiqueta = "RUN",
+                    onValueChange = {},
+                    etiqueta = "RUN (cuenta)",
                     modifier = Modifier.weight(1f),
-                    visualTransformation = FormatoRunVisualTransformation
+                    visualTransformation = FormatoRunVisualTransformation,
+                    readOnly = true,
+                    enabled = false
                 )
                 Text(
                     text = "-",
@@ -286,9 +314,11 @@ fun PantallaVerificarCuentaTrabajador(
                 )
                 CampoContrabajo(
                     valor = uiState.dvVerificacion,
-                    onValueChange = viewModel::actualizarDvVerificacion,
+                    onValueChange = {},
                     etiqueta = "DV",
-                    modifier = Modifier.weight(0.35f)
+                    modifier = Modifier.weight(0.35f),
+                    readOnly = true,
+                    enabled = false
                 )
             }
             CampoContrabajo(
@@ -327,6 +357,13 @@ fun PantallaVerificarCuentaTrabajador(
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
+                if (cuentaRegresivaCierre > 0) {
+                    Text(
+                        text = "Cerrando sesion en $cuentaRegresivaCierre...",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
     }
@@ -353,7 +390,6 @@ fun PantallaPreguntasSeguridad(
     var preguntaInput by rememberSaveable { mutableStateOf("") }
     var respuestaInput by rememberSaveable { mutableStateOf("") }
     var desplegarPreguntas by rememberSaveable { mutableStateOf(false) }
-    var respuestasVisibles by rememberSaveable { mutableStateOf(setOf<Int>()) }
     val preguntaAlterna = preguntas
         .firstOrNull { it.indice != indiceEnEdicion }
         ?.pregunta
@@ -376,25 +412,14 @@ fun PantallaPreguntasSeguridad(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             preguntas.forEach { item ->
-                TarjetaBase(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            indiceEnEdicion = item.indice
-                            preguntaInput = item.pregunta
-                            respuestaInput = item.respuesta
-                            desplegarPreguntas = false
-                            mostrarModal = true
-                            viewModel.limpiarMensajesPreguntasSeguridad()
-                        }
-                ) {
+                TarjetaBase(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(
-                            modifier = Modifier.fillMaxWidth(0.84f),
+                            modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
@@ -408,36 +433,26 @@ fun PantallaPreguntasSeguridad(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             if (item.configurada) {
-                                val visible = respuestasVisibles.contains(item.indice)
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(
-                                        text = if (visible) "Respuesta: ${item.respuesta}" else "Respuesta: ••••••••",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    IconButton(onClick = {
-                                        respuestasVisibles = if (visible) {
-                                            respuestasVisibles - item.indice
-                                        } else {
-                                            respuestasVisibles + item.indice
-                                        }
-                                    }) {
-                                        Icon(
-                                            imageVector = if (visible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                            contentDescription = if (visible) "Ocultar respuesta" else "Mostrar respuesta"
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = if (item.respuesta.isBlank()) "Respuesta configurada" else "Respuesta: ••••••••",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
-                        Icon(
-                            imageVector = Icons.Filled.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                        OutlinedIconButton(onClick = {
+                            indiceEnEdicion = item.indice
+                            preguntaInput = item.pregunta
+                            respuestaInput = item.respuesta
+                            desplegarPreguntas = false
+                            mostrarModal = true
+                            viewModel.limpiarMensajesPreguntasSeguridad()
+                        }) {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = "Editar pregunta"
+                            )
+                        }
                     }
                 }
             }
@@ -572,11 +587,17 @@ fun PantallaUbicacion(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     val uiState = viewModel.uiState
     val ubicacion = uiState.ubicacionAjustes
+    val direccionLinea = listOf(ubicacion.calle, ubicacion.numero)
+        .filter { it.isNotBlank() }
+        .joinToString(" ")
+        .ifBlank { "Sin direccion" }
+    val resumenUbicacion = listOf(direccionLinea, ubicacion.comuna, ubicacion.region)
+        .filter { it.isNotBlank() }
+        .joinToString(" - ")
     var mostrarModalDireccion by rememberSaveable { mutableStateOf(false) }
     var comunaInput by rememberSaveable { mutableStateOf("") }
     var calleInput by rememberSaveable { mutableStateOf("") }
     var numeroInput by rememberSaveable { mutableStateOf("") }
-    var detalleInput by rememberSaveable { mutableStateOf("") }
     var posicionSliderDisponibilidad by rememberSaveable { mutableStateOf(0f) }
     val reportarSinUbicacion = {
         viewModel.reportarErrorUbicacion(
@@ -647,6 +668,12 @@ fun PantallaUbicacion(
     LaunchedEffect(ubicacion.rangoDisponibilidadM) {
         posicionSliderDisponibilidad = EscalaRango.posicionSliderPorValor(ubicacion.rangoDisponibilidadM)
     }
+    LaunchedEffect(mostrarModalDireccion) {
+        if (mostrarModalDireccion) {
+            viewModel.recargar()
+            viewModel.recargarComunas()
+        }
+    }
 
     LaunchedEffect(uiState.mensajeUbicacion) {
         val mensaje = uiState.mensajeUbicacion ?: return@LaunchedEffect
@@ -664,12 +691,7 @@ fun PantallaUbicacion(
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "${ubicacion.calle} ${ubicacion.numero}, ${ubicacion.comuna}, ${ubicacion.region}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "Detalle: ${ubicacion.detalle}",
+                text = resumenUbicacion,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -678,7 +700,6 @@ fun PantallaUbicacion(
                     comunaInput = ubicacion.comuna
                     calleInput = ubicacion.calle
                     numeroInput = ubicacion.numero
-                    detalleInput = ubicacion.detalle
                     mostrarModalDireccion = true
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -789,12 +810,12 @@ fun PantallaUbicacion(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     ComboComunaRM(
-                        comunaSeleccionada = comunaInput.ifBlank { "Santiago" },
+                        comunaSeleccionada = comunaInput.ifBlank { "Sin comuna" },
+                        comunas = uiState.comunasDisponibles,
                         onSeleccionar = { comunaInput = it }
                     )
                     CampoContrabajo(valor = calleInput, onValueChange = { calleInput = it }, etiqueta = "Calle")
                     CampoContrabajo(valor = numeroInput, onValueChange = { numeroInput = it }, etiqueta = "Numero")
-                    CampoContrabajo(valor = detalleInput, onValueChange = { detalleInput = it }, etiqueta = "Detalle")
                 }
             },
             confirmButton = {
@@ -803,7 +824,6 @@ fun PantallaUbicacion(
                     viewModel.actualizarComunaUbicacion(comunaInput)
                     viewModel.actualizarCalleUbicacion(calleInput)
                     viewModel.actualizarNumeroUbicacion(numeroInput)
-                    viewModel.actualizarDetalleUbicacion(detalleInput)
                     viewModel.guardarUbicacionAjustes()
                     mostrarModalDireccion = false
                 }) {
@@ -828,21 +848,15 @@ fun PantallaUbicacion(
 @Composable
 private fun ComboComunaRM(
     comunaSeleccionada: String,
+    comunas: List<ComunaCatalogo>,
     onSeleccionar: (String) -> Unit
 ) {
     var desplegado by rememberSaveable { mutableStateOf(false) }
-    val comunas = remember {
-        listOf(
-            "Alhue", "Buin", "Calera de Tango", "Cerrillos", "Cerro Navia", "Colina",
-            "Conchali", "Curacavi", "El Bosque", "El Monte", "Estacion Central", "Huechuraba",
-            "Independencia", "Isla de Maipo", "La Cisterna", "La Florida", "La Granja", "La Pintana",
-            "La Reina", "Lampa", "Las Condes", "Lo Barnechea", "Lo Espejo", "Lo Prado",
-            "Macul", "Maipu", "Maria Pinto", "Melipilla", "Nunoa", "Padre Hurtado",
-            "Paine", "Pedro Aguirre Cerda", "Penaflor", "Penalolen", "Pirque", "Providencia",
-            "Pudahuel", "Puente Alto", "Quilicura", "Quinta Normal", "Recoleta", "Renca",
-            "San Bernardo", "San Joaquin", "San Jose de Maipo", "San Miguel", "San Pedro",
-            "San Ramon", "Santiago", "Talagante", "Tiltil", "Vitacura"
-        )
+    val comunasOrdenadas = remember(comunas) {
+        comunas.sortedWith(
+            compareBy<ComunaCatalogo> { if (it.nombre.equals("Sin comuna", ignoreCase = true)) 0 else 1 }
+                .thenBy { it.nombre.lowercase() }
+        ).map { it.nombre }
     }
 
     ExposedDropdownMenuBox(
@@ -864,14 +878,21 @@ private fun ComboComunaRM(
             expanded = desplegado,
             onDismissRequest = { desplegado = false }
         ) {
-            comunas.forEach { comuna ->
+            if (comunasOrdenadas.isEmpty()) {
                 DropdownMenuItem(
-                    text = { Text(comuna) },
-                    onClick = {
-                        onSeleccionar(comuna)
-                        desplegado = false
-                    }
+                    text = { Text("Sin comunas disponibles") },
+                    onClick = { desplegado = false }
                 )
+            } else {
+                comunasOrdenadas.forEach { comuna ->
+                    DropdownMenuItem(
+                        text = { Text(comuna) },
+                        onClick = {
+                            onSeleccionar(comuna)
+                            desplegado = false
+                        }
+                    )
+                }
             }
         }
     }

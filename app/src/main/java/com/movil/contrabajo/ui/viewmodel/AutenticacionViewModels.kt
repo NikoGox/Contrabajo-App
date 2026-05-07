@@ -6,10 +6,12 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.movil.contrabajo.data.repository.RepositorioAutenticacion
+import com.movil.contrabajo.domain.model.ComunaCatalogo
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
 import com.movil.contrabajo.domain.model.PreguntasSeguridadCatalogo
 import com.movil.contrabajo.domain.model.RegistroPendiente
 import com.movil.contrabajo.domain.model.TipoPerfil
+import java.text.Normalizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,8 +46,8 @@ class InicioViewModel(
 }
 
 data class LoginUiState(
-    val identificador: String = "cliente_demo",
-    val contrasena: String = "123456",
+    val identificador: String = "cliente_prueba",
+    val contrasena: String = "Contrabajo123!",
     val recordarme: Boolean = true,
     val error: String? = null,
     val loginExitoso: Boolean = false,
@@ -96,11 +98,11 @@ class LoginViewModel(
         }
     }
 
-    fun autocompletarPerfilDemo(perfil: String) {
+    fun autocompletarPerfilPrueba(perfil: String) {
         val (identificador, contrasena) = when (perfil) {
-            "trabajador" -> "trabajador_demo" to "123456"
-            "moderador" -> "moderador_demo" to "123456"
-            else -> "cliente_demo" to "123456"
+            "trabajador" -> DEMO_TRABAJADOR_USUARIO to DEMO_PASSWORD
+            "moderador" -> DEMO_MODERADOR_USUARIO to DEMO_PASSWORD
+            else -> DEMO_CLIENTE_USUARIO to DEMO_PASSWORD
         }
         uiState = uiState.copy(
             identificador = identificador,
@@ -261,6 +263,13 @@ class LoginViewModel(
 
 data class RegistroUiState(
     val registro: RegistroPendiente = RegistroPendiente(),
+    val comunas: List<ComunaCatalogo> = emptyList(),
+    val cargandoComunas: Boolean = false,
+    val errorComunas: String? = null,
+    val validandoDisponibilidad: Boolean = false,
+    val errorRunDisponible: String? = null,
+    val errorUsernameDisponible: String? = null,
+    val errorCorreoDisponible: String? = null,
     val error: String? = null,
     val registroExitoso: Boolean = false
 )
@@ -270,6 +279,30 @@ class RegistroViewModel(
 ) : ViewModel() {
     var uiState by mutableStateOf(RegistroUiState())
         private set
+
+    fun cargarComunas() {
+        if (uiState.cargandoComunas || uiState.comunas.isNotEmpty()) return
+        viewModelScope.launch {
+            uiState = uiState.copy(cargandoComunas = true, errorComunas = null)
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioAutenticacion.obtenerComunas()
+            }
+            resultado
+                .onSuccess { comunas ->
+                    uiState = uiState.copy(
+                        comunas = ordenarComunasIntegracion(comunas),
+                        cargandoComunas = false,
+                        errorComunas = null
+                    )
+                }
+                .onFailure {
+                    uiState = uiState.copy(
+                        cargandoComunas = false,
+                        errorComunas = it.message ?: "No se pudieron cargar las comunas"
+                    )
+                }
+        }
+    }
 
     fun actualizarNombre(valor: String) {
         actualizarRegistro(uiState.registro.copy(nombre = sanitizarNombrePersona(valor)))
@@ -285,7 +318,11 @@ class RegistroViewModel(
 
     fun actualizarRun(valor: String) {
         val runDigitos = valor.filter { it.isDigit() }.take(8)
-        actualizarRegistro(uiState.registro.copy(run = runDigitos))
+        uiState = uiState.copy(
+            registro = uiState.registro.copy(run = runDigitos),
+            error = null,
+            errorRunDisponible = null
+        )
     }
 
     fun actualizarDv(valor: String) {
@@ -293,7 +330,11 @@ class RegistroViewModel(
             .uppercase()
             .filter { it.isDigit() || it == 'K' }
             .take(1)
-        actualizarRegistro(uiState.registro.copy(dv = dvNormalizado))
+        uiState = uiState.copy(
+            registro = uiState.registro.copy(dv = dvNormalizado),
+            error = null,
+            errorRunDisponible = null
+        )
     }
 
     fun actualizarTelefono(valor: String) {
@@ -306,7 +347,12 @@ class RegistroViewModel(
     }
 
     fun actualizarComuna(valor: String) {
-        actualizarRegistro(uiState.registro.copy(comuna = valor))
+        val comuna = uiState.comunas.firstOrNull { it.nombre.equals(valor, ignoreCase = true) }
+        val idComuna = when {
+            valor.normalizarTexto() == "sin comuna" -> 1
+            else -> comuna?.id
+        }
+        actualizarRegistro(uiState.registro.copy(idComuna = idComuna, comuna = valor))
     }
 
     fun actualizarCalle(valor: String) {
@@ -322,11 +368,19 @@ class RegistroViewModel(
     }
 
     fun actualizarUsername(valor: String) {
-        actualizarRegistro(uiState.registro.copy(username = valor))
+        uiState = uiState.copy(
+            registro = uiState.registro.copy(username = valor),
+            error = null,
+            errorUsernameDisponible = null
+        )
     }
 
     fun actualizarCorreo(valor: String) {
-        actualizarRegistro(uiState.registro.copy(correo = valor))
+        uiState = uiState.copy(
+            registro = uiState.registro.copy(correo = valor),
+            error = null,
+            errorCorreoDisponible = null
+        )
     }
 
     fun actualizarFechaNacimiento(valor: String) {
@@ -357,6 +411,13 @@ class RegistroViewModel(
         actualizarRegistro(uiState.registro.copy(respuestaSeguridad2 = valor))
     }
 
+    private fun ordenarComunasIntegracion(comunas: List<ComunaCatalogo>): List<ComunaCatalogo> {
+        return comunas.sortedWith(
+            compareBy<ComunaCatalogo> { if (it.nombre.normalizarTexto() == "sin comuna") 0 else 1 }
+                .thenBy { it.nombre.normalizarTexto() }
+        )
+    }
+
     fun registrarUsuario() {
         val registro = uiState.registro
         viewModelScope.launch {
@@ -370,6 +431,74 @@ class RegistroViewModel(
             .onFailure {
                 uiState = uiState.copy(error = it.message, registroExitoso = false)
             }
+        }
+    }
+
+    fun verificarRunDisponibleAntesDeContinuar(onDisponible: () -> Unit) {
+        val registro = uiState.registro
+        val runValidado = registro.run.filter { it.isDigit() }
+        if (runValidado.length !in 7..8) {
+            uiState = uiState.copy(errorRunDisponible = "El RUN debe tener 7 u 8 digitos")
+            return
+        }
+        if (!validarRut(runValidado, registro.dv)) {
+            uiState = uiState.copy(errorRunDisponible = "El RUN no es valido")
+            return
+        }
+        viewModelScope.launch {
+            uiState = uiState.copy(validandoDisponibilidad = true, errorRunDisponible = null)
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioAutenticacion.verificarRunDisponible(runValidado)
+            }
+            resultado
+                .onSuccess { disponible ->
+                    if (disponible) {
+                        onDisponible()
+                    } else {
+                        uiState = uiState.copy(errorRunDisponible = "El RUN ya existe")
+                    }
+                }
+                .onFailure {
+                    uiState = uiState.copy(errorRunDisponible = it.message ?: "No se pudo validar el RUN")
+                }
+            uiState = uiState.copy(validandoDisponibilidad = false)
+        }
+    }
+
+    fun verificarCuentaDisponibleAntesDeContinuar(onDisponible: () -> Unit) {
+        val registro = uiState.registro
+        val username = registro.username.trim()
+        val correo = registro.correo.trim()
+        viewModelScope.launch {
+            uiState = uiState.copy(
+                validandoDisponibilidad = true,
+                errorUsernameDisponible = null,
+                errorCorreoDisponible = null
+            )
+            val usernameResultado = withContext(Dispatchers.IO) {
+                repositorioAutenticacion.verificarUsernameDisponible(username)
+            }
+            val correoResultado = withContext(Dispatchers.IO) {
+                repositorioAutenticacion.verificarCorreoDisponible(correo)
+            }
+            val usernameOk = usernameResultado.getOrNull()
+            val correoOk = correoResultado.getOrNull()
+            when {
+                usernameOk == false -> uiState = uiState.copy(errorUsernameDisponible = "El nombre de usuario ya existe")
+                usernameResultado.isFailure -> uiState = uiState.copy(
+                    errorUsernameDisponible = usernameResultado.exceptionOrNull()?.message ?: "No se pudo validar el nombre de usuario"
+                )
+            }
+            when {
+                correoOk == false -> uiState = uiState.copy(errorCorreoDisponible = "El correo ya existe")
+                correoResultado.isFailure -> uiState = uiState.copy(
+                    errorCorreoDisponible = correoResultado.exceptionOrNull()?.message ?: "No se pudo validar el correo"
+                )
+            }
+            if (usernameOk == true && correoOk == true) {
+                onDisponible()
+            }
+            uiState = uiState.copy(validandoDisponibilidad = false)
         }
     }
 
@@ -400,4 +529,33 @@ class RegistroViewModel(
             .let { if (it.length == 9 && it.startsWith("9")) it.drop(1) else it }
         return digitos.take(8)
     }
+}
+
+private const val DEMO_CLIENTE_USUARIO = "cliente_prueba"
+private const val DEMO_TRABAJADOR_USUARIO = "trabajador_prueba"
+private const val DEMO_MODERADOR_USUARIO = "moderador_prueba"
+private const val DEMO_PASSWORD = "Contrabajo123!"
+
+private fun String.normalizarTexto(): String {
+    return Normalizer.normalize(trim(), Normalizer.Form.NFD)
+        .replace("\\p{M}+".toRegex(), "")
+        .lowercase()
+}
+
+private fun validarRut(runRaw: String, dvRaw: String): Boolean {
+    val run = runRaw.filter { it.isDigit() }.take(8)
+    if (run.length !in 7..8) return false
+    val dv = dvRaw.trim().uppercase()
+    if (dv.isBlank()) return false
+
+    val digitos = run.reversed().map { it.digitToInt() }
+    val factores = listOf(2, 3, 4, 5, 6, 7)
+    val suma = digitos.mapIndexed { indice, valor -> valor * factores[indice % factores.size] }.sum()
+    val resto = 11 - (suma % 11)
+    val dvCalculado = when (resto) {
+        11 -> "0"
+        10 -> "K"
+        else -> resto.toString()
+    }
+    return dvCalculado == dv
 }

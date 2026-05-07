@@ -100,6 +100,23 @@ fun ContrabajoApp(
     var mostrarIndicadorCargaGlobal by rememberSaveable { mutableStateOf(true) }
     var modoSuaveCargaGlobal by rememberSaveable { mutableStateOf(false) }
     var navegacionEnCarga by rememberSaveable { mutableStateOf(false) }
+    val sesionCerrada = perfilViewModel.uiState.sesionCerrada
+
+    LaunchedEffect(sesionCerrada) {
+        if (sesionCerrada) {
+            mensajeCargaGlobal = "Cerrando sesion..."
+            progresoCargaGlobal = 1f
+            mostrarIndicadorCargaGlobal = false
+            modoSuaveCargaGlobal = true
+            mostrarCargaGlobal = true
+            delay(900)
+            perfilViewModel.consumirCierreSesion()
+            navController.navigate(RutasApp.Inicio.ruta) {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
+            mostrarCargaGlobal = false
+        }
+    }
 
     val abrirPrincipalConCarga: () -> Unit = {
         if (!navegacionEnCarga) {

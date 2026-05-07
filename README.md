@@ -15,27 +15,23 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.8.0-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.9.0-Pre-Alpha
 
 
 
-> <br>• Se inició la integración real del frontend con el backend de Contrabajo para la épica de Acceso y Cuenta.
-> <br>• Se descartó el selector Online/Offline y se definió una migración progresiva de funcionalidades locales hacia backend.
-> <br>• Se conectó el registro de usuarios con el backend, incluyendo datos personales, cuenta, dirección y preguntas de seguridad.
-> <br>• Se habilitó login contra backend usando nombre de usuario como identificador principal.
-> <br>• Se incorporó sesión persistente con token JWT y validación de sesión al reabrir la app.
-> <br>• Se conectó el cierre de sesión con backend y limpieza local de la sesión activa.
-> <br>• Se conectó recuperación de cuenta con validación de preguntas de seguridad y cambio de contraseña según los endpoints disponibles.
-> <br>• Se conectó lectura de perfil desde backend para mantener la identidad de cuenta integrada.
-> <br>• Se habilitó edición de correo y teléfono de perfil con backend, reflejando en pantalla los datos realmente guardados.
-> <br>• Se mantuvo el username visible pero no editable hasta que backend soporte edición de nombre de usuario.
-> <br>• Se dejó foto de perfil como dato local temporal porque backend aún no expone endpoint remoto para imagen de perfil.
-> <br>• Se corrigió el registro de RUN para aceptar personas con RUN de 7 u 8 dígitos antes del DV.
-> <br>• Se corrigió el formato visual de RUN para representar correctamente casos como 1.234.567 y 12.345.678.
-> <br>• Se reforzó la contraseña de registro con mínimo 8 caracteres, 1 mayúscula, 1 número y 1 símbolo.
-> <br>• Se agregó texto de ayuda bajo confirmar contraseña para explicar los requisitos antes de registrar.
-> <br>• Se configuró el cliente REST Android con Retrofit, OkHttp y Gson apuntando al backend local desde emulador.
-> <br>• Se mantuvieron servicios, marketplace, chats y reportes en repositorios locales/legacy para integrarlos en iteraciones siguientes.
+> <br>• Se consolidó el modo online-first en front para cuenta/perfil/seguridad/ubicación, eliminando fallback offline operativo en estos flujos.
+> <br>• Se integró precarga de perfil tras login para reducir cargas intermedias y mantener datos consistentes entre pantallas.
+> <br>• Se conectó validación previa de disponibilidad en registro para RUN, username y correo contra backend antes del alta final.
+> <br>• Se reforzó edición de perfil para sincronizar siempre desde backend y reflejar cambios de correo/teléfono con recarga posterior.
+> <br>• Se mejoró verificación de trabajador con cierre de sesión controlado y retorno a login tras validación exitosa.
+> <br>• Se ajustó verificación de RUN para admitir formatos reales de 7 u 8 dígitos, conservando DV y validación formal.
+> <br>• Se volvió inmutable el RUN/DV de cuenta en pantalla de verificación (solo lectura), usando cédula como dato de contraste.
+> <br>• Se conectó ubicación a backend con recarga activa de dirección/comuna y sincronización de coordenadas persistidas.
+> <br>• Se corrigió el modal de comuna para mostrar catálogo remoto y manejar estados de carga/error sin romper la UX.
+> <br>• Se rediseñó seguridad de cuenta para editar preguntas por ítem sin mostrar respuestas en pantalla.
+> <br>• Se conectó lectura y actualización de preguntas de seguridad con endpoints autenticados de perfil.
+> <br>• Se limpió estado sensible al cerrar sesión para evitar residuos entre usuarios (verificación, perfil y seguridad).
+> <br>• Se mantuvo compatibilidad visual con la estética actual de Contrabajo durante la migración a backend.
 
 ---
 

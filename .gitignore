@@ -16,3 +16,7 @@
 local.properties
 .tmp_xlsx_edit/
 .tmp_xlsx_edit2/
+.gradle-local/
+g/wrapper/dists/
+*.zip.part
+*.zip.lck

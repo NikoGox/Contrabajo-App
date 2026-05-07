@@ -182,6 +182,17 @@ fun PantallaEditarPerfil(
                         enabled = false
                     )
                     CampoContrabajo(
+                        valor = listOf(usuario.direccionCalle, usuario.direccionNumero, usuario.direccionComuna)
+                            .filter { it.isNotBlank() }
+                            .joinToString(", ")
+                            .ifBlank { "Sin direccion" },
+                        onValueChange = {},
+                        etiqueta = "Direccion",
+                        modifier = Modifier.fillMaxWidth(),
+                        readOnly = true,
+                        enabled = false
+                    )
+                    CampoContrabajo(
                         valor = usuario.fechaNacimiento,
                         onValueChange = {},
                         etiqueta = "Fecha de nacimiento",

@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.movil.contrabajo.data.repository.RepositorioAutenticacion
 import com.movil.contrabajo.domain.model.CategoriaServicio
+import com.movil.contrabajo.domain.model.ComunaCatalogo
 import com.movil.contrabajo.domain.model.CitaServicio
 import com.movil.contrabajo.data.repository.RepositorioChats
 import com.movil.contrabajo.data.repository.RepositorioOfertas
@@ -55,6 +56,7 @@ data class PrincipalUiState(
     val soloTrabajadorVerificado: Boolean = false,
     val filtroZonaComunaActivo: Boolean = false,
     val comunaFiltro: String = "",
+    val comunasDisponibles: List<ComunaCatalogo> = emptyList(),
     val ordenMarketplace: OrdenMarketplace = OrdenMarketplace.FECHA_RECIENTES,
     val mensajePrincipal: String? = null
 )
@@ -67,13 +69,26 @@ enum class OrdenMarketplace {
 
 class PrincipalViewModel(
     private val repositorioOfertas: RepositorioOfertas,
-    private val repositorioPerfil: RepositorioPerfil
+    private val repositorioPerfil: RepositorioPerfil,
+    private val repositorioAutenticacion: RepositorioAutenticacion
 ) : ViewModel() {
     var uiState by mutableStateOf(PrincipalUiState())
         private set
 
     init {
+        cargarComunas()
         recargar()
+    }
+
+    private fun cargarComunas() {
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioAutenticacion.obtenerComunas()
+            }
+            resultado.onSuccess { comunas ->
+                uiState = uiState.copy(comunasDisponibles = comunas)
+            }
+        }
     }
 
     fun recargar() {
@@ -533,6 +548,7 @@ data class PerfilUiState(
     val sesionCerrada: Boolean = false,
     val ofertasPropias: List<OfertaServicio> = emptyList(),
     val categorias: List<CategoriaServicio> = emptyList(),
+    val comunasDisponibles: List<ComunaCatalogo> = emptyList(),
     val formularioServicio: FormularioServicio = FormularioServicio(),
     val mostrandoFormularioServicio: Boolean = false,
     val idOfertaEditando: Long? = null,
@@ -566,42 +582,95 @@ class PerfilViewModel(
 ) : ViewModel() {
     var uiState by mutableStateOf(PerfilUiState())
         private set
+    private val preguntasSeguridadCache = mutableMapOf<Int, String>()
+    private var usuarioCacheId: Long? = null
 
     init {
         recargar()
     }
 
     fun recargar() {
-        val usuario = repositorioPerfil.obtenerPerfilActual()
-        val ofertasPropias = repositorioOfertas.obtenerOfertasPropias()
-        val categorias = repositorioOfertas.obtenerCategoriasServicio()
-        val idsOfertasEnCurso = repositorioOfertas.obtenerIdsOfertasConTrabajoEnCursoPropias()
-        val valoracionesPorServicio = repositorioOfertas.obtenerValoracionesPropiasPorServicio()
-        val ofertaPrincipal = ofertasPropias.firstOrNull()
-        val formularioServicio = if (uiState.mostrandoFormularioServicio) {
-            uiState.formularioServicio
-        } else {
-            ofertaPrincipal.toFormularioServicio()
-        }
+        viewModelScope.launch {
+            val snapshot = withContext(Dispatchers.IO) {
+                val usuario = repositorioPerfil.obtenerPerfilActual()
+                val ofertasPropias = repositorioOfertas.obtenerOfertasPropias()
+                val categorias = repositorioOfertas.obtenerCategoriasServicio()
+                val comunasDisponibles = repositorioAutenticacion.obtenerComunas().getOrNull()
+                    ?.takeIf { it.isNotEmpty() }
+                val idsOfertasEnCurso = repositorioOfertas.obtenerIdsOfertasConTrabajoEnCursoPropias()
+                val valoracionesPorServicio = repositorioOfertas.obtenerValoracionesPropiasPorServicio()
+                val preguntasSeguridad = repositorioPerfil.obtenerPreguntasSeguridad()
+                val ubicacionAjustes = repositorioPerfil.obtenerUbicacionAjustes()
+                listOf(
+                    usuario,
+                    ofertasPropias,
+                    categorias,
+                    comunasDisponibles,
+                    idsOfertasEnCurso,
+                    valoracionesPorServicio,
+                    preguntasSeguridad,
+                    ubicacionAjustes
+                )
+            }
 
-        uiState = uiState.copy(
-            usuario = usuario,
-            ofertasPropias = ofertasPropias,
-            categorias = categorias,
-            idsOfertasEnCurso = idsOfertasEnCurso,
-            valoracionesPorServicio = valoracionesPorServicio,
-            formularioServicio = formularioServicio,
-            runVerificacion = if (uiState.runVerificacion.isBlank()) usuario?.run.orEmpty() else uiState.runVerificacion,
-            dvVerificacion = if (uiState.dvVerificacion.isBlank()) usuario?.dv.orEmpty() else uiState.dvVerificacion,
-            correoPerfilInput = if (uiState.correoPerfilInput.isBlank()) usuario?.correo.orEmpty() else uiState.correoPerfilInput,
-            telefonoPerfilInput = if (uiState.telefonoPerfilInput.isBlank()) {
-                usuario?.telefono.orEmpty().normalizarTelefonoMovilSinPrefijo()
+            val usuario = snapshot[0] as Usuario?
+            val ofertasPropias = snapshot[1] as List<OfertaServicio>
+            val categorias = snapshot[2] as List<CategoriaServicio>
+            val comunasDisponiblesRemotas = snapshot[3] as List<ComunaCatalogo>?
+            val idsOfertasEnCurso = snapshot[4] as Set<Long>
+            val valoracionesPorServicio = snapshot[5] as List<ValoracionesServicio>
+            val preguntasRemotas = snapshot[6] as List<PreguntaSeguridadConfig>
+            val ubicacionAjustes = snapshot[7] as UbicacionAjustesConfig
+
+            if (usuario?.idUsuario != usuarioCacheId) {
+                preguntasSeguridadCache.clear()
+                usuarioCacheId = usuario?.idUsuario
+            }
+            val ofertaPrincipal = ofertasPropias.firstOrNull()
+            val formularioServicio = if (uiState.mostrandoFormularioServicio) {
+                uiState.formularioServicio
             } else {
-                uiState.telefonoPerfilInput
-            },
-            preguntasSeguridad = repositorioPerfil.obtenerPreguntasSeguridad(),
-            ubicacionAjustes = repositorioPerfil.obtenerUbicacionAjustes()
-        )
+                ofertaPrincipal.toFormularioServicio()
+            }
+
+            uiState = uiState.copy(
+                usuario = usuario,
+                ofertasPropias = ofertasPropias,
+                categorias = categorias,
+                comunasDisponibles = comunasDisponiblesRemotas ?: uiState.comunasDisponibles,
+                idsOfertasEnCurso = idsOfertasEnCurso,
+                valoracionesPorServicio = valoracionesPorServicio,
+                formularioServicio = formularioServicio,
+                runVerificacion = usuario?.run.orEmpty(),
+                dvVerificacion = usuario?.dv.orEmpty(),
+                correoPerfilInput = usuario?.correo.orEmpty(),
+                telefonoPerfilInput = usuario?.telefono.orEmpty().normalizarTelefonoMovilSinPrefijo(),
+                preguntasSeguridad = preguntasRemotas.map { pregunta ->
+                    pregunta.copy(respuesta = preguntasSeguridadCache[pregunta.indice].orEmpty())
+                },
+                ubicacionAjustes = ubicacionAjustes
+            )
+        }
+    }
+
+    fun recargarComunas() {
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioAutenticacion.obtenerComunas()
+            }
+            val comunas = resultado.getOrNull()
+            if (comunas.isNullOrEmpty()) {
+                uiState = uiState.copy(
+                    errorUbicacion = resultado.exceptionOrNull()?.message
+                        ?: "No se pudieron cargar las comunas desde backend."
+                )
+                return@launch
+            }
+            uiState = uiState.copy(
+                comunasDisponibles = comunas,
+                errorUbicacion = null
+            )
+        }
     }
 
     fun mostrarFormularioCreacion() {
@@ -905,6 +974,7 @@ class PerfilViewModel(
                         errorUbicacion = null,
                         mensajeUbicacion = "Ubicacion actualizada correctamente."
                     )
+                    recargar()
                 }
                 .onFailure {
                     uiState = uiState.copy(
@@ -947,6 +1017,7 @@ class PerfilViewModel(
                         errorUbicacion = null,
                         mensajeUbicacion = "Direccion y rango guardados."
                     )
+                    recargar()
                 }
                 .onFailure {
                     uiState = uiState.copy(
@@ -963,20 +1034,38 @@ class PerfilViewModel(
     }
 
     fun guardarPreguntaSeguridad(indice: Int, pregunta: String, respuesta: String) {
-        repositorioPerfil.guardarPreguntaSeguridad(indice, pregunta, respuesta)
-            .onSuccess { preguntas ->
-                uiState = uiState.copy(
-                    preguntasSeguridad = preguntas,
-                    errorPreguntasSeguridad = null,
-                    mensajePreguntasSeguridad = "Pregunta de seguridad $indice guardada."
-                )
+        viewModelScope.launch {
+            uiState = uiState.copy(cargandoPantalla = true)
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioPerfil.guardarPreguntaSeguridad(indice, pregunta, respuesta)
             }
-            .onFailure {
-                uiState = uiState.copy(
-                    errorPreguntasSeguridad = it.message ?: "No se pudo guardar la pregunta",
-                    mensajePreguntasSeguridad = null
-                )
-            }
+            resultado
+                .onSuccess { preguntas ->
+                    preguntasSeguridadCache[indice] = respuesta
+                    val preguntasActualizadas = preguntas.map { item ->
+                        if (item.indice == indice) {
+                            item.copy(
+                                pregunta = pregunta,
+                                respuesta = respuesta
+                            )
+                        } else {
+                            item
+                        }
+                    }
+                    uiState = uiState.copy(
+                        preguntasSeguridad = preguntasActualizadas,
+                        errorPreguntasSeguridad = null,
+                        mensajePreguntasSeguridad = "Pregunta de seguridad $indice guardada."
+                    )
+                }
+                .onFailure {
+                    uiState = uiState.copy(
+                        errorPreguntasSeguridad = it.message ?: "No se pudo guardar la pregunta",
+                        mensajePreguntasSeguridad = null
+                    )
+                }
+            uiState = uiState.copy(cargandoPantalla = false)
+        }
     }
 
     fun limpiarMensajesPreguntasSeguridad() {
@@ -1033,6 +1122,7 @@ class PerfilViewModel(
                     errorPerfilEdicion = null,
                     mensajePerfilEdicion = "Perfil actualizado correctamente."
                 )
+                recargar()
             }.onFailure {
                 uiState = uiState.copy(
                     errorPerfilEdicion = it.message ?: "No se pudo actualizar el perfil",
@@ -1051,8 +1141,8 @@ class PerfilViewModel(
     }
 
     fun solicitarVerificacionTrabajador() {
-        if (uiState.runVerificacion.length != 8) {
-            uiState = uiState.copy(errorVerificacion = "El RUN debe tener 8 digitos")
+        if (uiState.runVerificacion.length !in 7..8) {
+            uiState = uiState.copy(errorVerificacion = "El RUN debe tener 7 u 8 digitos")
             return
         }
         if (uiState.dvVerificacion.isBlank()) {
@@ -1063,21 +1153,29 @@ class PerfilViewModel(
             uiState = uiState.copy(errorVerificacion = "El numero de documento debe tener 9 digitos")
             return
         }
-        repositorioPerfil.solicitarVerificacionTrabajador(
-            run = uiState.runVerificacion,
-            dv = uiState.dvVerificacion,
-            numeroDocumento = uiState.numeroDocumentoVerificacion
-        ).onSuccess { usuarioActualizado ->
-            uiState = uiState.copy(
-                usuario = usuarioActualizado,
-                errorVerificacion = null,
-                mensajeVerificacion = "Cuenta verificada. Tu perfil ahora esta habilitado como trabajador."
-            )
-        }.onFailure {
-            uiState = uiState.copy(
-                errorVerificacion = it.message ?: "No se pudo iniciar la verificacion",
-                mensajeVerificacion = null
-            )
+        viewModelScope.launch {
+            uiState = uiState.copy(cargandoPantalla = true)
+            delay(180)
+            withContext(Dispatchers.IO) {
+                repositorioPerfil.solicitarVerificacionTrabajador(
+                    run = uiState.runVerificacion,
+                    dv = uiState.dvVerificacion,
+                    numeroDocumento = uiState.numeroDocumentoVerificacion
+                )
+            }.onSuccess { usuarioActualizado ->
+                uiState = uiState.copy(
+                    usuario = usuarioActualizado,
+                    errorVerificacion = null,
+                    mensajeVerificacion = "Cuenta verificada. Tu perfil ahora esta habilitado como trabajador."
+                )
+                recargar()
+            }.onFailure {
+                uiState = uiState.copy(
+                    errorVerificacion = it.message ?: "No se pudo iniciar la verificacion",
+                    mensajeVerificacion = null
+                )
+            }
+            uiState = uiState.copy(cargandoPantalla = false)
         }
     }
 
@@ -1086,7 +1184,9 @@ class PerfilViewModel(
             withContext(Dispatchers.IO) {
                 repositorioAutenticacion.cerrarSesion()
             }
-            uiState = uiState.copy(sesionCerrada = true)
+            preguntasSeguridadCache.clear()
+            usuarioCacheId = null
+            uiState = PerfilUiState(sesionCerrada = true)
         }
     }
 

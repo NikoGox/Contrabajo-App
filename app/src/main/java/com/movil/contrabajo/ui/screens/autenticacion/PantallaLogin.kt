@@ -64,7 +64,7 @@ fun PantallaLogin(
                     IconButton(onClick = { menuAutorellenoAbierto = true }) {
                         Icon(
                             imageVector = Icons.Filled.MoreVert,
-                            contentDescription = "Autorrelleno demo"
+                            contentDescription = "Accesos de prueba"
                         )
                     }
                     DropdownMenu(
@@ -72,24 +72,24 @@ fun PantallaLogin(
                         onDismissRequest = { menuAutorellenoAbierto = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Perfil cliente demo") },
+                            text = { Text("Cuenta cliente") },
                             onClick = {
                                 menuAutorellenoAbierto = false
-                                viewModel.autocompletarPerfilDemo("cliente")
+                                viewModel.autocompletarPerfilPrueba("cliente")
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Perfil trabajador demo") },
+                            text = { Text("Cuenta trabajador") },
                             onClick = {
                                 menuAutorellenoAbierto = false
-                                viewModel.autocompletarPerfilDemo("trabajador")
+                                viewModel.autocompletarPerfilPrueba("trabajador")
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Perfil moderador demo") },
+                            text = { Text("Cuenta moderador") },
                             onClick = {
                                 menuAutorellenoAbierto = false
-                                viewModel.autocompletarPerfilDemo("moderador")
+                                viewModel.autocompletarPerfilPrueba("moderador")
                             }
                         )
                     }
@@ -132,7 +132,7 @@ fun PantallaLogin(
             BotonSecundario(texto = "Crear cuenta", onClick = onRegistrarse)
             BotonSecundario(texto = "Recuperar cuenta", onClick = onRecuperarCuenta)
             Text(
-                text = "Usuario demo: cliente_demo / 123456",
+                text = "Cuenta de prueba: cliente_prueba / Contrabajo123!",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -212,6 +212,11 @@ fun PantallaRecuperarCuenta(
                     valor = uiState.confirmarContrasenaRecuperacion,
                     onValueChange = viewModel::actualizarConfirmarContrasenaRecuperacion,
                     etiqueta = "Confirmar contrasena"
+                )
+                Text(
+                    text = "La contrasena debe tener minimo 8 caracteres, 1 mayuscula, 1 numero y 1 simbolo.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 BotonPrimario(
                     texto = "Restablecer contrasena",

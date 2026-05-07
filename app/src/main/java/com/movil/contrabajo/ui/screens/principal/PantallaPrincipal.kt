@@ -566,6 +566,7 @@ fun PantallaPrincipal(
             soloVerificados = soloVerificadosTemporal,
             filtroZonaComunaActivo = filtroZonaComunaTemporal,
             comunaSeleccionada = comunaTemporal,
+            comunas = uiState.comunasDisponibles.map { it.nombre },
             ordenActual = OrdenMarketplace.valueOf(ordenTemporal),
             onCategoriaSeleccionada = { categoriaTemporal = it },
             onTipoPrecioSeleccionado = { tipoPrecioTemporal = it },
@@ -602,6 +603,7 @@ private fun FiltroMarketplaceDialog(
     soloVerificados: Boolean,
     filtroZonaComunaActivo: Boolean,
     comunaSeleccionada: String,
+    comunas: List<String>,
     ordenActual: OrdenMarketplace,
     onCategoriaSeleccionada: (Long?) -> Unit,
     onTipoPrecioSeleccionado: (Int?) -> Unit,
@@ -726,7 +728,7 @@ private fun FiltroMarketplaceDialog(
                         expanded = desplegarComunas && filtroZonaComunaActivo,
                         onDismissRequest = { desplegarComunas = false }
                     ) {
-                        COMUNAS_REGION_METROPOLITANA.forEach { comuna ->
+                        comunas.forEach { comuna ->
                             DropdownMenuItem(
                                 text = { Text(comuna) },
                                 onClick = {
@@ -835,15 +837,3 @@ private fun BotonOrdenCompacto(
         )
     }
 }
-
-private val COMUNAS_REGION_METROPOLITANA = listOf(
-    "Alhue", "Buin", "Calera de Tango", "Cerrillos", "Cerro Navia", "Colina",
-    "Conchali", "Curacavi", "El Bosque", "El Monte", "Estacion Central", "Huechuraba",
-    "Independencia", "Isla de Maipo", "La Cisterna", "La Florida", "La Granja", "La Pintana",
-    "La Reina", "Lampa", "Las Condes", "Lo Barnechea", "Lo Espejo", "Lo Prado",
-    "Macul", "Maipu", "Maria Pinto", "Melipilla", "Nunoa", "Padre Hurtado",
-    "Paine", "Pedro Aguirre Cerda", "Penaflor", "Penalolen", "Pirque", "Providencia",
-    "Pudahuel", "Puente Alto", "Quilicura", "Quinta Normal", "Recoleta", "Renca",
-    "San Bernardo", "San Joaquin", "San Jose de Maipo", "San Miguel", "San Pedro",
-    "San Ramon", "Santiago", "Talagante", "Tiltil", "Vitacura"
-)

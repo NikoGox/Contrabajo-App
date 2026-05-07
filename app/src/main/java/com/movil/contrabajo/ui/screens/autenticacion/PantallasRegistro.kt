@@ -219,7 +219,7 @@ fun PantallaRegistroPasoUno(
                         modifier = Modifier.weight(0.35f)
                     )
                 }
-                if (intentoContinuar) TextoErrorCampo(errorRun ?: errorDv)
+                if (intentoContinuar) TextoErrorCampo(errorRun ?: errorDv ?: viewModel.uiState.errorRunDisponible)
 
                 CampoContrabajo(
                     valor = registro.telefono,
@@ -282,11 +282,11 @@ fun PantallaRegistroPasoUno(
                 )
                 BotonPrimario(
                     texto = "Siguiente",
-                    enabled = !bloquearSiguiente,
+                    enabled = !bloquearSiguiente && !viewModel.uiState.validandoDisponibilidad,
                     onClick = {
                         intentoContinuar = true
                         if (formularioPasoUnoValido) {
-                            onContinuar()
+                            viewModel.verificarRunDisponibleAntesDeContinuar(onContinuar)
                         } else {
                             bloquearSiguiente = true
                         }
@@ -306,12 +306,14 @@ fun PantallaRegistroPasoDireccion(
     onContinuar: () -> Unit
 ) {
     val registro = viewModel.uiState.registro
+    val comunas = viewModel.uiState.comunas
     val context = LocalContext.current
     val scrollPasoDireccion = rememberScrollState()
     var desplegarComunas by rememberSaveable { mutableStateOf(false) }
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     LaunchedEffect(Unit) {
+        viewModel.cargarComunas()
         if (registro.region.isBlank()) {
             viewModel.actualizarRegion("Region Metropolitana")
         }
@@ -411,20 +413,41 @@ fun PantallaRegistroPasoDireccion(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegarComunas) },
                         singleLine = true
                     )
-                    DropdownMenu(
-                        expanded = desplegarComunas,
-                        onDismissRequest = { desplegarComunas = false }
-                    ) {
-                        COMUNAS_REGION_METROPOLITANA.forEach { comuna ->
+                DropdownMenu(
+                    expanded = desplegarComunas,
+                    onDismissRequest = { desplegarComunas = false }
+                ) {
+                        comunas
+                            .sortedWith(
+                                compareBy<com.movil.contrabajo.domain.model.ComunaCatalogo> {
+                                    if (it.nombre.equals("Sin comuna", ignoreCase = true)) 0 else 1
+                                }.thenBy { it.nombre }
+                            )
+                            .forEach { comuna ->
                             DropdownMenuItem(
-                                text = { Text(comuna) },
+                                text = { Text(comuna.nombre) },
                                 onClick = {
-                                    viewModel.actualizarComuna(comuna)
+                                    viewModel.actualizarComuna(comuna.nombre)
                                     desplegarComunas = false
                                 }
                             )
                         }
                     }
+                }
+
+                if (viewModel.uiState.cargandoComunas) {
+                    Text(
+                        text = "Cargando comunas...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (viewModel.uiState.errorComunas != null) {
+                    Text(
+                        text = viewModel.uiState.errorComunas.orEmpty(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
 
                 Row(
@@ -550,6 +573,7 @@ fun PantallaRegistroPasoDos(
                 )
                 if (intentoRegistro) {
                     TextoErrorCampo(errorUsername)
+                    TextoErrorCampo(uiState.errorUsernameDisponible)
                 }
 
                 CampoContrabajo(
@@ -562,6 +586,7 @@ fun PantallaRegistroPasoDos(
                 )
                 if (intentoRegistro) {
                     TextoErrorCampo(errorCorreo)
+                    TextoErrorCampo(uiState.errorCorreoDisponible)
                 }
 
                 CampoSecretoContrabajo(
@@ -613,11 +638,11 @@ fun PantallaRegistroPasoDos(
                 )
                 BotonPrimario(
                     texto = "Siguiente",
-                    enabled = formularioPasoTresValido,
+                    enabled = formularioPasoTresValido && !uiState.validandoDisponibilidad,
                     onClick = {
                         intentoRegistro = true
                         if (formularioPasoTresValido) {
-                            onContinuar()
+                            viewModel.verificarCuentaDisponibleAntesDeContinuar(onContinuar)
                         }
                     },
                     modifier = Modifier.weight(1f)
@@ -994,15 +1019,3 @@ private fun mapTransformadoAOriginal(
     }
     return consumidos.coerceIn(0, originalDigits.length)
 }
-
-private val COMUNAS_REGION_METROPOLITANA = listOf(
-    "Alhue", "Buin", "Calera de Tango", "Cerrillos", "Cerro Navia", "Colina",
-    "Conchali", "Curacavi", "El Bosque", "El Monte", "Estacion Central", "Huechuraba",
-    "Independencia", "Isla de Maipo", "La Cisterna", "La Florida", "La Granja", "La Pintana",
-    "La Reina", "Lampa", "Las Condes", "Lo Barnechea", "Lo Espejo", "Lo Prado",
-    "Macul", "Maipu", "Maria Pinto", "Melipilla", "Nunoa", "Padre Hurtado",
-    "Paine", "Pedro Aguirre Cerda", "Penaflor", "Penalolen", "Pirque", "Providencia",
-    "Pudahuel", "Puente Alto", "Quilicura", "Quinta Normal", "Recoleta", "Renca",
-    "San Bernardo", "San Joaquin", "San Jose de Maipo", "San Miguel", "San Pedro",
-    "San Ramon", "Santiago", "Talagante", "Tiltil", "Vitacura"
-)

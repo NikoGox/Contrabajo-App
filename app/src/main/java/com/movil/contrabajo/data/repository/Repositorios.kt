@@ -2,6 +2,7 @@ package com.movil.contrabajo.data.repository
 
 import com.movil.contrabajo.data.local.ContrabajoSQLiteHelper
 import com.movil.contrabajo.domain.model.CategoriaServicio
+import com.movil.contrabajo.domain.model.ComunaCatalogo
 import com.movil.contrabajo.domain.model.CitaServicio
 import com.movil.contrabajo.domain.model.ChatCita
 import com.movil.contrabajo.domain.model.EstadoCita
@@ -32,6 +33,10 @@ import java.time.format.DateTimeFormatter
 interface RepositorioAutenticacion {
     fun obtenerSesionActiva(): Usuario?
     fun iniciarSesion(identificador: String, contrasena: String, recordarme: Boolean): Result<Usuario>
+    fun obtenerComunas(): Result<List<ComunaCatalogo>>
+    fun verificarRunDisponible(run: String): Result<Boolean>
+    fun verificarUsernameDisponible(username: String): Result<Boolean>
+    fun verificarCorreoDisponible(correo: String): Result<Boolean>
     fun registrarUsuario(registro: RegistroPendiente): Result<Usuario>
     fun obtenerPreguntasRecuperacion(identificador: String): Result<List<PreguntaSeguridadConfig>>
     fun validarRespuestasRecuperacion(identificador: String, respuesta1: String, respuesta2: String): Result<Unit>
@@ -178,6 +183,32 @@ class RepositorioAutenticacionLocal(
         return Result.success(db.obtenerUsuarioPorId(id) ?: usuario.copy(idUsuario = id))
     }
 
+    override fun obtenerComunas(): Result<List<ComunaCatalogo>> = Result.success(
+        listOf(
+            ComunaCatalogo(1, "Sin comuna", 1, "Region Metropolitana"),
+            ComunaCatalogo(2, "Lampa", 1, "Region Metropolitana"),
+            ComunaCatalogo(3, "Batuco", 1, "Region Metropolitana"),
+            ComunaCatalogo(4, "Colina", 1, "Region Metropolitana"),
+            ComunaCatalogo(5, "Quilicura", 1, "Region Metropolitana"),
+            ComunaCatalogo(6, "Santiago", 1, "Region Metropolitana")
+        )
+    )
+
+    override fun verificarRunDisponible(run: String): Result<Boolean> {
+        val runNormalizado = limpiarRun(run)
+        return Result.success(!db.existeRun(runNormalizado, ""))
+    }
+
+    override fun verificarUsernameDisponible(username: String): Result<Boolean> {
+        val valor = username.trim()
+        return Result.success(!db.existeUsuario("", valor))
+    }
+
+    override fun verificarCorreoDisponible(correo: String): Result<Boolean> {
+        val valor = correo.trim()
+        return Result.success(!db.existeUsuario(valor, ""))
+    }
+
     override fun obtenerPreguntasRecuperacion(identificador: String): Result<List<PreguntaSeguridadConfig>> {
         val usuario = db.obtenerUsuarioPorIdentificador(identificador.trim())
             ?: return Result.failure(IllegalArgumentException("No existe una cuenta con ese usuario o correo"))
@@ -226,9 +257,7 @@ class RepositorioAutenticacionLocal(
             ?: return Result.failure(IllegalArgumentException("No existe una cuenta con ese usuario o correo"))
         val nueva = nuevaContrasena.trim()
         val confirmar = confirmarContrasena.trim()
-        if (nueva.length < 6) {
-            return Result.failure(IllegalArgumentException("La contrasena debe tener al menos 6 caracteres"))
-        }
+        validarContrasenaSegura(nueva)?.let { return Result.failure(IllegalArgumentException(it)) }
         if (nueva != confirmar) {
             return Result.failure(IllegalArgumentException("Las contrasenas no coinciden"))
         }
@@ -255,13 +284,13 @@ class RepositorioAutenticacionLocal(
             registro.apellidoMaterno.isBlank() -> "Ingresa tu apellido materno"
             !esNombrePersonaValido(registro.apellidoMaterno) -> "El apellido materno solo puede contener letras"
             registro.run.isBlank() || registro.dv.isBlank() -> "Ingresa un RUN valido"
-            limpiarRun(registro.run).length != 8 -> "El RUN debe tener exactamente 8 digitos"
+            limpiarRun(registro.run).length !in 7..8 -> "El RUN debe tener 7 u 8 digitos"
             !validarRut(registro.run, registro.dv) -> "El RUN no es valido"
             digitosTelefono(registro.telefono).length != 9 -> "Ingresa un telefono valido de 9 digitos"
             registro.username.isBlank() -> "Ingresa un nombre de usuario"
             registro.correo.isBlank() || !registro.correo.contains("@") -> "Ingresa un correo valido"
             errorFechaNacimiento != null -> errorFechaNacimiento
-            registro.contrasena.length < 6 -> "La contrasena debe tener al menos 6 caracteres"
+            validarContrasenaSegura(registro.contrasena) != null -> validarContrasenaSegura(registro.contrasena).orEmpty()
             registro.contrasena != registro.confirmarContrasena -> "Las contrasenas no coinciden"
             !PreguntasSeguridadCatalogo.esValida(registro.preguntaSeguridad1) -> "Selecciona una pregunta de seguridad valida (1)"
             !PreguntasSeguridadCatalogo.esValida(registro.preguntaSeguridad2) -> "Selecciona una pregunta de seguridad valida (2)"
@@ -290,7 +319,7 @@ class RepositorioAutenticacionLocal(
 
     private fun validarRut(runRaw: String, dvRaw: String): Boolean {
         val run = limpiarRun(runRaw)
-        if (run.length != 8) return false
+        if (run.length !in 7..8) return false
         val dv = dvRaw.trim().uppercase()
         if (dv.isBlank()) return false
 
@@ -307,6 +336,16 @@ class RepositorioAutenticacionLocal(
             else -> resto.toString()
         }
         return dv == dvEsperado
+    }
+
+    private fun validarContrasenaSegura(contrasena: String): String? {
+        return when {
+            contrasena.length < 8 -> "La contrasena debe tener al menos 8 caracteres"
+            contrasena.none { it.isUpperCase() } -> "La contrasena debe incluir al menos 1 mayuscula"
+            contrasena.none { it.isDigit() } -> "La contrasena debe incluir al menos 1 numero"
+            contrasena.none { !it.isLetterOrDigit() } -> "La contrasena debe incluir al menos 1 simbolo"
+            else -> null
+        }
     }
 
     private fun validarFechaNacimiento(fecha: String): String? {

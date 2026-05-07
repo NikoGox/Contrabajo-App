@@ -1,3 +1,20 @@
+VERSION 0.9.0-Pre-Alpha
+───────
+├─• Se consolidó el modo online-first en front para cuenta/perfil/seguridad/ubicación, eliminando fallback offline operativo en estos flujos.
+├─• Se integró precarga de perfil tras login para reducir cargas intermedias y mantener datos consistentes entre pantallas.
+├─• Se conectó validación previa de disponibilidad en registro para RUN, username y correo contra backend antes del alta final.
+├─• Se reforzó edición de perfil para sincronizar siempre desde backend y reflejar cambios de correo/teléfono con recarga posterior.
+├─• Se mejoró verificación de trabajador con cierre de sesión controlado y retorno a login tras validación exitosa.
+├─• Se ajustó verificación de RUN para admitir formatos reales de 7 u 8 dígitos, conservando DV y validación formal.
+├─• Se volvió inmutable el RUN/DV de cuenta en pantalla de verificación (solo lectura), usando cédula como dato de contraste.
+├─• Se conectó ubicación a backend con recarga activa de dirección/comuna y sincronización de coordenadas persistidas.
+├─• Se corrigió el modal de comuna para mostrar catálogo remoto y manejar estados de carga/error sin romper la UX.
+├─• Se rediseñó seguridad de cuenta para editar preguntas por ítem sin mostrar respuestas en pantalla.
+├─• Se conectó lectura y actualización de preguntas de seguridad con endpoints autenticados de perfil.
+├─• Se limpió estado sensible al cerrar sesión para evitar residuos entre usuarios (verificación, perfil y seguridad).
+└─• Se mantuvo compatibilidad visual con la estética actual de Contrabajo durante la migración a backend.
+
+
 VERSION 0.8.0-Pre-Alpha
 ───────
 ├─• Se inició la integración real del frontend con el backend de Contrabajo para la épica de Acceso y Cuenta.

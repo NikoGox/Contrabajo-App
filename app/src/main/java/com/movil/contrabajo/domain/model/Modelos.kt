@@ -20,7 +20,13 @@ data class Usuario(
     val respuestaRecuperacion: String = "",
     val verificacionTrabajadorPendiente: Boolean = false,
     val fechaSolicitudVerificacionMs: Long? = null,
-    val fotoPerfilUrl: String? = null
+    val fotoPerfilUrl: String? = null,
+    val direccionCalle: String = "",
+    val direccionNumero: String = "",
+    val direccionComuna: String = "",
+    val direccionRegion: String = "Region Metropolitana",
+    val direccionLatitud: Double? = null,
+    val direccionLongitud: Double? = null
 )
 
 data class OfertaServicio(
@@ -259,6 +265,7 @@ data class RegistroPendiente(
     val dv: String = "",
     val telefono: String = "",
     val region: String = "Region Metropolitana",
+    val idComuna: Int? = null,
     val comuna: String = "",
     val calle: String = "",
     val numeroDireccion: String = "",
@@ -274,6 +281,13 @@ data class RegistroPendiente(
     val respuestaSeguridad1: String = "",
     val preguntaSeguridad2: String = "",
     val respuestaSeguridad2: String = ""
+)
+
+data class ComunaCatalogo(
+    val id: Int,
+    val nombre: String,
+    val idRegion: Int? = null,
+    val region: String = ""
 )
 
 object TipoPerfil {
@@ -295,7 +309,7 @@ data class PreguntaSeguridadConfig(
     val pregunta: String = "",
     val respuesta: String = ""
 ) {
-    val configurada: Boolean get() = pregunta.isNotBlank() && respuesta.isNotBlank()
+    val configurada: Boolean get() = pregunta.isNotBlank()
 }
 
 object PreguntasSeguridadCatalogo {
@@ -317,7 +331,7 @@ data class ValoracionesServicio(
 
 data class UbicacionAjustesConfig(
     val region: String = "Region Metropolitana",
-    val comuna: String = "Santiago",
+    val comuna: String = "Sin comuna",
     val calle: String = "Sin calle",
     val numero: String = "Sin numero",
     val detalle: String = "Sin detalle",

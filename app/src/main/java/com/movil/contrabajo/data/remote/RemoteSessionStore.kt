@@ -63,8 +63,8 @@ class RemoteSessionStore(context: Context) {
 
             return Usuario(
                 idUsuario = dto.id?.toLong() ?: 0L,
-                run = "",
-                dv = "",
+                run = dto.run?.toString().orEmpty(),
+                dv = dto.dv.orEmpty(),
                 username = dto.username.orEmpty(),
                 nombre = dto.nombre.orEmpty(),
                 apellidoPaterno = apellidoPaterno,
@@ -75,7 +75,13 @@ class RemoteSessionStore(context: Context) {
                 fechaRegistro = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
                 fechaNacimiento = dto.fechaNacimiento.orEmpty(),
                 verificado = dto.verificado ?: false,
-                tipoPerfil = perfil
+                tipoPerfil = perfil,
+                direccionCalle = dto.direccion?.calle.orEmpty(),
+                direccionNumero = dto.direccion?.numero.orEmpty(),
+                direccionComuna = dto.direccion?.comuna?.nombre.orEmpty(),
+                direccionRegion = dto.direccion?.comuna?.region.orEmpty().ifBlank { "Region Metropolitana" },
+                direccionLatitud = dto.direccion?.latitud,
+                direccionLongitud = dto.direccion?.longitud
             )
         }
     }
