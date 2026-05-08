@@ -28,6 +28,7 @@ import com.movil.contrabajo.domain.model.MensajeChat
 import com.movil.contrabajo.domain.model.NotificacionMensajePendiente
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.domain.model.PrecioUtils
+import com.movil.contrabajo.domain.model.EscalaRango
 import com.movil.contrabajo.domain.model.PreguntaSeguridadConfig
 import com.movil.contrabajo.domain.model.PreguntasSeguridadCatalogo
 import com.movil.contrabajo.domain.model.RegistroPendiente
@@ -49,10 +50,14 @@ class RepositorioAutenticacionRemoto(
     override fun obtenerSesionActiva(): Usuario? {
         val token = sessionStore.obtenerToken() ?: return null
         val usuario = sessionStore.obtenerUsuario() ?: return null
-        val tokenValido = ejecutarApi(api.validarSesion(token)).getOrDefault(false)
-        return if (tokenValido) usuario else {
-            sessionStore.limpiarSesion()
-            null
+        val validacion = ejecutarApi(api.validarSesion(token))
+        return when {
+            validacion.getOrNull() == true -> usuario
+            validacion.isSuccess && validacion.getOrNull() == false -> {
+                sessionStore.limpiarSesion()
+                null
+            }
+            else -> usuario
         }
     }
 
@@ -351,6 +356,8 @@ class RepositorioPerfilRemoto(
         if (token != null && usuario != null) {
             val remoto = ejecutarApi(api.buscarUsuario(bearer(token), usuario.idUsuario.toInt())).getOrNull()
             if (remoto != null) {
+                val rangoDisponibilidadBackend = remoto.rangoDisponibilidadM ?: 20_000
+                val rangoBusquedaBackend = remoto.rangoBusquedaM ?: 20_000
                 val comuna = remoto.direccion?.comuna?.nombre.orEmpty().ifBlank { "Sin comuna" }
                 val region = remoto.direccion?.comuna?.region.orEmpty().ifBlank { "Region Metropolitana" }
                 return UbicacionAjustesConfig(
@@ -360,7 +367,9 @@ class RepositorioPerfilRemoto(
                     numero = remoto.direccion?.numero.orEmpty(),
                     detalle = "",
                     latitud = remoto.direccion?.latitud,
-                    longitud = remoto.direccion?.longitud
+                    longitud = remoto.direccion?.longitud,
+                    rangoDisponibilidadM = rangoDisponibilidadBackend,
+                    rangoBusquedaM = rangoBusquedaBackend
                 )
             }
         }
@@ -372,7 +381,9 @@ class RepositorioPerfilRemoto(
                 numero = usuario.direccionNumero.ifBlank { "Sin numero" },
                 detalle = "",
                 latitud = usuario.direccionLatitud,
-                longitud = usuario.direccionLongitud
+                longitud = usuario.direccionLongitud,
+                rangoDisponibilidadM = usuario.rangoDisponibilidadM,
+                rangoBusquedaM = usuario.rangoBusquedaM
             )
         }
         return UbicacionAjustesConfig(
@@ -403,7 +414,9 @@ class RepositorioPerfilRemoto(
                         longitud = config.longitud,
                         calle = config.calle,
                         numero = config.numero,
-                        idComuna = idComuna
+                        idComuna = idComuna,
+                        rangoDisponibilidadM = config.rangoDisponibilidadM,
+                        rangoBusquedaM = config.rangoBusquedaM
                     )
                 )
             ).onSuccess {
@@ -450,7 +463,8 @@ class RepositorioPerfilRemoto(
                 id = usuario.idUsuario.toInt(),
                 request = UsuarioUpdateRequestDto(
                     telefono = telefonoNormalizado,
-                    correo = correoNormalizado
+                    correo = correoNormalizado,
+                    rangoBusquedaM = usuario.rangoBusquedaM
                 )
             )
         ).fold(
@@ -529,6 +543,14 @@ class RepositorioOfertasRemoto(
     override fun obtenerOfertaPropiaPorId(idOfertaServicio: Long): OfertaServicio? =
         obtenerOfertasPropias().firstOrNull { it.idOfertaServicio == idOfertaServicio }
 
+    override fun obtenerDisponibilidadOfertaPropia(idOfertaServicio: Long): Result<Boolean> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        return ejecutarApiServicios(
+            api.obtenerDisponibilidadOferta(bearer(token), idOfertaServicio.toInt())
+        )
+    }
+
     override fun obtenerIdsOfertasConTrabajoEnCursoPropias(): Set<Long> = emptySet()
 
     override fun obtenerValoracionesPropiasPorServicio(): List<ValoracionesServicio> =
@@ -571,7 +593,7 @@ class RepositorioOfertasRemoto(
 
         val resultado = if (idOfertaServicio != null && idOfertaServicio > 0) {
             ejecutarApiServicios(
-                api.actualizarOferta(
+                api.actualizarOfertaPut(
                     authorization = bearer(token),
                     id = idOfertaServicio.toInt(),
                     request = OfertaServicioUpdateRequestDto(
@@ -596,13 +618,12 @@ class RepositorioOfertasRemoto(
         if (disponible && obtenerOfertasPropias().any { it.disponible && it.idOfertaServicio != idOfertaServicio }) {
             return Result.failure(IllegalStateException("Ya tienes un servicio activo. Desactivalo antes de activar otro."))
         }
-        return ejecutarApiServicios(
-            api.actualizarOferta(
-                authorization = bearer(token),
-                id = idOfertaServicio.toInt(),
-                request = OfertaServicioUpdateRequestDto(disponible = disponible)
-            )
-        ).map { it.toOfertaServicio() }
+        val call = if (disponible) {
+            api.activarDisponibilidadOferta(bearer(token), idOfertaServicio.toInt())
+        } else {
+            api.desactivarDisponibilidadOferta(bearer(token), idOfertaServicio.toInt())
+        }
+        return ejecutarApiServicios(call).map { it.toOfertaServicio() }
     }
 
     override fun eliminarOfertaPropia(idOfertaServicio: Long): Result<Unit> {
@@ -769,13 +790,14 @@ private fun OfertaServicioDto.toOfertaServicio(): OfertaServicio {
         fechaPublicacion = fechaPublicacion.orEmpty(),
         idCategoriaServicio = idCategoria?.toLong() ?: 0L,
         idTrabajador = idTrabajador?.toLong() ?: 0L,
-        nombreTrabajador = if (idTrabajador != null) "Trabajador $idTrabajador" else "",
-        usernameTrabajador = if (idTrabajador != null) "trabajador$idTrabajador" else "",
+        nombreTrabajador = nombreTrabajador.orEmpty(),
+        usernameTrabajador = usernameTrabajador.orEmpty(),
         nombreCategoria = categoriaNombre,
+        rangoDisponibilidadM = EscalaRango.normalizar(rangoDisponibilidadM ?: 20_000),
         ubicacionReferencia = ubicacionReferencia.orEmpty(),
         latitudReferencia = latitudReferencia,
         longitudReferencia = longitudReferencia,
-        eliminada = false
+        eliminada = borrado ?: false
     )
 }
 

@@ -587,6 +587,7 @@ fun PantallaUbicacion(
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     val uiState = viewModel.uiState
     val ubicacion = uiState.ubicacionAjustes
+    val esTrabajador = uiState.usuario?.tipoPerfil in listOf(TipoPerfil.TRABAJADOR, TipoPerfil.PREMIUM)
     val direccionLinea = listOf(ubicacion.calle, ubicacion.numero)
         .filter { it.isNotBlank() }
         .joinToString(" ")
@@ -706,33 +707,35 @@ fun PantallaUbicacion(
             ) { Text("Editar ubicacion") }
         }
 
-        TarjetaBase {
-            Text(
-                text = "Rango de disponibilidad: ${EscalaRango.formatear(ubicacion.rangoDisponibilidadM)}",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
-            )
-            Slider(
-                value = posicionSliderDisponibilidad,
-                onValueChange = {
-                    posicionSliderDisponibilidad = it
-                    viewModel.actualizarRangoUbicacion(it)
-                },
-                valueRange = 0f..EscalaRango.valoresMetros.lastIndex.toFloat(),
-                steps = EscalaRango.valoresMetros.size - 2
-            )
-        }
+        if (esTrabajador) {
+            TarjetaBase {
+                Text(
+                    text = "Rango de disponibilidad: ${EscalaRango.formatear(ubicacion.rangoDisponibilidadM)}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Slider(
+                    value = posicionSliderDisponibilidad,
+                    onValueChange = {
+                        posicionSliderDisponibilidad = it
+                        viewModel.actualizarRangoUbicacion(it)
+                    },
+                    valueRange = 0f..EscalaRango.valoresMetros.lastIndex.toFloat(),
+                    steps = EscalaRango.valoresMetros.size - 2
+                )
+            }
 
-        TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(10.dp)) {
-            MapaUbicacionOpenStreetMap(
-                latitud = ubicacion.latitud ?: -33.4489,
-                longitud = ubicacion.longitud ?: -70.6693,
-                rangoM = ubicacion.rangoDisponibilidadM,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(138.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-            )
+            TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(10.dp)) {
+                MapaUbicacionOpenStreetMap(
+                    latitud = ubicacion.latitud ?: -33.4489,
+                    longitud = ubicacion.longitud ?: -70.6693,
+                    rangoM = ubicacion.rangoDisponibilidadM,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(138.dp)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                )
+            }
         }
 
         TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
@@ -907,8 +910,9 @@ private fun MapaUbicacionOpenStreetMap(
 ) {
     val context = LocalContext.current
     val rangoNormalizadoM = EscalaRango.normalizar(rangoM)
-    val zoom = calcularZoomPorRangoM(rangoNormalizadoM).toDouble()
-    val radioMetros = rangoNormalizadoM.toDouble()
+    val rangoVisualM = maxOf(rangoNormalizadoM, 1000)
+    val zoom = calcularZoomPorRangoM(rangoVisualM).toDouble()
+    val radioMetros = rangoVisualM.toDouble()
 
     LaunchedEffect(Unit) {
         Configuration.getInstance().load(
@@ -1131,7 +1135,7 @@ private fun etiquetaPerfil(tipoPerfil: Int): String = when (tipoPerfil) {
     TipoPerfil.MODERADOR -> "Moderador"
     TipoPerfil.TRABAJADOR -> "Trabajador"
     TipoPerfil.PREMIUM -> "Premium"
-    else -> "Usuario base"
+    else -> "Cliente"
 }
 
 private object FormatoRunVisualTransformation : VisualTransformation {

@@ -205,8 +205,12 @@ fun PantallaPerfil(
                         InfoPerfilFila(
                             etiqueta = "Direccion",
                             valor = usuario?.let {
-                                listOf(it.direccionCalle, it.direccionNumero).filter { parte -> parte.isNotBlank() }
+                                val calleNumero = listOf(it.direccionCalle, it.direccionNumero)
+                                    .filter { parte -> parte.isNotBlank() }
                                     .joinToString(" ")
+                                listOf(calleNumero, it.direccionComuna, it.direccionRegion)
+                                    .filter { parte -> parte.isNotBlank() }
+                                    .joinToString(", ")
                                     .ifBlank { "Sin direccion" }
                             }.orEmpty()
                         )

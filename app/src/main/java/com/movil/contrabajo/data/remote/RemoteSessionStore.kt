@@ -76,6 +76,8 @@ class RemoteSessionStore(context: Context) {
                 fechaNacimiento = dto.fechaNacimiento.orEmpty(),
                 verificado = dto.verificado ?: false,
                 tipoPerfil = perfil,
+                rangoDisponibilidadM = dto.rangoDisponibilidadM ?: 20_000,
+                rangoBusquedaM = dto.rangoBusquedaM ?: 20_000,
                 direccionCalle = dto.direccion?.calle.orEmpty(),
                 direccionNumero = dto.direccion?.numero.orEmpty(),
                 direccionComuna = dto.direccion?.comuna?.nombre.orEmpty(),

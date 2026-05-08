@@ -14,6 +14,7 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.PATCH
+import retrofit2.http.PUT
 import retrofit2.http.POST
 import retrofit2.http.Path
 import java.math.BigDecimal
@@ -35,6 +36,12 @@ interface ServiciosApiService {
         @Path("id") id: Int
     ): Call<OfertaServicioDto>
 
+    @GET("api/ofertas/{id}/disponibilidad")
+    fun obtenerDisponibilidadOferta(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
+    ): Call<Boolean>
+
     @GET("api/ofertas/trabajador/{idTrabajador}")
     fun listarOfertasTrabajador(
         @Header("Authorization") authorization: String,
@@ -52,6 +59,25 @@ interface ServiciosApiService {
         @Header("Authorization") authorization: String,
         @Path("id") id: Int,
         @Body request: OfertaServicioUpdateRequestDto
+    ): Call<OfertaServicioDto>
+
+    @PUT("api/ofertas/{id}")
+    fun actualizarOfertaPut(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int,
+        @Body request: OfertaServicioUpdateRequestDto
+    ): Call<OfertaServicioDto>
+
+    @PATCH("api/ofertas/{id}/disponibilidad/activar")
+    fun activarDisponibilidadOferta(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
+    ): Call<OfertaServicioDto>
+
+    @PATCH("api/ofertas/{id}/disponibilidad/desactivar")
+    fun desactivarDisponibilidadOferta(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
     ): Call<OfertaServicioDto>
 
     @DELETE("api/ofertas/{id}")
@@ -77,15 +103,19 @@ data class OfertaServicioDto(
     val descripcion: String?,
     val precio: BigDecimal?,
     val disponible: Boolean?,
+    val borrado: Boolean? = null,
     val fechaPublicacion: String?,
     val idTrabajador: Int?,
     val idCategoria: Int?,
     val idTipoPrecio: Int?,
     val categoria: String?,
     val tipoPrecio: String?,
+    val rangoDisponibilidadM: Int? = null,
     val ubicacionReferencia: String? = null,
     val latitudReferencia: Double? = null,
-    val longitudReferencia: Double? = null
+    val longitudReferencia: Double? = null,
+    val nombreTrabajador: String? = null,
+    val usernameTrabajador: String? = null
 )
 
 data class OfertaServicioRequestDto(

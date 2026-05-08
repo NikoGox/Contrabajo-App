@@ -15,23 +15,28 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.9.0-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.10.0-Pre-Alpha
 
 
 
-> <br>• Se consolidó el modo online-first en front para cuenta/perfil/seguridad/ubicación, eliminando fallback offline operativo en estos flujos.
-> <br>• Se integró precarga de perfil tras login para reducir cargas intermedias y mantener datos consistentes entre pantallas.
-> <br>• Se conectó validación previa de disponibilidad en registro para RUN, username y correo contra backend antes del alta final.
-> <br>• Se reforzó edición de perfil para sincronizar siempre desde backend y reflejar cambios de correo/teléfono con recarga posterior.
-> <br>• Se mejoró verificación de trabajador con cierre de sesión controlado y retorno a login tras validación exitosa.
-> <br>• Se ajustó verificación de RUN para admitir formatos reales de 7 u 8 dígitos, conservando DV y validación formal.
-> <br>• Se volvió inmutable el RUN/DV de cuenta en pantalla de verificación (solo lectura), usando cédula como dato de contraste.
-> <br>• Se conectó ubicación a backend con recarga activa de dirección/comuna y sincronización de coordenadas persistidas.
-> <br>• Se corrigió el modal de comuna para mostrar catálogo remoto y manejar estados de carga/error sin romper la UX.
-> <br>• Se rediseñó seguridad de cuenta para editar preguntas por ítem sin mostrar respuestas en pantalla.
-> <br>• Se conectó lectura y actualización de preguntas de seguridad con endpoints autenticados de perfil.
-> <br>• Se limpió estado sensible al cerrar sesión para evitar residuos entre usuarios (verificación, perfil y seguridad).
-> <br>• Se mantuvo compatibilidad visual con la estética actual de Contrabajo durante la migración a backend.
+> <br>• Se integró el módulo de servicios con el backend real, reemplazando el repositorio local para marketplace, detalle y gestión de ofertas.
+> <br>• Se habilitaron controles dedicados para activar y desactivar disponibilidad de oferta sin requerir edición completa del servicio.
+> <br>• Se conectó el rango de búsqueda al backend; ambos rangos (búsqueda y disponibilidad) persisten de forma independiente sin sobreescribirse.
+> <br>• Se agregó migración de arranque en usuarios_api para crear las columnas de rango automáticamente en bases existentes.
+> <br>• Se corrigió que el marketplace se vaciara al no tener coordenadas cargadas; ahora muestra ofertas de todas formas.
+> <br>• Se corrigieron las llamadas de red para ejecutarse fuera del hilo principal, eliminando crashes en dispositivos reales.
+> <br>• Se estabilizó la sesión tras verificación de trabajador para no borrar el token ante errores transitorios de red.
+> <br>• Se corrigió el flujo de verificación para cerrar sesión y renovar el JWT con el rol correcto de trabajador.
+> <br>• Se corrigió que los servicios nuevos partían activos; ahora se crean desactivados y el trabajador los publica manualmente.
+> <br>• Se corrigió que las tarjetas mostraban nombres genéricos en lugar del nombre real del trabajador.
+> <br>• Se corrigió la causa raíz del filtro de rango: el valor real del trabajador no se leía y todos los servicios usaban el fallback de 20 km.
+> <br>• Se corrigió la fórmula de intersección de círculos en el marketplace para considerar el rango del trabajador y no solo el del cliente.
+> <br>• Se corrigió que el trabajador veía su propio servicio a 37 km en lugar de 0 km.
+> <br>• Se protegió la privacidad de dirección: las ofertas exponen solo comuna y región; la dirección completa se muestra solo al propietario.
+> <br>• Se agregó mini mapa con círculo al modal de rango de búsqueda para visualizar el área en tiempo real.
+> <br>• Se aplicó un mínimo visual de 1.000 m en los mapas de rango de disponibilidad para no revelar la ubicación exacta del trabajador.
+> <br>• Se ocultaron el rango de disponibilidad y su mapa en ajustes de ubicación para usuarios con perfil cliente.
+> <br>• Se corrigió la etiqueta de tipo de cuenta: USUARIO_BASE ahora se muestra como "Cliente".
 
 ---
 

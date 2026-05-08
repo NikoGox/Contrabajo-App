@@ -93,6 +93,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.movil.contrabajo.domain.model.EscalaRango
 import com.movil.contrabajo.domain.model.TipoPrecio
+import com.movil.contrabajo.ui.components.OverlayPantallaCarga
 import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaMarketplaceCompacta
 import com.movil.contrabajo.ui.viewmodel.OrdenMarketplace
@@ -107,6 +108,17 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.tween
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
+import android.content.Context
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import com.movil.contrabajo.R
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polygon
 
 @Composable
 @OptIn(ExperimentalMaterialApi::class)
@@ -457,8 +469,10 @@ fun PantallaPrincipal(
                         } else {
                             "No hay publicaciones dentro de tu rango actual."
                         }
+                    } else if (hayBusquedaOFiltrosActivos) {
+                        "No hay coincidencias. Ajusta tu busqueda o filtros."
                     } else {
-                        "Obten tu ubicacion en Ajustes > Ubicacion > Obtener ubicacion."
+                        "No hay publicaciones disponibles por ahora."
                     }
                     Box(
                         modifier = Modifier
@@ -529,6 +543,15 @@ fun PantallaPrincipal(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
+                    MiniMapaRangoBusqueda(
+                        latitud = uiState.latitudUsuario ?: -33.4489,
+                        longitud = uiState.longitudUsuario ?: -70.6693,
+                        rangoM = EscalaRango.valorPorPosicionSlider(posicionSliderRangoBusqueda),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
                     Slider(
                         value = posicionSliderRangoBusqueda,
                         onValueChange = { posicionSliderRangoBusqueda = it },
@@ -539,6 +562,7 @@ fun PantallaPrincipal(
             },
             confirmButton = {
                 OutlinedButton(
+                    enabled = !uiState.cargandoOperacion,
                     onClick = {
                         viewModel.guardarRangoBusqueda(
                             EscalaRango.valorPorPosicionSlider(posicionSliderRangoBusqueda)
@@ -557,6 +581,11 @@ fun PantallaPrincipal(
             }
         )
     }
+
+    OverlayPantallaCarga(
+        visible = uiState.cargandoOperacion,
+        mensaje = "Guardando rango de busqueda..."
+    )
 
     if (mostrarModalFiltros) {
         FiltroMarketplaceDialog(
@@ -836,4 +865,78 @@ private fun BotonOrdenCompacto(
             color = if (seleccionado) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
         )
     }
+}
+
+@Composable
+private fun MiniMapaRangoBusqueda(
+    latitud: Double,
+    longitud: Double,
+    rangoM: Int,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val radioMetros = rangoM.toDouble()
+    val zoom = calcularZoomRangoBusqueda(rangoM).toDouble()
+
+    LaunchedEffect(Unit) {
+        Configuration.getInstance().load(
+            context,
+            context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
+        )
+        Configuration.getInstance().userAgentValue = context.packageName
+    }
+
+    val mapView = remember {
+        MapView(context).apply {
+            setTileSource(TileSourceFactory.MAPNIK)
+            setMultiTouchControls(false)
+            controller.setZoom(zoom)
+            controller.setCenter(GeoPoint(latitud, longitud))
+            setOnTouchListener { _, _ -> true }
+        }
+    }
+
+    DisposableEffect(mapView) {
+        onDispose { mapView.onDetach() }
+    }
+
+    AndroidView(
+        modifier = modifier,
+        factory = { mapView },
+        update = { map ->
+            val centro = GeoPoint(latitud, longitud)
+            map.controller.setZoom(zoom)
+            map.controller.setCenter(centro)
+            map.overlays.clear()
+
+            val marcador = Marker(map).apply {
+                position = centro
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                title = "Mi ubicacion"
+                icon = ContextCompat.getDrawable(context, R.drawable.ic_pin_marcador_azul)
+            }
+
+            val circulo = Polygon(map).apply {
+                points = Polygon.pointsAsCircle(centro, radioMetros)
+                fillColor = android.graphics.Color.argb(0x33, 0x19, 0xA1, 0xA8)
+                strokeColor = android.graphics.Color.argb(0xFF, 0x0E, 0x8C, 0x94)
+                strokeWidth = 2f
+            }
+
+            map.overlays.add(circulo)
+            map.overlays.add(marcador)
+            map.invalidate()
+        }
+    )
+}
+
+private fun calcularZoomRangoBusqueda(rangoM: Int): Int = when {
+    rangoM <= 400 -> 15
+    rangoM <= 900 -> 14
+    rangoM <= 2_000 -> 13
+    rangoM <= 5_000 -> 12
+    rangoM <= 10_000 -> 11
+    rangoM <= 20_000 -> 10
+    rangoM <= 35_000 -> 9
+    else -> 9
 }

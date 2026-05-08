@@ -49,6 +49,7 @@ data class PrincipalUiState(
     val ofertas: List<OfertaServicio> = emptyList(),
     val categoriasDisponibles: List<CategoriaServicio> = emptyList(),
     val refrescando: Boolean = false,
+    val cargandoOperacion: Boolean = false,
     val rangoBusquedaM: Int = 20_000,
     val filtroPorCoordenadasActivo: Boolean = false,
     val filtroCategoriaId: Long? = null,
@@ -58,7 +59,9 @@ data class PrincipalUiState(
     val comunaFiltro: String = "",
     val comunasDisponibles: List<ComunaCatalogo> = emptyList(),
     val ordenMarketplace: OrdenMarketplace = OrdenMarketplace.FECHA_RECIENTES,
-    val mensajePrincipal: String? = null
+    val mensajePrincipal: String? = null,
+    val latitudUsuario: Double? = null,
+    val longitudUsuario: Double? = null
 )
 
 enum class OrdenMarketplace {
@@ -92,25 +95,38 @@ class PrincipalViewModel(
     }
 
     fun recargar() {
-        val ubicacionActual = repositorioPerfil.obtenerUbicacionAjustes()
-        val ofertas = repositorioOfertas.obtenerOfertasMarketplace(uiState.busqueda)
-        val categorias = repositorioOfertas.obtenerCategoriasServicio()
-        val filtroActivo = ubicacionActual.latitud != null && ubicacionActual.longitud != null
-        val rangoBusqueda = EscalaRango.normalizar(ubicacionActual.rangoBusquedaM)
-        val ofertasFiltradas = filtrarPorMatchRangos(
-            ofertas = ofertas,
-            latitudBase = ubicacionActual.latitud,
-            longitudBase = ubicacionActual.longitud,
-            rangoBusquedaM = rangoBusqueda
-        )
-        val ofertasFinales = aplicarFiltrosYOrden(ofertasFiltradas)
+        viewModelScope.launch {
+            val snapshot = withContext(Dispatchers.IO) {
+                val ubicacionActual = repositorioPerfil.obtenerUbicacionAjustes()
+                val usuarioActual = repositorioAutenticacion.obtenerSesionActiva()
+                val ofertas = repositorioOfertas.obtenerOfertasMarketplace(uiState.busqueda)
+                val categorias = repositorioOfertas.obtenerCategoriasServicio()
+                Triple(ubicacionActual, Pair(usuarioActual, ofertas), categorias)
+            }
+            val ubicacionActual = snapshot.first
+            val usuarioActual = snapshot.second.first
+            val ofertas = snapshot.second.second
+            val categorias = snapshot.third
+            val filtroActivo = ubicacionActual.latitud != null && ubicacionActual.longitud != null
+            val rangoBusqueda = EscalaRango.normalizar(ubicacionActual.rangoBusquedaM)
+            val ofertasFiltradas = filtrarPorMatchRangos(
+                ofertas = ofertas,
+                latitudBase = ubicacionActual.latitud,
+                longitudBase = ubicacionActual.longitud,
+                rangoBusquedaM = rangoBusqueda,
+                idUsuarioActual = usuarioActual?.idUsuario
+            )
+            val ofertasFinales = aplicarFiltrosYOrden(ofertasFiltradas)
 
-        uiState = uiState.copy(
-            ofertas = ofertasFinales,
-            categoriasDisponibles = categorias,
-            rangoBusquedaM = rangoBusqueda,
-            filtroPorCoordenadasActivo = filtroActivo
-        )
+            uiState = uiState.copy(
+                ofertas = ofertasFinales,
+                categoriasDisponibles = categorias,
+                rangoBusquedaM = rangoBusqueda,
+                filtroPorCoordenadasActivo = filtroActivo,
+                latitudUsuario = ubicacionActual.latitud,
+                longitudUsuario = ubicacionActual.longitud
+            )
+        }
     }
 
     fun refrescarDesdeGesto() {
@@ -129,15 +145,24 @@ class PrincipalViewModel(
     }
 
     fun guardarRangoBusqueda(valorMetros: Int) {
-        val ubicacionActual = repositorioPerfil.obtenerUbicacionAjustes()
         val rangoNormalizado = EscalaRango.normalizar(valorMetros)
-        repositorioPerfil.guardarUbicacionAjustes(
-            ubicacionActual.copy(rangoBusquedaM = rangoNormalizado)
-        ).onSuccess {
-            recargar()
-            uiState = uiState.copy(mensajePrincipal = "Rango de busqueda actualizado a ${EscalaRango.formatear(rangoNormalizado)}.")
-        }.onFailure {
-            uiState = uiState.copy(mensajePrincipal = it.message ?: "No se pudo guardar el rango de busqueda")
+        viewModelScope.launch {
+            uiState = uiState.copy(cargandoOperacion = true)
+            val resultado = withContext(Dispatchers.IO) {
+                val ubicacionActual = repositorioPerfil.obtenerUbicacionAjustes()
+                repositorioPerfil.guardarUbicacionAjustes(
+                    ubicacionActual.copy(
+                        rangoBusquedaM = rangoNormalizado
+                    )
+                )
+            }
+            resultado.onSuccess {
+                recargar()
+                uiState = uiState.copy(mensajePrincipal = "Rango de busqueda actualizado a ${EscalaRango.formatear(rangoNormalizado)}.")
+            }.onFailure {
+                uiState = uiState.copy(mensajePrincipal = it.message ?: "No se pudo guardar el rango de busqueda")
+            }
+            uiState = uiState.copy(cargandoOperacion = false)
         }
     }
 
@@ -185,11 +210,17 @@ class PrincipalViewModel(
         ofertas: List<OfertaServicio>,
         latitudBase: Double?,
         longitudBase: Double?,
-        rangoBusquedaM: Int
+        rangoBusquedaM: Int,
+        idUsuarioActual: Long?
     ): List<OfertaServicio> {
-        if (latitudBase == null || longitudBase == null) return emptyList()
+        if (latitudBase == null || longitudBase == null) {
+            return ofertas.filter { idUsuarioActual != null && it.idTrabajador == idUsuarioActual }
+        }
 
         return ofertas.filter { oferta ->
+            if (idUsuarioActual != null && oferta.idTrabajador == idUsuarioActual) {
+                return@filter true
+            }
             val latitudOferta = oferta.latitudReferencia
             val longitudOferta = oferta.longitudReferencia
             if (latitudOferta == null || longitudOferta == null) return@filter false
@@ -200,7 +231,7 @@ class PrincipalViewModel(
                 lat2 = latitudOferta,
                 lon2 = longitudOferta
             )
-            distanciaM <= rangoBusquedaM
+            distanciaM <= rangoBusquedaM + oferta.rangoDisponibilidadM
         }
     }
 
@@ -697,8 +728,7 @@ class PerfilViewModel(
             uiState = uiState.copy(errorServicio = "Debes verificarte como trabajador para editar servicios")
             return
         }
-        val oferta = repositorioOfertas.obtenerOfertaPropiaPorId(idOfertaServicio)
-            ?: uiState.ofertasPropias.firstOrNull { it.idOfertaServicio == idOfertaServicio }
+        val oferta = uiState.ofertasPropias.firstOrNull { it.idOfertaServicio == idOfertaServicio }
         if (oferta == null) {
             uiState = uiState.copy(errorServicio = "No se encontro el servicio a editar")
             return
@@ -712,8 +742,9 @@ class PerfilViewModel(
     }
 
     fun cancelarFormularioServicio() {
-        val ofertaRecuperada = uiState.idOfertaEditando?.let { repositorioOfertas.obtenerOfertaPropiaPorId(it) }
-            ?: uiState.ofertasPropias.firstOrNull()
+        val ofertaRecuperada = uiState.idOfertaEditando?.let { id ->
+            uiState.ofertasPropias.firstOrNull { it.idOfertaServicio == id }
+        } ?: uiState.ofertasPropias.firstOrNull()
         uiState = uiState.copy(
             mostrandoFormularioServicio = false,
             formularioServicio = ofertaRecuperada.toFormularioServicio(),
@@ -774,14 +805,20 @@ class PerfilViewModel(
     }
 
     fun cambiarDisponibilidadServicioRapido(idOfertaServicio: Long, valor: Boolean) {
-        repositorioOfertas.actualizarDisponibilidadOfertaPropia(idOfertaServicio, valor)
-            .onSuccess {
+        viewModelScope.launch {
+            uiState = uiState.copy(cargandoPantalla = true)
+            delay(180)
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioOfertas.actualizarDisponibilidadOfertaPropia(idOfertaServicio, valor)
+            }
+            resultado.onSuccess {
                 recargar()
                 uiState = uiState.copy(errorServicio = null)
-            }
-            .onFailure {
+            }.onFailure {
                 uiState = uiState.copy(errorServicio = it.message ?: "No se pudo actualizar disponibilidad")
             }
+            uiState = uiState.copy(cargandoPantalla = false)
+        }
     }
 
     fun actualizarFotoServicio(
@@ -816,10 +853,13 @@ class PerfilViewModel(
         viewModelScope.launch {
             uiState = uiState.copy(cargandoPantalla = true)
             delay(220)
-            repositorioOfertas.guardarOfertaPropia(
-                formulario = uiState.formularioServicio,
-                idOfertaServicio = uiState.idOfertaEditando
-            )
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioOfertas.guardarOfertaPropia(
+                    formulario = uiState.formularioServicio,
+                    idOfertaServicio = uiState.idOfertaEditando
+                )
+            }
+            resultado
                 .onSuccess { oferta ->
                     recargar()
                     uiState = uiState.copy(
@@ -862,7 +902,10 @@ class PerfilViewModel(
         viewModelScope.launch {
             uiState = uiState.copy(cargandoPantalla = true)
             delay(220)
-            repositorioOfertas.eliminarOfertaPropia(idOferta)
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioOfertas.eliminarOfertaPropia(idOferta)
+            }
+            resultado
                 .onSuccess {
                     recargar()
                     uiState = uiState.copy(
@@ -1076,7 +1119,7 @@ class PerfilViewModel(
     }
 
     fun validarContrasenaCuenta(contrasena: String): Result<Unit> {
-        val usuario = uiState.usuario ?: repositorioPerfil.obtenerPerfilActual()
+        val usuario = uiState.usuario
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         val valor = contrasena.trim()
         if (valor.isBlank()) {
@@ -1153,6 +1196,9 @@ class PerfilViewModel(
             uiState = uiState.copy(errorVerificacion = "El numero de documento debe tener 9 digitos")
             return
         }
+        val credencialesSesion = uiState.usuario?.let { usuario ->
+            usuario.username to usuario.contrasenaHash
+        }
         viewModelScope.launch {
             uiState = uiState.copy(cargandoPantalla = true)
             delay(180)
@@ -1163,12 +1209,35 @@ class PerfilViewModel(
                     numeroDocumento = uiState.numeroDocumentoVerificacion
                 )
             }.onSuccess { usuarioActualizado ->
-                uiState = uiState.copy(
-                    usuario = usuarioActualizado,
-                    errorVerificacion = null,
-                    mensajeVerificacion = "Cuenta verificada. Tu perfil ahora esta habilitado como trabajador."
-                )
-                recargar()
+                val usernameSesion = credencialesSesion?.first
+                val contrasenaSesion = credencialesSesion?.second
+                val reautenticado = if (!usernameSesion.isNullOrBlank() && !contrasenaSesion.isNullOrBlank()) {
+                    withContext(Dispatchers.IO) {
+                        repositorioAutenticacion.iniciarSesion(
+                            identificador = usernameSesion,
+                            contrasena = contrasenaSesion,
+                            recordarme = true
+                        )
+                    }
+                } else {
+                    Result.failure(IllegalStateException("No se encontro la credencial temporal para renovar la sesion."))
+                }
+
+                reautenticado.onSuccess { usuarioSesionRenovada ->
+                    uiState = uiState.copy(
+                        usuario = usuarioSesionRenovada,
+                        errorVerificacion = null,
+                        mensajeVerificacion = "Cuenta verificada. Sesion renovada como trabajador."
+                    )
+                    recargar()
+                }.onFailure {
+                    uiState = uiState.copy(
+                        usuario = usuarioActualizado,
+                        errorVerificacion = null,
+                        mensajeVerificacion = "Cuenta verificada, pero no se pudo renovar la sesion. Vuelve a iniciar sesion."
+                    )
+                    cerrarSesion()
+                }
             }.onFailure {
                 uiState = uiState.copy(
                     errorVerificacion = it.message ?: "No se pudo iniciar la verificacion",
@@ -1380,7 +1449,9 @@ class ReportesViewModel(
 data class DetalleServicioUiState(
     val ofertas: List<OfertaServicio> = emptyList(),
     val indiceActual: Int = 0,
-    val idUsuarioActual: Long? = null
+    val idUsuarioActual: Long? = null,
+    val latitudUsuario: Double? = null,
+    val longitudUsuario: Double? = null
 ) {
     val ofertaActual: OfertaServicio? get() = ofertas.getOrNull(indiceActual)
 }
@@ -1402,30 +1473,81 @@ class DetalleServicioViewModel(
     fun cargarOferta(idOfertaServicio: Long, forzarRecarga: Boolean = false) {
         if (!forzarRecarga && ofertaActualId == idOfertaServicio && uiState.ofertaActual != null) return
         ofertaActualId = idOfertaServicio
-        val idUsuarioActual = repositorioPerfil.obtenerPerfilActual()?.idUsuario
-        val ofertasContexto = ofertasContextoMarketplace?.takeIf { it.isNotEmpty() }
-        val ofertas = ofertasContexto ?: repositorioOfertas.obtenerOfertasMarketplace()
-        if (ofertas.isEmpty()) {
-            val oferta = repositorioOfertas.obtenerOfertaPorId(idOfertaServicio, incluirEliminadas = true)
-            uiState = uiState.copy(ofertas = listOfNotNull(oferta), indiceActual = 0, idUsuarioActual = idUsuarioActual)
-            return
-        }
-        val indice = ofertas.indexOfFirst { it.idOfertaServicio == idOfertaServicio }
-        if (indice < 0) {
-            val ofertaEliminada = repositorioOfertas.obtenerOfertaPorId(idOfertaServicio, incluirEliminadas = true)
-            if (ofertaEliminada != null) {
-                uiState = uiState.copy(ofertas = listOf(ofertaEliminada), indiceActual = 0, idUsuarioActual = idUsuarioActual)
-                return
+        viewModelScope.launch {
+            data class Snapshot(
+                val idUsuarioActual: Long?,
+                val latitudUsuario: Double?,
+                val longitudUsuario: Double?,
+                val ofertas: List<OfertaServicio>,
+                val ofertaEliminada: OfertaServicio?,
+                val ofertasContexto: List<OfertaServicio>?
+            )
+            val snapshot = withContext(Dispatchers.IO) {
+                val idUsuarioActual = repositorioPerfil.obtenerPerfilActual()?.idUsuario
+                val ubicacion = repositorioPerfil.obtenerUbicacionAjustes()
+                val ofertasContexto = ofertasContextoMarketplace?.takeIf { it.isNotEmpty() }
+                val ofertas = ofertasContexto ?: repositorioOfertas.obtenerOfertasMarketplace()
+                val ofertaEliminada = if (ofertas.isEmpty() || ofertas.indexOfFirst { it.idOfertaServicio == idOfertaServicio } < 0) {
+                    repositorioOfertas.obtenerOfertaPorId(idOfertaServicio, incluirEliminadas = true)
+                } else null
+                Snapshot(idUsuarioActual, ubicacion.latitud, ubicacion.longitud, ofertas, ofertaEliminada, ofertasContexto)
             }
-            if (ofertasContexto != null) {
-                uiState = uiState.copy(ofertas = ofertasContexto, indiceActual = 0, idUsuarioActual = idUsuarioActual)
+            val idUsuarioActual = snapshot.idUsuarioActual
+            val latitudUsuario = snapshot.latitudUsuario
+            val longitudUsuario = snapshot.longitudUsuario
+            val ofertas = snapshot.ofertas
+            val ofertaEliminada = snapshot.ofertaEliminada
+            val ofertasContexto = snapshot.ofertasContexto
+            if (ofertas.isEmpty()) {
+                uiState = uiState.copy(
+                    ofertas = listOfNotNull(ofertaEliminada),
+                    indiceActual = 0,
+                    idUsuarioActual = idUsuarioActual,
+                    latitudUsuario = latitudUsuario,
+                    longitudUsuario = longitudUsuario
+                )
+                return@launch
+            }
+            val indice = ofertas.indexOfFirst { it.idOfertaServicio == idOfertaServicio }
+            if (indice < 0) {
+                if (ofertaEliminada != null) {
+                    uiState = uiState.copy(
+                        ofertas = listOf(ofertaEliminada),
+                        indiceActual = 0,
+                        idUsuarioActual = idUsuarioActual,
+                        latitudUsuario = latitudUsuario,
+                        longitudUsuario = longitudUsuario
+                    )
+                } else if (ofertasContexto != null) {
+                    uiState = uiState.copy(
+                        ofertas = ofertasContexto,
+                        indiceActual = 0,
+                        idUsuarioActual = idUsuarioActual,
+                        latitudUsuario = latitudUsuario,
+                        longitudUsuario = longitudUsuario
+                    )
+                } else {
+                    val fallback = withContext(Dispatchers.IO) {
+                        repositorioOfertas.obtenerOfertasMarketplace()
+                    }
+                    val indiceFallback = fallback.indexOfFirst { it.idOfertaServicio == idOfertaServicio }.takeIf { it >= 0 } ?: 0
+                    uiState = uiState.copy(
+                        ofertas = fallback,
+                        indiceActual = indiceFallback,
+                        idUsuarioActual = idUsuarioActual,
+                        latitudUsuario = latitudUsuario,
+                        longitudUsuario = longitudUsuario
+                    )
+                }
             } else {
-                val fallback = repositorioOfertas.obtenerOfertasMarketplace()
-                val indiceFallback = fallback.indexOfFirst { it.idOfertaServicio == idOfertaServicio }.takeIf { it >= 0 } ?: 0
-                uiState = uiState.copy(ofertas = fallback, indiceActual = indiceFallback, idUsuarioActual = idUsuarioActual)
+                uiState = uiState.copy(
+                    ofertas = ofertas,
+                    indiceActual = indice,
+                    idUsuarioActual = idUsuarioActual,
+                    latitudUsuario = latitudUsuario,
+                    longitudUsuario = longitudUsuario
+                )
             }
-        } else {
-            uiState = uiState.copy(ofertas = ofertas, indiceActual = indice, idUsuarioActual = idUsuarioActual)
         }
     }
 

@@ -484,6 +484,9 @@ fun PantallaDetalleServicio(
                                 key(ofertaPagina.idOfertaServicio) {
                                     TarjetaDetalleOferta(
                                         oferta = ofertaPagina,
+                                        latitudUsuario = uiState.latitudUsuario,
+                                        longitudUsuario = uiState.longitudUsuario,
+                                        idUsuarioActual = uiState.idUsuarioActual,
                                         modoLigero = !esPaginaVecina && page != indiceDetalleCompleto,
                                         elevacionTarjetaDp = elevacionTarjeta,
                                         bloquearScrollVertical = pagerState.isScrollInProgress || page != pagerState.currentPage,
@@ -751,6 +754,9 @@ private fun BarraSuperiorDetalle(
 @Composable
 private fun TarjetaDetalleOferta(
     oferta: OfertaServicio,
+    latitudUsuario: Double? = null,
+    longitudUsuario: Double? = null,
+    idUsuarioActual: Long? = null,
     modoLigero: Boolean = false,
     elevacionTarjetaDp: Float = 8f,
     bloquearScrollVertical: Boolean = false,
@@ -868,7 +874,7 @@ private fun TarjetaDetalleOferta(
             )
             if (!oferta.eliminada) {
                 Text(
-                    text = "${calcularDistanciaKm(oferta)} km - ${oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" }}",
+                    text = "${calcularDistanciaKm(oferta, latitudUsuario, longitudUsuario, idUsuarioActual)} km - ${oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" }}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -960,6 +966,9 @@ private fun TarjetaDetalleOferta(
 @Composable
 private fun TarjetaDetallePrevisualizacion(
     oferta: OfertaServicio,
+    latitudUsuario: Double? = null,
+    longitudUsuario: Double? = null,
+    idUsuarioActual: Long? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -1050,7 +1059,7 @@ private fun TarjetaDetallePrevisualizacion(
             )
             if (!oferta.eliminada) {
                 Text(
-                    text = "${calcularDistanciaKm(oferta)} km - ${oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" }}",
+                    text = "${calcularDistanciaKm(oferta, latitudUsuario, longitudUsuario, idUsuarioActual)} km - ${oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" }}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1256,8 +1265,9 @@ private fun MapaRangoOpenStreetMap(
 ) {
     val context = LocalContext.current
     val rangoNormalizadoM = EscalaRango.normalizar(rangoM)
-    val zoom = calcularZoomPorRangoM(rangoNormalizadoM).toDouble()
-    val radioMetros = rangoNormalizadoM.toDouble()
+    val rangoVisualM = maxOf(rangoNormalizadoM, 1000)
+    val zoom = calcularZoomPorRangoM(rangoVisualM).toDouble()
+    val radioMetros = rangoVisualM.toDouble()
 
     LaunchedEffect(Unit) {
         Configuration.getInstance().load(
@@ -1286,7 +1296,7 @@ private fun MapaRangoOpenStreetMap(
         modifier = modifier,
         factory = { mapView },
         update = { map ->
-            val claveActual = Triple(latitud, longitud, rangoNormalizadoM)
+            val claveActual = Triple(latitud, longitud, rangoVisualM)
             if (claveMapaAnterior == claveActual) return@AndroidView
             claveMapaAnterior = claveActual
 
@@ -1410,11 +1420,17 @@ private fun lerpFloat(inicio: Float, fin: Float, fraccion: Float): Float {
     return inicio + ((fin - inicio) * fraccion.coerceIn(0f, 1f))
 }
 
-private fun calcularDistanciaKm(oferta: OfertaServicio): Int {
+private fun calcularDistanciaKm(
+    oferta: OfertaServicio,
+    latUsuario: Double?,
+    lonUsuario: Double?,
+    idUsuarioActual: Long?
+): Int {
+    if (idUsuarioActual != null && oferta.idTrabajador == idUsuarioActual) return 0
     val lat = oferta.latitudReferencia ?: return 0
     val lon = oferta.longitudReferencia ?: return 0
-    val referenciaLat = -33.4489
-    val referenciaLon = -70.6693
+    val referenciaLat = latUsuario ?: return 0
+    val referenciaLon = lonUsuario ?: return 0
 
     val radioTierraKm = 6371.0
     val dLat = (lat - referenciaLat) * PI / 180.0

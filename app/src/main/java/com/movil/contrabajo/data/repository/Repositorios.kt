@@ -85,6 +85,7 @@ interface RepositorioOfertas {
     fun obtenerOfertasPropias(): List<OfertaServicio>
     fun obtenerOfertaPropiaActual(): OfertaServicio?
     fun obtenerOfertaPropiaPorId(idOfertaServicio: Long): OfertaServicio?
+    fun obtenerDisponibilidadOfertaPropia(idOfertaServicio: Long): Result<Boolean>
     fun obtenerIdsOfertasConTrabajoEnCursoPropias(): Set<Long>
     fun obtenerValoracionesPropiasPorServicio(): List<ValoracionesServicio>
     fun obtenerCategoriasServicio(): List<CategoriaServicio>
@@ -648,6 +649,12 @@ class RepositorioOfertasLocal(
         val usuario = db.obtenerUsuarioSesionActiva() ?: return null
         return db.obtenerOfertaPorId(idOfertaServicio, incluirEliminadas = false)
             ?.takeIf { it.idTrabajador == usuario.idUsuario }
+    }
+
+    override fun obtenerDisponibilidadOfertaPropia(idOfertaServicio: Long): Result<Boolean> {
+        val oferta = obtenerOfertaPropiaPorId(idOfertaServicio)
+            ?: return Result.failure(IllegalStateException("No existe un servicio propio para consultar"))
+        return Result.success(oferta.disponible)
     }
 
     override fun obtenerIdsOfertasConTrabajoEnCursoPropias(): Set<Long> {

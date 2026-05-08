@@ -15,6 +15,8 @@ data class Usuario(
     val fechaNacimiento: String,
     val verificado: Boolean,
     val tipoPerfil: Int = TipoPerfil.USUARIO_BASE,
+    val rangoDisponibilidadM: Int = 20_000,
+    val rangoBusquedaM: Int = 20_000,
     val numeroDocumentoIdentidad: String? = null,
     val preguntaRecuperacion: String = "",
     val respuestaRecuperacion: String = "",

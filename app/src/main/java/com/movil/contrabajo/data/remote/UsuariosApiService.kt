@@ -8,6 +8,7 @@ import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import com.google.gson.annotations.SerializedName
 
 interface UsuariosApiService {
     @POST("api/auth/login")
@@ -116,6 +117,10 @@ data class UsuarioResponseDto(
     val apellidos: String?,
     val correo: String?,
     val telefono: String?,
+    @SerializedName("rango_disponibilidad_m")
+    val rangoDisponibilidadM: Int? = null,
+    @SerializedName("rango_busqueda_m")
+    val rangoBusquedaM: Int? = null,
     val fechaNacimiento: String?,
     val perfil: String?,
     val verificado: Boolean?,
@@ -172,6 +177,10 @@ data class DireccionRegistroRequestDto(
 data class UsuarioUpdateRequestDto(
     val telefono: String? = null,
     val correo: String? = null,
+    @SerializedName("rango_disponibilidad_m")
+    val rangoDisponibilidadM: Int? = null,
+    @SerializedName("rango_busqueda_m")
+    val rangoBusquedaM: Int? = null,
     val latitud: Double? = null,
     val longitud: Double? = null,
     val calle: String? = null,

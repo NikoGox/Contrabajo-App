@@ -1,3 +1,25 @@
+VERSION 0.10.0-Pre-Alpha
+───────
+├─• Se integró el módulo de servicios con el backend real, reemplazando el repositorio local para marketplace, detalle y gestión de ofertas.
+├─• Se habilitaron controles dedicados para activar y desactivar disponibilidad de oferta sin requerir edición completa del servicio.
+├─• Se conectó el rango de búsqueda al backend; ambos rangos (búsqueda y disponibilidad) persisten de forma independiente sin sobreescribirse.
+├─• Se agregó migración de arranque en usuarios_api para crear las columnas de rango automáticamente en bases existentes.
+├─• Se corrigió que el marketplace se vaciara al no tener coordenadas cargadas; ahora muestra ofertas de todas formas.
+├─• Se corrigieron las llamadas de red para ejecutarse fuera del hilo principal, eliminando crashes en dispositivos reales.
+├─• Se estabilizó la sesión tras verificación de trabajador para no borrar el token ante errores transitorios de red.
+├─• Se corrigió el flujo de verificación para cerrar sesión y renovar el JWT con el rol correcto de trabajador.
+├─• Se corrigió que los servicios nuevos partían activos; ahora se crean desactivados y el trabajador los publica manualmente.
+├─• Se corrigió que las tarjetas mostraban nombres genéricos en lugar del nombre real del trabajador.
+├─• Se corrigió la causa raíz del filtro de rango: el valor real del trabajador no se leía y todos los servicios usaban el fallback de 20 km.
+├─• Se corrigió la fórmula de intersección de círculos en el marketplace para considerar el rango del trabajador y no solo el del cliente.
+├─• Se corrigió que el trabajador veía su propio servicio a 37 km en lugar de 0 km.
+├─• Se protegió la privacidad de dirección: las ofertas exponen solo comuna y región; la dirección completa se muestra solo al propietario.
+├─• Se agregó mini mapa con círculo al modal de rango de búsqueda para visualizar el área en tiempo real.
+├─• Se aplicó un mínimo visual de 1.000 m en los mapas de rango de disponibilidad para no revelar la ubicación exacta del trabajador.
+├─• Se ocultaron el rango de disponibilidad y su mapa en ajustes de ubicación para usuarios con perfil cliente.
+└─• Se corrigió la etiqueta de tipo de cuenta: USUARIO_BASE ahora se muestra como "Cliente".
+
+
 VERSION 0.9.0-Pre-Alpha
 ───────
 ├─• Se consolidó el modo online-first en front para cuenta/perfil/seguridad/ubicación, eliminando fallback offline operativo en estos flujos.
