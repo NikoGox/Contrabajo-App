@@ -15,28 +15,20 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.10.0-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.10.1-Pre-Alpha
 
 
 
-> <br>• Se integró el módulo de servicios con el backend real, reemplazando el repositorio local para marketplace, detalle y gestión de ofertas.
-> <br>• Se habilitaron controles dedicados para activar y desactivar disponibilidad de oferta sin requerir edición completa del servicio.
-> <br>• Se conectó el rango de búsqueda al backend; ambos rangos (búsqueda y disponibilidad) persisten de forma independiente sin sobreescribirse.
-> <br>• Se agregó migración de arranque en usuarios_api para crear las columnas de rango automáticamente en bases existentes.
-> <br>• Se corrigió que el marketplace se vaciara al no tener coordenadas cargadas; ahora muestra ofertas de todas formas.
-> <br>• Se corrigieron las llamadas de red para ejecutarse fuera del hilo principal, eliminando crashes en dispositivos reales.
-> <br>• Se estabilizó la sesión tras verificación de trabajador para no borrar el token ante errores transitorios de red.
-> <br>• Se corrigió el flujo de verificación para cerrar sesión y renovar el JWT con el rol correcto de trabajador.
-> <br>• Se corrigió que los servicios nuevos partían activos; ahora se crean desactivados y el trabajador los publica manualmente.
-> <br>• Se corrigió que las tarjetas mostraban nombres genéricos en lugar del nombre real del trabajador.
-> <br>• Se corrigió la causa raíz del filtro de rango: el valor real del trabajador no se leía y todos los servicios usaban el fallback de 20 km.
-> <br>• Se corrigió la fórmula de intersección de círculos en el marketplace para considerar el rango del trabajador y no solo el del cliente.
-> <br>• Se corrigió que el trabajador veía su propio servicio a 37 km en lugar de 0 km.
-> <br>• Se protegió la privacidad de dirección: las ofertas exponen solo comuna y región; la dirección completa se muestra solo al propietario.
-> <br>• Se agregó mini mapa con círculo al modal de rango de búsqueda para visualizar el área en tiempo real.
-> <br>• Se aplicó un mínimo visual de 1.000 m en los mapas de rango de disponibilidad para no revelar la ubicación exacta del trabajador.
-> <br>• Se ocultaron el rango de disponibilidad y su mapa en ajustes de ubicación para usuarios con perfil cliente.
-> <br>• Se corrigió la etiqueta de tipo de cuenta: USUARIO_BASE ahora se muestra como "Cliente".
+> <br>• Se implementó el flujo de verificación como trabajador con OCR real: bienvenida, captura, procesando y resultado.
+> <br>• Pantalla de bienvenida con ilustración estilizada de cédula e instrucciones en tres pasos.
+> <br>• Pantalla de captura con vista de cámara en vivo y marco guía animado sobre overlay oscuro.
+> <br>• Extracción automática de RUT y N° de documento del carnet usando ML Kit Text Recognition on-device.
+> <br>• Rotación de imagen corregida: se pasa el ángulo real del sensor a ML Kit para leer texto en cualquier orientación.
+> <br>• Extractor de RUT con cuatro patrones (con puntos, sin puntos, con espacios, zona MRZ) y normalización de caracteres OCR confundibles.
+> <br>• N° de documento reconocido en formato XXX.XXX.XXX propio de la cédula chilena, con fallback a dígitos consecutivos.
+> <br>• Diagnóstico incluido en el error de RUT no encontrado: muestra el texto reconocido para facilitar depuración.
+> <br>• Validación local del RUT antes de consultar el backend; pantalla de resultado diferenciada para éxito y rechazo.
+> <br>• Corrección de compatibilidad con dispositivos Android de 16 KB de tamaño de página (useLegacyPackaging = false).
 
 ---
 

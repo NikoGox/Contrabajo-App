@@ -1,3 +1,17 @@
+VERSION 0.10.1-Pre-Alpha
+───────
+├─• Se implementó el flujo de verificación como trabajador con OCR real: bienvenida, captura, procesando y resultado.
+├─• Pantalla de bienvenida con ilustración estilizada de cédula e instrucciones en tres pasos.
+├─• Pantalla de captura con vista de cámara en vivo y marco guía animado sobre overlay oscuro.
+├─• Extracción automática de RUT y N° de documento del carnet usando ML Kit Text Recognition on-device.
+├─• Rotación de imagen corregida: se pasa el ángulo real del sensor a ML Kit para leer texto en cualquier orientación.
+├─• Extractor de RUT con cuatro patrones (con puntos, sin puntos, con espacios, zona MRZ) y normalización de caracteres OCR confundibles.
+├─• N° de documento reconocido en formato XXX.XXX.XXX propio de la cédula chilena, con fallback a dígitos consecutivos.
+├─• Diagnóstico incluido en el error de RUT no encontrado: muestra el texto reconocido para facilitar depuración.
+├─• Validación local del RUT antes de consultar el backend; pantalla de resultado diferenciada para éxito y rechazo.
+└─• Corrección de compatibilidad con dispositivos Android de 16 KB de tamaño de página (useLegacyPackaging = false).
+
+
 VERSION 0.10.0-Pre-Alpha
 ───────
 ├─• Se integró el módulo de servicios con el backend real, reemplazando el repositorio local para marketplace, detalle y gestión de ofertas.

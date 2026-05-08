@@ -253,122 +253,6 @@ fun PantallaAjustesSeguridad(
     }
 }
 
-@Composable
-fun PantallaVerificarCuentaTrabajador(
-    viewModel: PerfilViewModel,
-    onVolver: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val uiState = viewModel.uiState
-    val tipoPerfil = uiState.usuario?.tipoPerfil
-    val puedeVerificar = tipoPerfil == null || tipoPerfil == TipoPerfil.USUARIO_BASE
-    var cuentaRegresivaCierre by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) { viewModel.recargar() }
-    LaunchedEffect(uiState.mensajeVerificacion) {
-        if (uiState.mensajeVerificacion != null) {
-            cuentaRegresivaCierre = 5
-            while (cuentaRegresivaCierre > 0) {
-                kotlinx.coroutines.delay(1_000)
-                cuentaRegresivaCierre -= 1
-            }
-            viewModel.cerrarSesion()
-        }
-    }
-
-    PantallaBase(modifier = modifier, mostrarFondo = false) {
-        BarraSuperiorAjustes(titulo = "Verificar cuenta trabajador", onVolver = onVolver, iconoDerecha = Icons.Filled.Security)
-
-        TarjetaBase {
-            if (!puedeVerificar) {
-                Text(
-                    text = "Esta cuenta no requiere verificacion de trabajador.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                return@TarjetaBase
-            }
-            Text(
-                text = "Tu tipo de perfil se actualiza automaticamente despues de la validacion.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CampoContrabajo(
-                    valor = uiState.runVerificacion,
-                    onValueChange = {},
-                    etiqueta = "RUN (cuenta)",
-                    modifier = Modifier.weight(1f),
-                    visualTransformation = FormatoRunVisualTransformation,
-                    readOnly = true,
-                    enabled = false
-                )
-                Text(
-                    text = "-",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(0.08f)
-                )
-                CampoContrabajo(
-                    valor = uiState.dvVerificacion,
-                    onValueChange = {},
-                    etiqueta = "DV",
-                    modifier = Modifier.weight(0.35f),
-                    readOnly = true,
-                    enabled = false
-                )
-            }
-            CampoContrabajo(
-                valor = uiState.numeroDocumentoVerificacion,
-                onValueChange = viewModel::actualizarNumeroDocumentoVerificacion,
-                etiqueta = "Numero de documento",
-                visualTransformation = FormatoDocumentoVisualTransformation
-            )
-
-            if (uiState.usuario?.verificacionTrabajadorPendiente == true) {
-                EtiquetaEstado("Verificacion en curso")
-                Text(
-                    text = "La cuenta se actualizara en 3 minutos aprox.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                BotonPrimario(
-                    texto = "Enviar solicitud",
-                    onClick = viewModel::solicitarVerificacionTrabajador
-                )
-            }
-
-            if (uiState.errorVerificacion != null) {
-                Text(
-                    text = uiState.errorVerificacion,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-            if (uiState.mensajeVerificacion != null) {
-                Text(
-                    text = uiState.mensajeVerificacion,
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-                if (cuentaRegresivaCierre > 0) {
-                    Text(
-                        text = "Cerrando sesion en $cuentaRegresivaCierre...",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaPreguntasSeguridad(
@@ -978,7 +862,7 @@ private fun calcularZoomPorRangoM(rangoM: Int): Int = when {
 }
 
 @Composable
-private fun BarraSuperiorAjustes(
+internal fun BarraSuperiorAjustes(
     titulo: String,
     onVolver: () -> Unit,
     iconoDerecha: ImageVector

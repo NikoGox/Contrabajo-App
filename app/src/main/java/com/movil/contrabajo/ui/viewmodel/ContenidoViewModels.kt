@@ -943,6 +943,13 @@ class PerfilViewModel(
         )
     }
 
+    fun limpiarEstadoVerificacion() {
+        uiState = uiState.copy(
+            errorVerificacion = null,
+            mensajeVerificacion = null
+        )
+    }
+
     fun actualizarRegionUbicacion(valor: String) {
         uiState = uiState.copy(
             ubicacionAjustes = uiState.ubicacionAjustes.copy(region = valor),
