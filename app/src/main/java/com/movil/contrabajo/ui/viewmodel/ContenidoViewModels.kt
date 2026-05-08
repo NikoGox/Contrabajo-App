@@ -16,6 +16,7 @@ import com.movil.contrabajo.data.repository.RepositorioReportes
 import com.movil.contrabajo.domain.model.AccionModeracion
 import com.movil.contrabajo.domain.model.ChatCita
 import com.movil.contrabajo.domain.model.EstadoCita
+import com.movil.contrabajo.domain.model.FotoOferta
 import com.movil.contrabajo.domain.model.FotoServicioLocal
 import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
@@ -603,7 +604,8 @@ data class PerfilUiState(
     val mensajePerfilEdicion: String? = null,
     val errorVerificacion: String? = null,
     val mensajeVerificacion: String? = null,
-    val cargandoPantalla: Boolean = false
+    val cargandoPantalla: Boolean = false,
+    val subiendoFotoPerfil: Boolean = false
 )
 
 class PerfilViewModel(
@@ -878,8 +880,7 @@ class PerfilViewModel(
 
     fun actualizarFotoPerfil(uriLocal: String) {
         viewModelScope.launch {
-            uiState = uiState.copy(cargandoPantalla = true)
-            delay(180)
+            uiState = uiState.copy(subiendoFotoPerfil = true)
             withContext(Dispatchers.IO) {
                 repositorioPerfil.actualizarFotoPerfil(uriLocal)
             }
@@ -889,7 +890,7 @@ class PerfilViewModel(
                 .onFailure {
                     uiState = uiState.copy(errorServicio = it.message ?: "No se pudo actualizar la foto de perfil")
                 }
-            uiState = uiState.copy(cargandoPantalla = false)
+            uiState = uiState.copy(subiendoFotoPerfil = false)
         }
     }
 
@@ -1458,7 +1459,10 @@ data class DetalleServicioUiState(
     val indiceActual: Int = 0,
     val idUsuarioActual: Long? = null,
     val latitudUsuario: Double? = null,
-    val longitudUsuario: Double? = null
+    val longitudUsuario: Double? = null,
+    val fotosOferta: List<FotoOferta> = emptyList(),
+    val subiendoFoto: Boolean = false,
+    val errorFoto: String? = null
 ) {
     val ofertaActual: OfertaServicio? get() = ofertas.getOrNull(indiceActual)
 }
@@ -1579,5 +1583,49 @@ class DetalleServicioViewModel(
         if (indiceNormalizado != uiState.indiceActual) {
             uiState = uiState.copy(indiceActual = indiceNormalizado)
         }
+    }
+
+    fun cargarFotosOferta(idOferta: Long) {
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioOfertas.listarFotosOferta(idOferta)
+            }
+            resultado
+                .onSuccess { fotos -> uiState = uiState.copy(fotosOferta = fotos, errorFoto = null) }
+                .onFailure { uiState = uiState.copy(errorFoto = it.message) }
+        }
+    }
+
+    fun subirFoto(uriString: String, idOferta: Long) {
+        viewModelScope.launch {
+            uiState = uiState.copy(subiendoFoto = true, errorFoto = null)
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioOfertas.subirFotoOferta(uriString, idOferta)
+            }
+            resultado
+                .onSuccess { nuevaFoto ->
+                    uiState = uiState.copy(
+                        fotosOferta = uiState.fotosOferta + nuevaFoto,
+                        errorFoto = null
+                    )
+                }
+                .onFailure { uiState = uiState.copy(errorFoto = it.message ?: "No se pudo subir la foto") }
+            uiState = uiState.copy(subiendoFoto = false)
+        }
+    }
+
+    fun eliminarFoto(idFoto: Long, idOferta: Long) {
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioOfertas.eliminarFotoOferta(idFoto)
+            }
+            resultado
+                .onSuccess { cargarFotosOferta(idOferta) }
+                .onFailure { uiState = uiState.copy(errorFoto = it.message ?: "No se pudo eliminar la foto") }
+        }
+    }
+
+    fun consumirErrorFoto() {
+        uiState = uiState.copy(errorFoto = null)
     }
 }

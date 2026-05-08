@@ -26,7 +26,15 @@ class RemoteSessionStore(context: Context) {
 
     fun obtenerUsuario(): Usuario? {
         val json = preferencias.getString(CLAVE_USUARIO, null) ?: return null
-        return runCatching { gson.fromJson(json, Usuario::class.java) }.getOrNull()
+        return runCatching { gson.fromJson(json, Usuario::class.java) }
+            .getOrNull()
+            ?.let { usuario ->
+                val urlNormalizada = usuario.fotoPerfilUrl
+                    ?.replace("://localhost:", "://10.0.2.2:", ignoreCase = true)
+                    ?.replace("://127.0.0.1:", "://10.0.2.2:", ignoreCase = true)
+                if (urlNormalizada != usuario.fotoPerfilUrl) usuario.copy(fotoPerfilUrl = urlNormalizada)
+                else usuario
+            }
     }
 
     fun actualizarUsuario(usuario: Usuario) {

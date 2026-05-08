@@ -1,11 +1,15 @@
 package com.movil.contrabajo.data.remote
 
+import okhttp3.MultipartBody
 import retrofit2.Call
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 import com.google.gson.annotations.SerializedName
@@ -96,6 +100,24 @@ interface UsuariosApiService {
         @Path("indice") indice: Int,
         @Body request: PreguntaSeguridadUpdateRequestDto
     ): Call<PreguntasSeguridadDto>
+
+    // ── Foto de perfil ───────────────────────────────────────────────────────
+    @Multipart
+    @POST("api/usuarios/foto-perfil")
+    fun subirFotoPerfil(
+        @Header("Authorization") authorization: String,
+        @Part imagen: MultipartBody.Part
+    ): Call<FotoPerfilResponseDto>
+
+    @GET("api/usuarios/foto-perfil/{idUsuario}")
+    fun obtenerFotoPerfil(
+        @Path("idUsuario") idUsuario: Int
+    ): Call<FotoPerfilResponseDto>
+
+    @DELETE("api/usuarios/foto-perfil")
+    fun eliminarFotoPerfil(
+        @Header("Authorization") authorization: String
+    ): Call<Map<String, String>>
 }
 
 data class LoginRequestDto(
@@ -209,4 +231,16 @@ data class RecuperacionPasswordRequestDto(
 data class PreguntaSeguridadUpdateRequestDto(
     val pregunta: String,
     val respuesta: String
+)
+
+data class FotoPerfilResponseDto(
+    @SerializedName("id_foto_perfil") val idFotoPerfil: Int?,
+    @SerializedName("enlace")         val enlace: String?,
+    @SerializedName("nombre_original") val nombreOriginal: String?,
+    @SerializedName("tipo_mime")      val tipoMime: String?,
+    @SerializedName("tamano_bytes")   val tamanoBytes: Long?,
+    @SerializedName("ancho_px")       val anchoPx: Int?,
+    @SerializedName("alto_px")        val altoPx: Int?,
+    @SerializedName("fecha_subida")   val fechaSubida: String?,
+    @SerializedName("id_usuario")     val idUsuario: Int?
 )

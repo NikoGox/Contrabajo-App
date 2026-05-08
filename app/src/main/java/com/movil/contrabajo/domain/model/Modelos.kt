@@ -153,6 +153,19 @@ data class Foto(
     val urlRemota: String? = null
 )
 
+data class FotoOferta(
+    val idFoto: Long = 0,
+    val enlace: String,
+    val nombreOriginal: String = "",
+    val tipoMime: String = "",
+    val tamanoBytes: Long = 0,
+    val anchoPx: Int? = null,
+    val altoPx: Int? = null,
+    val fechaSubida: String = "",
+    val idOfertaServicio: Long = 0,
+    val idUsuario: Long = 0
+)
+
 data class FotoServicioLocal(
     val idFoto: Long? = null,
     val uriLocal: String = "",

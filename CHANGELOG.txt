@@ -1,3 +1,19 @@
+VERSION 0.10.2-Pre-Alpha
+───────
+├─• Se implementó la subida real de foto de perfil al backend: ya no se guarda solo el URI local, ahora se hace upload multipart a POST /api/usuarios/foto-perfil y se almacena la URL remota.
+├─• Se implementó galería de fotos por servicio: los trabajadores pueden subir y eliminar fotos en la pantalla de detalle de su oferta.
+├─• Nuevo componente GaleriaFotosOferta con carrusel horizontal de thumbnails, botón + solo para el dueño e indicador de carga durante la subida.
+├─• Indicador de carga diferenciado al subir foto de perfil (subiendoFotoPerfil) sin bloquear el resto de la pantalla.
+├─• Placeholder de foto de perfil reemplazado: LogoContrabajo → icono AccountCircle coherente con estado sin foto.
+├─• Nuevos endpoints Retrofit multipart: subirFotoPerfil, obtenerFotoPerfil, eliminarFotoPerfil en UsuariosApiService.
+├─• Nuevos endpoints Retrofit multipart: subirFotoOferta, listarFotosOferta, eliminarFotoOferta en ServiciosApiService.
+├─• RepositorioPerfilRemoto y RepositorioOfertasRemoto reciben Context para leer bytes de URI via ContentResolver.
+└─• Errores de foto de servicio se muestran como Toast; errores de foto de perfil se reflejan en el estado de UI.
+
+->>> [Pendiente — nube] Eliminar parche normalizarEnlaceEmulador() de RepositoriosRemotos.kt y RemoteSessionStore.kt cuando el backend esté en Azure.
+->>> [Pendiente — nube] Migrar almacenamiento de imágenes a Azure Blob Storage; el parche desaparece solo al hacerlo.
+
+
 VERSION 0.10.1-Pre-Alpha
 ───────
 ├─• Se implementó el flujo de verificación como trabajador con OCR real: bienvenida, captura, procesando y resultado.

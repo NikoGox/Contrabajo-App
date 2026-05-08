@@ -14,11 +14,13 @@ class ProveedorRepositorios(context: Context) {
     )
     val perfil: RepositorioPerfil = RepositorioPerfilRemoto(
         api = UsuariosApiClient.api,
-        sessionStore = sessionStore
+        sessionStore = sessionStore,
+        context = context.applicationContext
     )
     val ofertas: RepositorioOfertas = RepositorioOfertasRemoto(
         api = ServiciosApiClient.api,
-        sessionStore = sessionStore
+        sessionStore = sessionStore,
+        context = context.applicationContext
     )
     val chats: RepositorioChats = RepositorioChatsRecortado(sessionStore)
     val reportes: RepositorioReportes = RepositorioReportesRecortado()

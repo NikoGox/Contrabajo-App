@@ -25,6 +25,7 @@ import com.movil.contrabajo.domain.model.Valoracion
 import com.movil.contrabajo.domain.model.ValoracionesServicio
 import com.movil.contrabajo.domain.model.AccionModeracion
 import com.movil.contrabajo.domain.model.EstadoReporte
+import com.movil.contrabajo.domain.model.FotoOferta
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeParseException
@@ -79,6 +80,9 @@ interface RepositorioReportes {
 }
 
 interface RepositorioOfertas {
+    fun subirFotoOferta(uriString: String, idOferta: Long): Result<FotoOferta>
+    fun listarFotosOferta(idOferta: Long): Result<List<FotoOferta>>
+    fun eliminarFotoOferta(idFoto: Long): Result<Unit>
     fun obtenerOfertaPrincipal(): OfertaServicio?
     fun obtenerOfertasMarketplace(busqueda: String = ""): List<OfertaServicio>
     fun obtenerOfertaPorId(idOfertaServicio: Long, incluirEliminadas: Boolean = false): OfertaServicio?
@@ -775,6 +779,15 @@ class RepositorioOfertasLocal(
         db.eliminarOfertaServicio(oferta.idOfertaServicio)
         return Result.success(Unit)
     }
+
+    override fun subirFotoOferta(uriString: String, idOferta: Long): Result<FotoOferta> =
+        Result.failure(IllegalStateException("Subida de fotos no disponible en modo local"))
+
+    override fun listarFotosOferta(idOferta: Long): Result<List<FotoOferta>> =
+        Result.success(emptyList())
+
+    override fun eliminarFotoOferta(idFoto: Long): Result<Unit> =
+        Result.failure(IllegalStateException("Eliminacion de fotos no disponible en modo local"))
 
     private fun validarFormularioServicio(formulario: FormularioServicio): String? = when {
         formulario.titulo.isBlank() -> "Ingresa un titulo para tu servicio"

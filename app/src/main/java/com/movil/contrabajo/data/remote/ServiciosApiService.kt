@@ -5,6 +5,7 @@ import com.google.gson.JsonObject
 import com.movil.contrabajo.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import okhttp3.MultipartBody
 import retrofit2.Call
 import retrofit2.Response
 import retrofit2.Retrofit
@@ -13,10 +14,13 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.PUT
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
+import com.google.gson.annotations.SerializedName
 import java.math.BigDecimal
 import java.util.concurrent.TimeUnit
 
@@ -85,6 +89,27 @@ interface ServiciosApiService {
         @Header("Authorization") authorization: String,
         @Path("id") id: Int
     ): Call<Map<String, String>>
+
+    // ── Fotos de oferta ──────────────────────────────────────────────────────
+    @Multipart
+    @POST("api/fotos/{idOferta}")
+    fun subirFotoOferta(
+        @Header("Authorization") authorization: String,
+        @Path("idOferta") idOferta: Int,
+        @Part imagen: MultipartBody.Part
+    ): Call<FotoOfertaResponseDto>
+
+    @GET("api/fotos/oferta/{idOferta}")
+    fun listarFotosOferta(
+        @Header("Authorization") authorization: String,
+        @Path("idOferta") idOferta: Int
+    ): Call<List<FotoOfertaResponseDto>>
+
+    @DELETE("api/fotos/{idFoto}")
+    fun eliminarFotoOferta(
+        @Header("Authorization") authorization: String,
+        @Path("idFoto") idFoto: Int
+    ): Call<Map<String, String>>
 }
 
 data class CategoriaServicioDto(
@@ -124,6 +149,19 @@ data class OfertaServicioRequestDto(
     val precio: BigDecimal?,
     val idCategoria: Int,
     val idTipoPrecio: Int?
+)
+
+data class FotoOfertaResponseDto(
+    @SerializedName("id_foto")           val idFoto: Int?,
+    @SerializedName("enlace")            val enlace: String?,
+    @SerializedName("nombre_original")   val nombreOriginal: String?,
+    @SerializedName("tipo_mime")         val tipoMime: String?,
+    @SerializedName("tamano_bytes")      val tamanoBytes: Long?,
+    @SerializedName("ancho_px")          val anchoPx: Int?,
+    @SerializedName("alto_px")           val altoPx: Int?,
+    @SerializedName("fecha_subida")      val fechaSubida: String?,
+    @SerializedName("id_oferta_servicio") val idOfertaServicio: Int?,
+    @SerializedName("id_usuario")        val idUsuario: Int?
 )
 
 data class OfertaServicioUpdateRequestDto(

@@ -1,5 +1,10 @@
 package com.movil.contrabajo.data.repository
 
+import android.content.Context
+import android.net.Uri
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import com.movil.contrabajo.data.remote.DireccionRegistroRequestDto
 import com.movil.contrabajo.data.remote.LoginRequestDto
 import com.movil.contrabajo.data.remote.OcrSimuladoRequestDto
@@ -8,6 +13,8 @@ import com.movil.contrabajo.data.remote.PreguntasSeguridadDto
 import com.movil.contrabajo.data.remote.RecuperacionPasswordRequestDto
 import com.movil.contrabajo.data.remote.RecuperacionRegistroRequestDto
 import com.movil.contrabajo.data.remote.RemoteSessionStore
+import com.movil.contrabajo.data.remote.FotoOfertaResponseDto
+import com.movil.contrabajo.data.remote.FotoPerfilResponseDto
 import com.movil.contrabajo.data.remote.ServiciosApiService
 import com.movil.contrabajo.data.remote.OfertaServicioDto
 import com.movil.contrabajo.data.remote.OfertaServicioRequestDto
@@ -20,6 +27,7 @@ import com.movil.contrabajo.data.remote.ejecutarApi
 import com.movil.contrabajo.data.remote.ejecutarApiServicios
 import com.movil.contrabajo.domain.model.ComunaCatalogo
 import com.movil.contrabajo.domain.model.CategoriaServicio
+import com.movil.contrabajo.domain.model.FotoOferta
 import com.movil.contrabajo.domain.model.CitaServicio
 import com.movil.contrabajo.domain.model.ChatCita
 import com.movil.contrabajo.domain.model.FiltroMarketplaceConfig
@@ -242,7 +250,8 @@ class RepositorioAutenticacionRemoto(
 
 class RepositorioPerfilRemoto(
     private val api: UsuariosApiService,
-    private val sessionStore: RemoteSessionStore
+    private val sessionStore: RemoteSessionStore,
+    private val context: Context
 ) : RepositorioPerfil {
 
     override fun obtenerPerfilActual(): Usuario? {
@@ -438,9 +447,21 @@ class RepositorioPerfilRemoto(
 
     override fun actualizarFotoPerfil(uriLocal: String): Result<Usuario> {
         if (uriLocal.isBlank()) return Result.failure(IllegalArgumentException("Selecciona una foto valida"))
-        val usuario = sessionStore.guardarFotoPerfil(uriLocal)
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay token de sesion activo"))
+        val usuario = sessionStore.obtenerUsuario()
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
-        return Result.success(usuario)
+        val part = runCatching { uriToMultipartPart(context, uriLocal, "imagen") }
+            .getOrElse { return Result.failure(IllegalStateException("No se pudo leer la imagen seleccionada")) }
+        return ejecutarApi(api.subirFotoPerfil(bearer(token), part))
+            .mapCatching { dto ->
+                val enlace = dto.enlace?.takeIf { it.isNotBlank() }
+                    ?.normalizarEnlaceEmulador()
+                    ?: throw IllegalStateException("El servidor no devolvio un enlace de foto valido")
+                val actualizado = usuario.copy(fotoPerfilUrl = enlace)
+                sessionStore.actualizarUsuario(actualizado)
+                actualizado
+            }
     }
 
     override fun actualizarContactoPerfil(correo: String, telefono: String): Result<Usuario> {
@@ -500,7 +521,8 @@ class RepositorioPerfilRemoto(
 
 class RepositorioOfertasRemoto(
     private val api: ServiciosApiService,
-    private val sessionStore: RemoteSessionStore
+    private val sessionStore: RemoteSessionStore,
+    private val context: Context
 ) : RepositorioOfertas {
 
     override fun obtenerOfertaPrincipal(): OfertaServicio? =
@@ -630,6 +652,28 @@ class RepositorioOfertasRemoto(
         val token = sessionStore.obtenerToken()
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         return ejecutarApiServicios(api.eliminarOferta(bearer(token), idOfertaServicio.toInt())).map { Unit }
+    }
+
+    override fun subirFotoOferta(uriString: String, idOferta: Long): Result<FotoOferta> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val part = runCatching { uriToMultipartPart(context, uriString, "imagen") }
+            .getOrElse { return Result.failure(IllegalStateException("No se pudo leer la imagen seleccionada")) }
+        return ejecutarApiServicios(api.subirFotoOferta(bearer(token), idOferta.toInt(), part))
+            .map { it.toFotoOferta() }
+    }
+
+    override fun listarFotosOferta(idOferta: Long): Result<List<FotoOferta>> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        return ejecutarApiServicios(api.listarFotosOferta(bearer(token), idOferta.toInt()))
+            .map { lista -> lista.map { it.toFotoOferta() } }
+    }
+
+    override fun eliminarFotoOferta(idFoto: Long): Result<Unit> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        return ejecutarApiServicios(api.eliminarFotoOferta(bearer(token), idFoto.toInt())).map { Unit }
     }
 
     private fun obtenerTiposPrecio(token: String): List<Pair<Int, String>> {
@@ -848,6 +892,36 @@ private fun validarFormularioServicioRemoto(formulario: FormularioServicio): Str
         "El monto debe estar entre ${PrecioUtils.MIN_MONTO} y ${PrecioUtils.MAX_MONTO}"
     else -> null
 }
+
+private fun uriToMultipartPart(context: Context, uriString: String, partName: String): MultipartBody.Part {
+    val uri = Uri.parse(uriString)
+    val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
+    val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+    val extension = when {
+        mimeType.contains("png", ignoreCase = true) -> "png"
+        mimeType.contains("webp", ignoreCase = true) -> "webp"
+        else -> "jpg"
+    }
+    val requestBody = bytes.toRequestBody(mimeType.toMediaType())
+    return MultipartBody.Part.createFormData(partName, "foto.$extension", requestBody)
+}
+
+private fun String.normalizarEnlaceEmulador(): String =
+    replace("://localhost:", "://10.0.2.2:", ignoreCase = true)
+        .replace("://127.0.0.1:", "://10.0.2.2:", ignoreCase = true)
+
+private fun FotoOfertaResponseDto.toFotoOferta(): FotoOferta = FotoOferta(
+    idFoto = idFoto?.toLong() ?: 0L,
+    enlace = enlace.orEmpty().normalizarEnlaceEmulador(),
+    nombreOriginal = nombreOriginal.orEmpty(),
+    tipoMime = tipoMime.orEmpty(),
+    tamanoBytes = tamanoBytes ?: 0L,
+    anchoPx = anchoPx,
+    altoPx = altoPx,
+    fechaSubida = fechaSubida.orEmpty(),
+    idOfertaServicio = idOfertaServicio?.toLong() ?: 0L,
+    idUsuario = idUsuario?.toLong() ?: 0L
+)
 
 private fun normalizarTexto(valor: String): String {
     return java.text.Normalizer.normalize(valor.trim(), java.text.Normalizer.Form.NFD)
