@@ -316,7 +316,9 @@ data class ChatsUiState(
     val comentarioValoracion: String = "",
     val borradorMensaje: String = "",
     val mensajeSistema: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    // ID de chat recien creado/iniciado; se consume una vez para navegar
+    val pendingNavChatId: Long? = null
 ) {
     val chatsFiltrados: List<ChatCita> get() {
         if (!filtroChatsContacto && !filtroChatsTrabajador) return chats
@@ -337,18 +339,190 @@ class ChatsViewModel(
 
     init {
         recargar()
+        escucharWebSocket()
+        escucharRecibos()
+        escucharConexion()
     }
 
-    fun recargar() {
-        val chatsActuales = repositorioChats.obtenerChatsActuales()
-        val notificacionesPendientes = repositorioChats.obtenerNotificacionesPendientes()
-        uiState = uiState.copy(
-            idUsuarioActual = repositorioChats.obtenerIdUsuarioActual(),
-            chats = chatsActuales,
-            totalMensajesNoLeidos = chatsActuales.sumOf { it.mensajesNoLeidos.coerceAtLeast(0) },
-            idPrimerChatPendiente = chatsActuales.firstOrNull { it.mensajesNoLeidos > 0 }?.idChatCita,
-            notificacionesPendientes = notificacionesPendientes
-        )
+    /**
+     * Colecta el flow de WsManager para actualizar la UI en tiempo real.
+     *
+     * Si el mensaje pertenece al chat activo:
+     *   1. Lo agrega de inmediato a mensajesActivos (UX responsiva).
+     *   2. Recarga el historial desde el servidor, que llama marcarRecibidos+marcarLeidos,
+     *      y devuelve los mensajes con los campos fechaRecibido/fechaLeido poblados
+     *      para que los ticks se muestren correctamente.
+     *
+     * Si el mensaje pertenece a otro chat:
+     *   - Llama marcarRecibidos en el servidor para registrar la entrega (tick entregado).
+     *   - Si el chat no existe aun en la lista (mensaje de sistema de nuevo chat), recarga primero
+     *     para descubrir el chat y luego muestra la notificacion con el nombre correcto.
+     *
+     * En ambos casos refresca la lista de chats para actualizar contadores de no leidos.
+     */
+    private fun escucharWebSocket() {
+        viewModelScope.launch {
+            com.movil.contrabajo.data.remote.WsManager.mensajesEntrantes.collect { mensaje ->
+                val chatActivo = uiState.chatActivo
+                if (chatActivo != null && mensaje.idChatCita == chatActivo.idChatCita) {
+                    // Agrega el mensaje de inmediato para que aparezca sin esperar al servidor
+                    uiState = uiState.copy(mensajesActivos = uiState.mensajesActivos + mensaje)
+                    // Recarga desde el servidor: aplica marks y devuelve ticks actualizados
+                    val mensajesActualizados = withContext(Dispatchers.IO) {
+                        repositorioChats.obtenerMensajes(chatActivo.idChatCita)
+                    }
+                    uiState = uiState.copy(mensajesActivos = mensajesActualizados)
+                } else {
+                    // El chat no esta abierto: registrar entrega
+                    withContext(Dispatchers.IO) {
+                        repositorioChats.marcarRecibidos(mensaje.idChatCita)
+                    }
+                    // Buscar el username del contacto en la lista de chats ya cargada.
+                    // Si no existe todavia (nuevo chat por mensaje de sistema), recargar primero.
+                    var chatEnLista = uiState.chats.firstOrNull { it.idChatCita == mensaje.idChatCita }
+                    if (chatEnLista == null) {
+                        // Chat nuevo (trabajador recibe notificacion de nuevo contacto): recargar
+                        val nuevosChatsList = withContext(Dispatchers.IO) {
+                            repositorioChats.obtenerChatsActuales()
+                        }
+                        uiState = uiState.copy(
+                            chats = nuevosChatsList,
+                            totalMensajesNoLeidos = nuevosChatsList.sumOf { it.mensajesNoLeidos.coerceAtLeast(0) }
+                        )
+                        chatEnLista = nuevosChatsList.firstOrNull { it.idChatCita == mensaje.idChatCita }
+                    }
+                    val usernameContacto = chatEnLista?.usernameContacto
+                    val tituloNotif = when {
+                        !usernameContacto.isNullOrBlank() -> usernameContacto
+                        mensaje.tipo == 1                 -> "Nuevo chat"
+                        else                              -> "Nuevo mensaje"
+                    }
+                    val contenidoNotif = when {
+                        mensaje.tipo == 1 -> mensaje.contenido.take(80).ifBlank { "Tienes un nuevo chat." }
+                        else              -> mensaje.contenido.take(80).ifBlank { "Tienes un nuevo mensaje." }
+                    }
+                    // Alimenta el mecanismo de notificaciones existente en ShellPrincipal.
+                    // El LaunchedEffect(notificacionesPendientes) de ShellPrincipal lo captura
+                    // y muestra el banner del sistema antes de que recargar() lo limpie.
+                    val notif = NotificacionMensajePendiente(
+                        idMensajeChat = mensaje.idMensajeChat,
+                        idChatCita    = mensaje.idChatCita,
+                        titulo        = tituloNotif,
+                        contenido     = contenidoNotif
+                    )
+                    uiState = uiState.copy(notificacionesPendientes = listOf(notif))
+                }
+                // Refrescar lista de chats (sobreescribe notificacionesPendientes con emptyList,
+                // pero el LaunchedEffect de ShellPrincipal ya habra disparado para entonces)
+                recargar()
+            }
+        }
+    }
+
+    /**
+     * Limpia el chat activo. Debe llamarse cuando el usuario sale de PantallaDetalleChat
+     * para evitar que los mensajes entrantes se marquen automaticamente como leidos
+     * mientras el usuario no esta viendo el chat.
+     */
+    fun limpiarChatActivo() {
+        uiState = uiState.copy(chatActivo = null)
+    }
+
+    /**
+     * Cuando el WebSocket (re)conecta, recarga la lista de chats y el historial
+     * del chat activo para recuperar mensajes que llegaron mientras estabamos offline.
+     */
+    private fun escucharConexion() {
+        viewModelScope.launch {
+            com.movil.contrabajo.data.remote.WsManager.conexionEstablecida.collect {
+                recargar()
+                val chatActivo = uiState.chatActivo ?: return@collect
+                val mensajes = withContext(Dispatchers.IO) {
+                    repositorioChats.obtenerMensajes(chatActivo.idChatCita)
+                }
+                uiState = uiState.copy(mensajesActivos = mensajes)
+            }
+        }
+    }
+
+    /**
+     * Colecta eventos de recibo/lectura del backend para actualizar los ticks
+     * en tiempo real cuando el receptor confirma que recibio o leyo los mensajes.
+     */
+    private fun escucharRecibos() {
+        viewModelScope.launch {
+            com.movil.contrabajo.data.remote.WsManager.recibosActualizados.collect { idChat ->
+                // Solo refrescar si el chat afectado es el que esta activo actualmente
+                if (uiState.chatActivo?.idChatCita == idChat) {
+                    val mensajes = withContext(Dispatchers.IO) {
+                        repositorioChats.obtenerMensajes(idChat)
+                    }
+                    uiState = uiState.copy(mensajesActivos = mensajes)
+                }
+            }
+        }
+    }
+
+    /**
+     * Recarga la lista de chats y contadores.
+     *
+     * Si [notificarNoLeidos] es true y hay chats con mensajes sin leer,
+     * genera notificaciones in-app para cada uno. Usar al iniciar sesion
+     * para alertar de mensajes previos al usuario.
+     */
+    fun recargar(notificarNoLeidos: Boolean = false) {
+        viewModelScope.launch {
+            val (chats, notificaciones) = withContext(Dispatchers.IO) {
+                repositorioChats.obtenerChatsActuales() to repositorioChats.obtenerNotificacionesPendientes()
+            }
+            // Al abrir la app: marcar como recibidos en background todos los chats con no leidos.
+            // Esto hace que el emisor vea el doble check gris sin que el receptor abra cada chat.
+            if (notificarNoLeidos) {
+                chats.filter { it.mensajesNoLeidos > 0 }.forEach { chat ->
+                    launch(Dispatchers.IO) {
+                        runCatching { repositorioChats.marcarRecibidos(chat.idChatCita) }
+                    }
+                }
+            }
+            // Al iniciar sesion, si hay chats con mensajes no leidos, generar notificaciones
+            val notificacionesFinales = if (notificarNoLeidos && notificaciones.isEmpty()) {
+                chats.filter { it.mensajesNoLeidos > 0 }.map { chat ->
+                    NotificacionMensajePendiente(
+                        idMensajeChat = chat.idChatCita,  // usado como ID de la notificacion Android
+                        idChatCita    = chat.idChatCita,
+                        titulo        = chat.usernameContacto.takeIf {
+                            chat.usernameContacto.isNotBlank()
+                        } ?: "Mensajes pendientes",
+                        contenido     = "${chat.mensajesNoLeidos} mensaje(s) sin leer"
+                    )
+                }
+            } else {
+                notificaciones
+            }
+            uiState = uiState.copy(
+                idUsuarioActual = repositorioChats.obtenerIdUsuarioActual(),
+                chats = chats,
+                totalMensajesNoLeidos = chats.sumOf { it.mensajesNoLeidos.coerceAtLeast(0) },
+                idPrimerChatPendiente = chats.firstOrNull { it.mensajesNoLeidos > 0 }?.idChatCita,
+                notificacionesPendientes = notificacionesFinales
+            )
+        }
+    }
+
+    /**
+     * Recarga solo los mensajes del chat activo desde el servidor.
+     * Usado por el refresh periodico de PantallaDetalleChat para que el emisor
+     * vea los ticks actualizados (entregado/leido) sin tener que reabrir el chat.
+     */
+    fun refrescarMensajes(idChatCita: Long) {
+        viewModelScope.launch {
+            val mensajes = withContext(Dispatchers.IO) {
+                repositorioChats.obtenerMensajes(idChatCita)
+            }
+            if (uiState.chatActivo?.idChatCita == idChatCita) {
+                uiState = uiState.copy(mensajesActivos = mensajes)
+            }
+        }
     }
 
     fun actualizarFiltroChatsContacto(activo: Boolean) {
@@ -359,48 +533,79 @@ class ChatsViewModel(
         uiState = uiState.copy(filtroChatsTrabajador = activo)
     }
 
-    fun iniciarConversacionDesdeOferta(idOfertaServicio: Long): Result<ChatCita> {
-        val resultado = repositorioChats.iniciarConversacionDesdeOferta(idOfertaServicio)
-        resultado.onSuccess { chat ->
-            uiState = uiState.copy(
-                mensajeSistema = "Chat iniciado correctamente.",
-                error = null
-            )
-            recargar()
-            abrirChat(chat.idChatCita)
-        }.onFailure {
-            uiState = uiState.copy(
-                error = it.message ?: "No se pudo iniciar la conversacion",
-                mensajeSistema = null
-            )
+    /**
+     * El ID del chat creado se comunica via uiState.pendingNavChatId; consumir con consumirNavChatId().
+     * [tituloServicio] y [usernameTrabajador] se almacenan en el backend para la cabecera del chat.
+     * [usernameCliente] es opcional — el repositorio lo toma del store si se omite.
+     */
+    fun iniciarConversacionDesdeOferta(
+        idOfertaServicio: Long,
+        tituloServicio: String = "",
+        usernameTrabajador: String = "",
+        usernameCliente: String = ""
+    ) {
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioChats.iniciarConversacionDesdeOferta(
+                    idOfertaServicio   = idOfertaServicio,
+                    tituloServicio     = tituloServicio,
+                    usernameTrabajador = usernameTrabajador,
+                    usernameCliente    = usernameCliente
+                )
+            }
+            resultado.onSuccess { chat ->
+                uiState = uiState.copy(
+                    mensajeSistema = "Chat iniciado correctamente.",
+                    error = null,
+                    pendingNavChatId = chat.idChatCita
+                )
+                recargar()
+            }.onFailure {
+                uiState = uiState.copy(
+                    error = it.message ?: "No se pudo iniciar la conversacion",
+                    mensajeSistema = null
+                )
+            }
         }
-        return resultado
+    }
+
+    /** Llamar desde la UI despues de consumir pendingNavChatId para navegar. */
+    fun consumirNavChatId() {
+        uiState = uiState.copy(pendingNavChatId = null)
     }
 
     fun abrirChat(idChatCita: Long) {
-        val chat = repositorioChats.obtenerChat(idChatCita)
-        if (chat == null) {
-            uiState = uiState.copy(error = "No se pudo abrir el chat")
-            return
+        viewModelScope.launch {
+            val chat = withContext(Dispatchers.IO) { repositorioChats.obtenerChat(idChatCita) }
+            if (chat == null) {
+                uiState = uiState.copy(error = "No se pudo abrir el chat")
+                return@launch
+            }
+            val idActual = repositorioChats.obtenerIdUsuarioActual()
+            val esCliente = chat.idCliente == idActual
+            val (valoracion, cita, mensajes) = withContext(Dispatchers.IO) {
+                Triple(
+                    repositorioChats.obtenerValoracionPorChat(idChatCita),
+                    repositorioChats.obtenerCitaPorChat(idChatCita),
+                    repositorioChats.obtenerMensajes(idChatCita)
+                )
+            }
+            val permiteValorar = cita?.estado in setOf(EstadoCita.FINALIZADO, EstadoCita.CERRADO)
+            val mostrarModalValoracion = chat.chatCerrado && esCliente && valoracion == null && permiteValorar
+            uiState = uiState.copy(
+                chatActivo = chat,
+                mensajesActivos = mensajes,
+                citaActiva = cita,
+                valoracionExistente = valoracion,
+                mostrarModalValoracion = mostrarModalValoracion,
+                votoValoracion = valoracion?.voto ?: 5,
+                comentarioValoracion = valoracion?.comentario.orEmpty(),
+                borradorMensaje = "",
+                idUsuarioActual = idActual,
+                error = null
+            )
+            recargar()
         }
-        val valoracion = repositorioChats.obtenerValoracionPorChat(idChatCita)
-        val esCliente = chat.idCliente == repositorioChats.obtenerIdUsuarioActual()
-        val cita = repositorioChats.obtenerCitaPorChat(idChatCita)
-        val permiteValorar = cita?.estado in setOf(EstadoCita.FINALIZADO, EstadoCita.CERRADO)
-        val mostrarModalValoracion = chat.chatCerrado && esCliente && valoracion == null && permiteValorar
-        uiState = uiState.copy(
-            chatActivo = chat,
-            mensajesActivos = repositorioChats.obtenerMensajes(idChatCita),
-            citaActiva = cita,
-            valoracionExistente = valoracion,
-            mostrarModalValoracion = mostrarModalValoracion,
-            votoValoracion = valoracion?.voto ?: 5,
-            comentarioValoracion = valoracion?.comentario.orEmpty(),
-            borradorMensaje = "",
-            idUsuarioActual = repositorioChats.obtenerIdUsuarioActual(),
-            error = null
-        )
-        recargar()
     }
 
     fun actualizarBorradorMensaje(valor: String) {
@@ -409,43 +614,51 @@ class ChatsViewModel(
 
     fun enviarMensaje() {
         val chat = uiState.chatActivo ?: return
-        repositorioChats.enviarMensaje(chat.idChatCita, uiState.borradorMensaje)
-            .onSuccess {
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioChats.enviarMensaje(chat.idChatCita, uiState.borradorMensaje)
+            }
+            resultado.onSuccess {
+                val mensajes = withContext(Dispatchers.IO) { repositorioChats.obtenerMensajes(chat.idChatCita) }
                 uiState = uiState.copy(
                     borradorMensaje = "",
-                    mensajesActivos = repositorioChats.obtenerMensajes(chat.idChatCita),
+                    mensajesActivos = mensajes,
                     error = null
                 )
                 recargar()
-            }
-            .onFailure {
+            }.onFailure {
                 uiState = uiState.copy(error = it.message ?: "No se pudo enviar el mensaje")
             }
+        }
     }
 
     fun crearCita(fechaProgramada: String, comentario: String) {
         val chat = uiState.chatActivo ?: return
-        repositorioChats.crearCitaDesdeChat(
-            idChatCita = chat.idChatCita,
-            fechaProgramada = fechaProgramada,
-            comentario = comentario
-        )
-            .onSuccess { cita ->
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioChats.crearCitaDesdeChat(
+                    idChatCita = chat.idChatCita,
+                    fechaProgramada = fechaProgramada,
+                    comentario = comentario
+                )
+            }
+            resultado.onSuccess { cita ->
                 uiState = uiState.copy(
                     citaActiva = cita,
                     mensajeSistema = "Cita creada correctamente.",
                     error = null
                 )
                 abrirChat(chat.idChatCita)
-            }
-            .onFailure {
+            }.onFailure {
                 uiState = uiState.copy(error = it.message ?: "No se pudo crear la cita")
             }
+        }
     }
 
     fun aceptarCitaTrabajador() {
         val chat = uiState.chatActivo ?: return
         procesarTransicionCita(
+            idChatCita = chat.idChatCita,
             accion = { repositorioChats.aceptarCitaTrabajador(chat.idChatCita) },
             mensajeExito = "Cita aceptada. Estado: Handshake."
         )
@@ -454,6 +667,7 @@ class ChatsViewModel(
     fun rechazarCitaTrabajador() {
         val chat = uiState.chatActivo ?: return
         procesarTransicionCita(
+            idChatCita = chat.idChatCita,
             accion = { repositorioChats.rechazarCitaTrabajador(chat.idChatCita) },
             mensajeExito = "Propuesta rechazada. Puedes seguir negociando sobre la misma cita."
         )
@@ -462,6 +676,7 @@ class ChatsViewModel(
     fun reenviarPropuestaCitaCliente() {
         val chat = uiState.chatActivo ?: return
         procesarTransicionCita(
+            idChatCita = chat.idChatCita,
             accion = { repositorioChats.reenviarPropuestaCitaCliente(chat.idChatCita) },
             mensajeExito = "Propuesta reenviada. Estado actualizado a pendiente."
         )
@@ -470,6 +685,7 @@ class ChatsViewModel(
     fun solicitarInicioTrabajoTrabajador() {
         val chat = uiState.chatActivo ?: return
         procesarTransicionCita(
+            idChatCita = chat.idChatCita,
             accion = { repositorioChats.solicitarInicioTrabajoTrabajador(chat.idChatCita) },
             mensajeExito = "Solicitud de inicio enviada al cliente."
         )
@@ -478,6 +694,7 @@ class ChatsViewModel(
     fun aceptarInicioTrabajoCliente() {
         val chat = uiState.chatActivo ?: return
         procesarTransicionCita(
+            idChatCita = chat.idChatCita,
             accion = { repositorioChats.aceptarInicioTrabajoCliente(chat.idChatCita) },
             mensajeExito = "Inicio del trabajo confirmado."
         )
@@ -486,6 +703,7 @@ class ChatsViewModel(
     fun solicitarFinalizarTrabajoTrabajador() {
         val chat = uiState.chatActivo ?: return
         procesarTransicionCita(
+            idChatCita = chat.idChatCita,
             accion = { repositorioChats.solicitarFinalizarTrabajoTrabajador(chat.idChatCita) },
             mensajeExito = "Solicitud de finalizacion enviada al cliente."
         )
@@ -494,6 +712,7 @@ class ChatsViewModel(
     fun aceptarFinalizarTrabajoCliente() {
         val chat = uiState.chatActivo ?: return
         procesarTransicionCita(
+            idChatCita = chat.idChatCita,
             accion = { repositorioChats.aceptarFinalizarTrabajoCliente(chat.idChatCita) },
             mensajeExito = "Trabajo finalizado correctamente."
         )
@@ -501,17 +720,18 @@ class ChatsViewModel(
 
     fun cerrarChatActivo() {
         val chat = uiState.chatActivo ?: return
-        repositorioChats.cerrarChat(chat.idChatCita)
-            .onSuccess {
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) { repositorioChats.cerrarChat(chat.idChatCita) }
+            resultado.onSuccess {
                 uiState = uiState.copy(
                     mensajeSistema = "Chat finalizado. Queda en solo lectura.",
                     error = null
                 )
                 abrirChat(chat.idChatCita)
-            }
-            .onFailure {
+            }.onFailure {
                 uiState = uiState.copy(error = it.message ?: "No se pudo finalizar el chat")
             }
+        }
     }
 
     fun actualizarVotoValoracion(voto: Int) {
@@ -528,40 +748,46 @@ class ChatsViewModel(
 
     fun guardarValoracionChat() {
         val chat = uiState.chatActivo ?: return
-        repositorioChats.guardarValoracionChat(
-            idChatCita = chat.idChatCita,
-            voto = uiState.votoValoracion,
-            comentario = uiState.comentarioValoracion
-        ).onSuccess { valoracion ->
-            uiState = uiState.copy(
-                valoracionExistente = valoracion,
-                mostrarModalValoracion = false,
-                mensajeSistema = "Gracias por tu valoracion.",
-                error = null
-            )
-            abrirChat(chat.idChatCita)
-        }.onFailure {
-            uiState = uiState.copy(error = it.message ?: "No se pudo guardar la valoracion")
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioChats.guardarValoracionChat(
+                    idChatCita = chat.idChatCita,
+                    voto = uiState.votoValoracion,
+                    comentario = uiState.comentarioValoracion
+                )
+            }
+            resultado.onSuccess { valoracion ->
+                uiState = uiState.copy(
+                    valoracionExistente = valoracion,
+                    mostrarModalValoracion = false,
+                    mensajeSistema = "Gracias por tu valoracion.",
+                    error = null
+                )
+                abrirChat(chat.idChatCita)
+            }.onFailure {
+                uiState = uiState.copy(error = it.message ?: "No se pudo guardar la valoracion")
+            }
         }
     }
 
     private fun procesarTransicionCita(
+        idChatCita: Long,
         accion: () -> Result<CitaServicio>,
         mensajeExito: String
     ) {
-        val chat = uiState.chatActivo ?: return
-        accion()
-            .onSuccess { citaActualizada ->
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) { accion() }
+            resultado.onSuccess { citaActualizada ->
                 uiState = uiState.copy(
                     citaActiva = citaActualizada,
                     mensajeSistema = mensajeExito,
                     error = null
                 )
-                abrirChat(chat.idChatCita)
-            }
-            .onFailure {
+                abrirChat(idChatCita)
+            }.onFailure {
                 uiState = uiState.copy(error = it.message ?: "No se pudo actualizar la cita")
             }
+        }
     }
 
     fun consumirMensajes() {

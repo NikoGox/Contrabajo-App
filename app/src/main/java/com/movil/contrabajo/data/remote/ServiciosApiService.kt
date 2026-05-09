@@ -110,6 +110,72 @@ interface ServiciosApiService {
         @Header("Authorization") authorization: String,
         @Path("idFoto") idFoto: Int
     ): Call<Map<String, String>>
+
+    // ── Citas de servicio ─────────────────────────────────────────────────────
+    @POST("api/citas/solicitar")
+    fun solicitarCita(
+        @Header("Authorization") authorization: String,
+        @Body dto: SolicitarCitaRequestDto
+    ): Call<CitaServicioDto>
+
+    @PATCH("api/citas/{id}/aceptar")
+    fun aceptarCita(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
+    ): Call<CitaServicioDto>
+
+    @PATCH("api/citas/{id}/rechazar")
+    fun rechazarCita(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
+    ): Call<CitaServicioDto>
+
+    @PATCH("api/citas/{id}/reenviar")
+    fun reenviarCita(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
+    ): Call<CitaServicioDto>
+
+    @PATCH("api/citas/{id}/comenzar")
+    fun comenzarCita(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
+    ): Call<CitaServicioDto>
+
+    @PATCH("api/citas/{id}/confirmar-inicio")
+    fun confirmarInicioCita(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
+    ): Call<CitaServicioDto>
+
+    @PATCH("api/citas/{id}/finalizar")
+    fun finalizarCita(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
+    ): Call<CitaServicioDto>
+
+    @PATCH("api/citas/{id}/confirmar-finalizacion")
+    fun confirmarFinalizacionCita(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
+    ): Call<CitaServicioDto>
+
+    @PATCH("api/citas/{id}/cancelar")
+    fun cancelarCita(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
+    ): Call<CitaServicioDto>
+
+    @GET("api/citas/mis-citas")
+    fun misCitas(
+        @Header("Authorization") authorization: String
+    ): Call<List<CitaServicioDto>>
+
+    @GET("api/citas/{id}")
+    fun obtenerCita(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
+    ): Call<CitaServicioDto>
 }
 
 data class CategoriaServicioDto(
@@ -171,6 +237,27 @@ data class OfertaServicioUpdateRequestDto(
     val disponible: Boolean? = null,
     val idCategoria: Int? = null,
     val idTipoPrecio: Int? = null
+)
+
+data class SolicitarCitaRequestDto(
+    @SerializedName("idOfertaServicio") val idOfertaServicio: Int,
+    @SerializedName("comentario")       val comentario: String,
+    @SerializedName("idChatOferta")     val idChatOferta: Long? = null
+)
+
+data class CitaServicioDto(
+    @SerializedName("id")                val id: Int?,
+    @SerializedName("comentario")        val comentario: String?,
+    @SerializedName("fechaSolicitud")    val fechaSolicitud: String?,
+    @SerializedName("fechaInicioTrabajo") val fechaInicioTrabajo: String?,
+    @SerializedName("fechaFinTrabajo")   val fechaFinTrabajo: String?,
+    @SerializedName("idOfertaServicio")  val idOfertaServicio: Int?,
+    @SerializedName("tituloOferta")      val tituloOferta: String?,
+    @SerializedName("idCliente")         val idCliente: Int?,
+    @SerializedName("idTrabajador")      val idTrabajador: Int?,
+    @SerializedName("idEstado")          val idEstado: Int?,
+    @SerializedName("codigoEstado")      val codigoEstado: String?,
+    @SerializedName("estado")            val estado: String?
 )
 
 object ServiciosApiClient {

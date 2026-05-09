@@ -45,6 +45,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Receptor para la accion "Marcar como leido" de las notificaciones de mensajes -->
+        <receiver
+            android:name=".ui.notificaciones.MarcarLeidoReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.movil.contrabajo.MARCAR_LEIDO" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

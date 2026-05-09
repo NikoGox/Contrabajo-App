@@ -12,24 +12,35 @@ import com.movil.contrabajo.data.remote.PreguntaSeguridadUpdateRequestDto
 import com.movil.contrabajo.data.remote.PreguntasSeguridadDto
 import com.movil.contrabajo.data.remote.RecuperacionPasswordRequestDto
 import com.movil.contrabajo.data.remote.RecuperacionRegistroRequestDto
+import com.movil.contrabajo.data.remote.ChatDto
+import com.movil.contrabajo.data.remote.ChatIniciarRequestDto
+import com.movil.contrabajo.data.remote.CitaServicioDto
+import com.movil.contrabajo.data.remote.ComunicacionesApiService
+import com.movil.contrabajo.data.remote.MensajeChatDto
+import com.movil.contrabajo.data.remote.MensajeChatEnviarDto
 import com.movil.contrabajo.data.remote.RemoteSessionStore
 import com.movil.contrabajo.data.remote.FotoOfertaResponseDto
 import com.movil.contrabajo.data.remote.FotoPerfilResponseDto
 import com.movil.contrabajo.data.remote.ServiciosApiService
+import com.movil.contrabajo.data.remote.SolicitarCitaRequestDto
 import com.movil.contrabajo.data.remote.OfertaServicioDto
 import com.movil.contrabajo.data.remote.OfertaServicioRequestDto
 import com.movil.contrabajo.data.remote.OfertaServicioUpdateRequestDto
 import com.movil.contrabajo.data.remote.UsuarioRegistroRequestDto
 import com.movil.contrabajo.data.remote.UsuarioUpdateRequestDto
 import com.movil.contrabajo.data.remote.UsuariosApiService
+import com.movil.contrabajo.data.remote.VincularCitaRequestDto
 import com.movil.contrabajo.data.remote.bearer
 import com.movil.contrabajo.data.remote.ejecutarApi
+import com.movil.contrabajo.data.remote.ejecutarApiComunicaciones
 import com.movil.contrabajo.data.remote.ejecutarApiServicios
 import com.movil.contrabajo.domain.model.ComunaCatalogo
 import com.movil.contrabajo.domain.model.CategoriaServicio
 import com.movil.contrabajo.domain.model.FotoOferta
 import com.movil.contrabajo.domain.model.CitaServicio
 import com.movil.contrabajo.domain.model.ChatCita
+import com.movil.contrabajo.domain.model.EstadoCita
+import com.movil.contrabajo.domain.model.EstadoCodigo
 import com.movil.contrabajo.domain.model.FiltroMarketplaceConfig
 import com.movil.contrabajo.domain.model.FormularioServicio
 import com.movil.contrabajo.domain.model.MensajeChat
@@ -49,6 +60,7 @@ import com.movil.contrabajo.domain.model.TipoPrecio
 import com.movil.contrabajo.domain.model.Valoracion
 import com.movil.contrabajo.domain.model.ValoracionesServicio
 import java.math.BigDecimal
+import retrofit2.Call
 
 class RepositorioAutenticacionRemoto(
     private val api: UsuariosApiService,
@@ -688,6 +700,310 @@ class RepositorioOfertasRemoto(
     }
 }
 
+class RepositorioChatRemoto(
+    private val comunicacionesApi: ComunicacionesApiService,
+    private val serviciosApi: ServiciosApiService,
+    private val sessionStore: RemoteSessionStore
+) : RepositorioChats {
+
+    // Cache en memoria: chatId → citaId  y  chatId → ofertaId
+    // Se rellena cada vez que se cargan los chats o se crea/vincula una cita.
+    private val citaIdPorChat: MutableMap<Long, Long> = mutableMapOf()
+    private val ofertaIdPorChat: MutableMap<Long, Long> = mutableMapOf()
+
+    override fun obtenerIdUsuarioActual(): Long? = sessionStore.obtenerUsuario()?.idUsuario
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Lista de chats
+    // ────────────────────────────────────────────────────────────────────────────
+    override fun obtenerChatsActuales(): List<ChatCita> {
+        val token = sessionStore.obtenerToken() ?: return emptyList()
+        return ejecutarApiComunicaciones(comunicacionesApi.listarChats(bearer(token)))
+            .getOrDefault(emptyList())
+            .mapNotNull { dto ->
+                val idChat = dto.id ?: return@mapNotNull null
+                // Actualizar caches
+                dto.idCita?.let { citaIdPorChat[idChat] = it.toLong() }
+                dto.idOfertaServicio?.let { ofertaIdPorChat[idChat] = it.toLong() }
+                dto.toChatCita(sessionStore.obtenerUsuario()?.idUsuario ?: 0L)
+            }
+    }
+
+    override fun obtenerChat(idChatCita: Long): ChatCita? {
+        return obtenerChatsActuales().firstOrNull { it.idChatCita == idChatCita }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Iniciar conversacion desde oferta
+    // ────────────────────────────────────────────────────────────────────────────
+    override fun iniciarConversacionDesdeOferta(
+        idOfertaServicio: Long,
+        tituloServicio: String,
+        usernameTrabajador: String,
+        usernameCliente: String
+    ): Result<ChatCita> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val idUsuario = sessionStore.obtenerUsuario()?.idUsuario
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+
+        // Necesitamos el idTrabajador de la oferta
+        val ofertaResult = ejecutarApiServicios(
+            serviciosApi.buscarOferta(bearer(token), idOfertaServicio.toInt())
+        )
+        val oferta = ofertaResult.getOrElse { return Result.failure(it) }
+        val idTrabajador = oferta.idTrabajador
+            ?: return Result.failure(IllegalArgumentException("La oferta no tiene trabajador asignado"))
+        if (idTrabajador.toLong() == idUsuario) {
+            return Result.failure(IllegalStateException("No puedes iniciar chat con tu propia publicacion"))
+        }
+
+        // usernameCliente: si el llamador no lo paso, usar el del store como fallback
+        val usernameClienteFinal = usernameCliente.ifBlank {
+            sessionStore.obtenerUsuario()?.username ?: ""
+        }
+
+        val dto = ChatIniciarRequestDto(
+            idTrabajador       = idTrabajador,
+            idOfertaServicio   = idOfertaServicio.toInt(),
+            usernameTrabajador = usernameTrabajador.ifBlank { null },
+            usernameCliente    = usernameClienteFinal.ifBlank { null },
+            tituloServicio     = tituloServicio.ifBlank { null }
+        )
+        return ejecutarApiComunicaciones(comunicacionesApi.iniciarChat(bearer(token), dto))
+            .map { chatDto ->
+                val idChat = chatDto.id ?: 0L
+                chatDto.idCita?.let { citaIdPorChat[idChat] = it.toLong() }
+                ofertaIdPorChat[idChat] = idOfertaServicio
+                chatDto.toChatCita(idUsuario)
+            }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Mensajes
+    // ────────────────────────────────────────────────────────────────────────────
+    override fun obtenerMensajes(idChatCita: Long): List<MensajeChat> {
+        val token = sessionStore.obtenerToken() ?: return emptyList()
+        // Marcar como recibidos y leidos
+        ejecutarApiComunicaciones(comunicacionesApi.marcarRecibidos(bearer(token), idChatCita))
+        ejecutarApiComunicaciones(comunicacionesApi.marcarLeidos(bearer(token), idChatCita))
+        return ejecutarApiComunicaciones(comunicacionesApi.obtenerHistorial(bearer(token), idChatCita))
+            .getOrDefault(emptyList())
+            .mapNotNull { it.toMensajeChat() }
+    }
+
+    override fun enviarMensaje(idChatCita: Long, contenido: String): Result<MensajeChat> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val texto = contenido.trim()
+        if (texto.isBlank()) return Result.failure(IllegalArgumentException("Escribe un mensaje"))
+        return ejecutarApiComunicaciones(
+            comunicacionesApi.enviarMensaje(bearer(token), MensajeChatEnviarDto(idChatCita, texto))
+        ).mapCatching { it?.toMensajeChat() ?: throw IllegalStateException("Respuesta vacia al enviar mensaje") }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Crear cita desde chat (cliente)
+    // ────────────────────────────────────────────────────────────────────────────
+    override fun crearCitaDesdeChat(
+        idChatCita: Long,
+        fechaProgramada: String,
+        comentario: String,
+        precioAcordado: Int
+    ): Result<CitaServicio> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val idOferta = ofertaIdPorChat[idChatCita]
+            ?: return Result.failure(IllegalStateException("No se encontro la oferta asociada al chat. Abre el chat primero."))
+        if (comentario.trim().isBlank()) {
+            return Result.failure(IllegalArgumentException("Ingresa un comentario para la cita"))
+        }
+
+        // 1. Crear la cita en servicios_api
+        val citaDto = ejecutarApiServicios(
+            serviciosApi.solicitarCita(
+                authorization = bearer(token),
+                dto = SolicitarCitaRequestDto(
+                    idOfertaServicio = idOferta.toInt(),
+                    comentario = comentario.trim(),
+                    idChatOferta = idChatCita
+                )
+            )
+        ).getOrElse { return Result.failure(it) }
+
+        val idCita = citaDto.id?.toLong()
+            ?: return Result.failure(IllegalStateException("El servidor no devolvio el ID de la cita"))
+
+        // 2. Vincular la cita al chat
+        ejecutarApiComunicaciones(
+            comunicacionesApi.vincularCita(
+                bearer(token), idChatCita, VincularCitaRequestDto(idCita.toInt())
+            )
+        )
+        citaIdPorChat[idChatCita] = idCita
+
+        return Result.success(citaDto.toCitaServicio(idChatCita))
+    }
+
+    override fun obtenerCitaPorChat(idChatCita: Long): CitaServicio? {
+        val token = sessionStore.obtenerToken() ?: return null
+        val idCita = citaIdPorChat[idChatCita] ?: return null
+        return ejecutarApiServicios(serviciosApi.obtenerCita(bearer(token), idCita.toInt()))
+            .getOrNull()?.toCitaServicio(idChatCita)
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Transiciones de estado de cita (todas requieren idCita del cache)
+    // ────────────────────────────────────────────────────────────────────────────
+    private fun transicionarCita(
+        idChatCita: Long,
+        llamada: (String, Int) -> Call<CitaServicioDto>
+    ): Result<CitaServicio> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val idCita = citaIdPorChat[idChatCita]?.toInt()
+            ?: return Result.failure(IllegalStateException("No se encontro la cita del chat. Abre el chat primero."))
+        return ejecutarApiServicios(llamada(bearer(token), idCita))
+            .map { it.toCitaServicio(idChatCita) }
+    }
+
+    override fun aceptarCitaTrabajador(idChatCita: Long): Result<CitaServicio> =
+        transicionarCita(idChatCita) { token, id -> serviciosApi.aceptarCita(token, id) }
+
+    override fun rechazarCitaTrabajador(idChatCita: Long): Result<CitaServicio> =
+        transicionarCita(idChatCita) { token, id -> serviciosApi.rechazarCita(token, id) }
+
+    override fun reenviarPropuestaCitaCliente(idChatCita: Long): Result<CitaServicio> =
+        transicionarCita(idChatCita) { token, id -> serviciosApi.reenviarCita(token, id) }
+
+    override fun solicitarInicioTrabajoTrabajador(idChatCita: Long): Result<CitaServicio> =
+        transicionarCita(idChatCita) { token, id -> serviciosApi.comenzarCita(token, id) }
+
+    override fun aceptarInicioTrabajoCliente(idChatCita: Long): Result<CitaServicio> =
+        transicionarCita(idChatCita) { token, id -> serviciosApi.confirmarInicioCita(token, id) }
+
+    override fun solicitarFinalizarTrabajoTrabajador(idChatCita: Long): Result<CitaServicio> =
+        transicionarCita(idChatCita) { token, id -> serviciosApi.finalizarCita(token, id) }
+
+    override fun aceptarFinalizarTrabajoCliente(idChatCita: Long): Result<CitaServicio> =
+        transicionarCita(idChatCita) { token, id -> serviciosApi.confirmarFinalizacionCita(token, id) }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Cerrar chat
+    // ────────────────────────────────────────────────────────────────────────────
+    override fun cerrarChat(idChatCita: Long): Result<ChatCita> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val idUsuario = sessionStore.obtenerUsuario()?.idUsuario ?: 0L
+
+        // Cancelar la cita si existe y sigue activa
+        citaIdPorChat[idChatCita]?.let { idCita ->
+            ejecutarApiServicios(serviciosApi.cancelarCita(bearer(token), idCita.toInt()))
+        }
+        // Desactivar el chat — reutilizamos el endpoint existente solo si tenemos idTrabajador/oferta
+        // El endpoint desactivar recibe idTrabajador + idOferta; lo obtenemos del chat actual
+        val chat = obtenerChat(idChatCita)
+        if (chat != null) {
+            val desactivarDto = ChatIniciarRequestDto(
+                idTrabajador = chat.idTrabajador.toInt(),
+                idOfertaServicio = chat.idOfertaServicio?.toInt() ?: 0
+            )
+            ejecutarApiComunicaciones(comunicacionesApi.desactivarChat(bearer(token), desactivarDto))
+        }
+
+        // Devolver el chat actualizado (chatCerrado = true)
+        return Result.success(
+            (chat ?: ChatCita(
+                idChatCita = idChatCita,
+                fechaCreacion = "",
+                idTrabajador = 0L,
+                idCliente = idUsuario
+            )).copy(chatCerrado = true)
+        )
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Valoraciones y notificaciones — pendientes para siguiente iteracion
+    // ────────────────────────────────────────────────────────────────────────────
+    override fun obtenerValoracionPorChat(idChatCita: Long): Valoracion? = null
+
+    override fun guardarValoracionChat(idChatCita: Long, voto: Int, comentario: String): Result<Valoracion> =
+        Result.failure(IllegalStateException("Valoraciones se integraran en la siguiente iteracion"))
+
+    override fun obtenerNotificacionesPendientes(): List<NotificacionMensajePendiente> = emptyList()
+
+    override fun marcarNotificacionesComoMostradas(idsMensaje: List<Long>) = Unit
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Mapeos DTO → dominio
+    // ────────────────────────────────────────────────────────────────────────────
+    private fun ChatDto.toChatCita(idUsuarioActual: Long): ChatCita {
+        val idTrab = idTrabajador?.toLong() ?: 0L
+        val idCli  = idCliente?.toLong()   ?: 0L
+        // El "contacto" es el otro participante (no el usuario actual)
+        val esCliente       = idCli == idUsuarioActual
+        val usernameContacto = if (esCliente) usernameTrabajador ?: "" else usernameCliente ?: ""
+        return ChatCita(
+            idChatCita        = id ?: 0L,
+            fechaCreacion     = fechaCreacion ?: "",
+            idTrabajador      = idTrab,
+            idCliente         = idCli,
+            idOfertaServicio  = idOfertaServicio?.toLong(),
+            idCita            = idCita?.toLong(),
+            tituloServicio    = tituloServicio ?: "",
+            usernameContacto  = usernameContacto,
+            ultimoMensaje     = ultimoMensaje ?: "",
+            horaUltimoMensaje = fechaUltimoMensaje ?: "",
+            mensajesNoLeidos  = mensajesNoLeidos?.toInt() ?: 0,
+            chatCerrado       = activo == false
+        )
+    }
+
+    override fun marcarRecibidos(idChatCita: Long) {
+        val token = sessionStore.obtenerToken() ?: return
+        ejecutarApiComunicaciones(comunicacionesApi.marcarRecibidos(bearer(token), idChatCita))
+    }
+
+    override fun marcarLeidos(idChatCita: Long) {
+        val token = sessionStore.obtenerToken() ?: return
+        ejecutarApiComunicaciones(comunicacionesApi.marcarLeidos(bearer(token), idChatCita))
+    }
+
+    private fun MensajeChatDto.toMensajeChat(): MensajeChat? {
+        val idMsg = id ?: return null
+        return MensajeChat(
+            idMensajeChat = idMsg,
+            fechaEnvio    = fechaEnvio ?: "",
+            fechaRecibido = fechaRecibido,
+            fechaLeido    = fechaLeido,
+            idEmisor      = idEmisor?.toLong() ?: 0L,
+            idReceptor    = idReceptor?.toLong() ?: 0L,
+            idChatCita    = idChatOferta ?: 0L,
+            idEstado      = when {
+                fechaLeido    != null -> EstadoCodigo.MSG_LEIDO
+                fechaRecibido != null -> EstadoCodigo.MSG_ENTREGADO
+                else                  -> EstadoCodigo.MSG_ENVIADO
+            },
+            contenido     = contenido ?: "",
+            tipo          = tipo ?: 0
+        )
+    }
+}
+
+private fun CitaServicioDto.toCitaServicio(idChatCita: Long): CitaServicio {
+    return CitaServicio(
+        idCita          = id?.toLong() ?: 0L,
+        idChatCita      = idChatCita,
+        fechaCreacion   = fechaSolicitud ?: "",
+        fechaProgramada = "",
+        comentario      = comentario ?: "",
+        precioAcordado  = 0,
+        fechaInicioTrabajo = fechaInicioTrabajo,
+        fechaFinTrabajo    = fechaFinTrabajo,
+        estado          = idEstado ?: EstadoCita.PENDIENTE
+    )
+}
+
 class RepositorioChatsRecortado(
     private val sessionStore: RemoteSessionStore
 ) : RepositorioChats {
@@ -698,7 +1014,12 @@ class RepositorioChatsRecortado(
 
     override fun obtenerMensajes(idChatCita: Long): List<MensajeChat> = emptyList()
 
-    override fun iniciarConversacionDesdeOferta(idOfertaServicio: Long): Result<ChatCita> =
+    override fun iniciarConversacionDesdeOferta(
+        idOfertaServicio: Long,
+        tituloServicio: String,
+        usernameTrabajador: String,
+        usernameCliente: String
+    ): Result<ChatCita> =
         Result.failure(IllegalStateException("Comunicaciones se integrara en una siguiente iteracion."))
 
     override fun obtenerChat(idChatCita: Long): ChatCita? = null
@@ -748,6 +1069,10 @@ class RepositorioChatsRecortado(
     override fun obtenerNotificacionesPendientes(): List<NotificacionMensajePendiente> = emptyList()
 
     override fun marcarNotificacionesComoMostradas(idsMensaje: List<Long>) = Unit
+
+    override fun marcarRecibidos(idChatCita: Long) = Unit
+
+    override fun marcarLeidos(idChatCita: Long) = Unit
 }
 
 class RepositorioReportesRecortado : RepositorioReportes {

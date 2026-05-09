@@ -57,6 +57,21 @@ class RemoteSessionStore(context: Context) {
         private const val CLAVE_TOKEN = "jwt_token"
         private const val CLAVE_USUARIO = "usuario"
 
+        /** Acceso estatico al token — usado por WorkManager sin instancia de RemoteSessionStore. */
+        fun obtenerTokenEstatico(context: Context): String? =
+            context.applicationContext
+                .getSharedPreferences(NOMBRE_PREFERENCIAS, Context.MODE_PRIVATE)
+                .getString(CLAVE_TOKEN, null)?.takeIf { it.isNotBlank() }
+
+        /** Acceso estatico al id del usuario — usado por WorkManager. */
+        fun obtenerIdUsuarioEstatico(context: Context): Int? =
+            runCatching {
+                val json = context.applicationContext
+                    .getSharedPreferences(NOMBRE_PREFERENCIAS, Context.MODE_PRIVATE)
+                    .getString(CLAVE_USUARIO, null) ?: return@runCatching null
+                Gson().fromJson(json, Usuario::class.java)?.idUsuario?.toInt()
+            }.getOrNull()
+
         fun usuarioDesdeDto(dto: UsuarioResponseDto, passwordTemporal: String = ""): Usuario {
             val apellidos = dto.apellidos.orEmpty().trim()
             val partesApellido = apellidos.split(" ").filter { it.isNotBlank() }

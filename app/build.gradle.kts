@@ -12,10 +12,11 @@ android {
         applicationId = "com.movil.contrabajo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.10.2-Pre-Alpha"
+        versionCode = 9
+        versionName = "0.11.0-Pre-Alpha"
         buildConfigField("String", "USUARIOS_BASE_URL", "\"http://10.0.2.2:8081/\"")
         buildConfigField("String", "SERVICIOS_BASE_URL", "\"http://10.0.2.2:8082/\"")
+        buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"http://10.0.2.2:8083/\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -76,6 +77,8 @@ dependencies {
     implementation("androidx.camera:camera-view:1.3.4")
     // ML Kit Text Recognition
     implementation("com.google.mlkit:text-recognition:16.0.1")
+    // WorkManager — tareas en segundo plano (polling de mensajes)
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -1,6 +1,7 @@
 package com.movil.contrabajo.data.repository
 
 import android.content.Context
+import com.movil.contrabajo.data.remote.ComunicacionesApiClient
 import com.movil.contrabajo.data.remote.RemoteSessionStore
 import com.movil.contrabajo.data.remote.ServiciosApiClient
 import com.movil.contrabajo.data.remote.UsuariosApiClient
@@ -22,6 +23,10 @@ class ProveedorRepositorios(context: Context) {
         sessionStore = sessionStore,
         context = context.applicationContext
     )
-    val chats: RepositorioChats = RepositorioChatsRecortado(sessionStore)
+    val chats: RepositorioChats = RepositorioChatRemoto(
+        comunicacionesApi = ComunicacionesApiClient.api,
+        serviciosApi = ServiciosApiClient.api,
+        sessionStore = sessionStore
+    )
     val reportes: RepositorioReportes = RepositorioReportesRecortado()
 }

@@ -4,8 +4,6 @@ import android.content.Context
 import android.widget.Toast
 import android.widget.ImageView
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -29,9 +27,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.PagerSnapDistance
@@ -42,9 +37,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChatBubble
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.rounded.Star
@@ -98,7 +91,6 @@ import coil.request.ImageRequest
 import coil.imageLoader
 import com.movil.contrabajo.R
 import com.movil.contrabajo.domain.model.EscalaRango
-import com.movil.contrabajo.domain.model.FotoOferta
 import com.movil.contrabajo.domain.model.OfertaServicio
 import com.movil.contrabajo.ui.viewmodel.DetalleServicioViewModel
 import com.movil.contrabajo.ui.viewmodel.ReportesViewModel
@@ -123,7 +115,7 @@ fun PantallaDetalleServicio(
     viewModel: DetalleServicioViewModel,
     reportesViewModel: ReportesViewModel,
     onEditarServicio: (Long) -> Unit,
-    onContactarServicio: (Long) -> Unit,
+    onContactarServicio: (Long, String, String) -> Unit,
     onVolver: () -> Unit
 ) {
     val uiState = viewModel.uiState
@@ -172,32 +164,11 @@ fun PantallaDetalleServicio(
 
     BackHandler(onBack = volverConScroll)
 
-    val selectorFotoOfertaLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            }
-            viewModel.subirFoto(uri.toString(), idOfertaServicio)
-        }
-    }
-
     LaunchedEffect(idOfertaServicio) {
         viewModel.cargarOferta(idOfertaServicio)
-        viewModel.cargarFotosOferta(idOfertaServicio)
         if (reportesViewModel.uiState.tiposReporte.isEmpty()) {
             reportesViewModel.recargar()
         }
-    }
-
-    LaunchedEffect(uiState.errorFoto) {
-        val error = uiState.errorFoto ?: return@LaunchedEffect
-        Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
-        viewModel.consumirErrorFoto()
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -531,10 +502,6 @@ fun PantallaDetalleServicio(
                                                 mostrarCta = mostrar
                                             }
                                         },
-                                        fotosOferta = if (esPaginaActual) uiState.fotosOferta else emptyList(),
-                                        subiendoFoto = esPaginaActual && uiState.subiendoFoto,
-                                        onSubirFoto = { selectorFotoOfertaLauncher.launch(arrayOf("image/*")) },
-                                        onEliminarFoto = { idFoto -> viewModel.eliminarFoto(idFoto, idOfertaServicio) },
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
@@ -621,7 +588,14 @@ fun PantallaDetalleServicio(
                             val idOferta = ofertaPendienteChatId
                             mostrarConfirmacionChat = false
                             ofertaPendienteChatId = null
-                            if (idOferta != null) onContactarServicio(idOferta)
+                            if (idOferta != null) {
+                                val ofertaActual = uiState.ofertaActual
+                                onContactarServicio(
+                                    idOferta,
+                                    ofertaActual?.titulo ?: "",
+                                    ofertaActual?.usernameTrabajador ?: ""
+                                )
+                            }
                         }
                     ) {
                         Text("Sí, continuar")
@@ -797,10 +771,6 @@ private fun TarjetaDetalleOferta(
     bloquearScrollVertical: Boolean = false,
     onScrollEstado: (androidx.compose.foundation.ScrollState) -> Unit = {},
     onDireccionScroll: (Boolean) -> Unit = {},
-    fotosOferta: List<FotoOferta> = emptyList(),
-    subiendoFoto: Boolean = false,
-    onSubirFoto: () -> Unit = {},
-    onEliminarFoto: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val shapeTarjeta = RoundedCornerShape(24.dp)
@@ -860,17 +830,6 @@ private fun TarjetaDetalleOferta(
                     .height(282.dp)
                     .clip(RoundedCornerShape(20.dp))
             )
-
-            val esPropia = oferta.idTrabajador == idUsuarioActual
-            if (!modoLigero && (fotosOferta.isNotEmpty() || esPropia || subiendoFoto)) {
-                GaleriaFotosOferta(
-                    fotos = fotosOferta,
-                    subiendoFoto = subiendoFoto,
-                    esPropia = esPropia && !oferta.eliminada,
-                    onSubirFoto = onSubirFoto,
-                    onEliminarFoto = onEliminarFoto
-                )
-            }
 
             Text(
                 text = oferta.titulo,
@@ -1008,100 +967,6 @@ private fun TarjetaDetalleOferta(
                     usernameTrabajador = oferta.usernameTrabajador,
                     fotoPerfilTrabajador = oferta.fotoPerfilTrabajador
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun GaleriaFotosOferta(
-    fotos: List<FotoOferta>,
-    subiendoFoto: Boolean,
-    esPropia: Boolean,
-    onSubirFoto: () -> Unit,
-    onEliminarFoto: (Long) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = "Fotos del servicio",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        LazyRow(
-            state = rememberLazyListState(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(fotos) { foto ->
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                ) {
-                    AsyncImage(
-                        model = foto.enlace,
-                        contentDescription = "Foto del servicio",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    if (esPropia) {
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(4.dp)
-                                .size(22.dp)
-                                .clickable { onEliminarFoto(foto.idFoto) },
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Filled.Close,
-                                    contentDescription = "Eliminar foto",
-                                    tint = MaterialTheme.colorScheme.onError,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            if (esPropia) {
-                item {
-                    Surface(
-                        modifier = Modifier
-                            .size(100.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable(enabled = !subiendoFoto) { onSubirFoto() },
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            if (subiendoFoto) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(28.dp),
-                                    strokeWidth = 3.dp
-                                )
-                            } else {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Add,
-                                        contentDescription = "Agregar foto",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                    Text(
-                                        text = "Foto",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }

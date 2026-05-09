@@ -3,7 +3,9 @@ package com.movil.contrabajo.ui.screens.chats
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,6 +71,7 @@ import java.time.format.DateTimeParseException
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 @Composable
 fun PantallaDetalleChat(
@@ -86,6 +90,12 @@ fun PantallaDetalleChat(
         }
     }
 
+    // Al salir del chat limpiar chatActivo para que los mensajes que lleguen
+    // en segundo plano no se marquen automaticamente como leidos.
+    DisposableEffect(idChatCita) {
+        onDispose { viewModel.limpiarChatActivo() }
+    }
+
     val uiState = viewModel.uiState
     val chat = uiState.chatActivo
     val idUsuarioActual = uiState.idUsuarioActual
@@ -93,6 +103,7 @@ fun PantallaDetalleChat(
     val esTrabajador = chat != null && idUsuarioActual != null && chat.idTrabajador == idUsuarioActual
     val mostrarModalValoracion = uiState.mostrarModalValoracion && esCliente
 
+    var mensajeInfoSeleccionado by remember { mutableStateOf<MensajeChat?>(null) }
     var mostrarModalCita by remember { mutableStateOf(false) }
     var mostrarMenuOpciones by remember { mutableStateOf(false) }
     var confirmarCerrarChat by remember { mutableStateOf(false) }
@@ -119,6 +130,15 @@ fun PantallaDetalleChat(
         val total = uiState.mensajesActivos.size
         if (total > 0) {
             estadoListaMensajes.scrollToItem(total - 1)
+        }
+    }
+
+    // Refresca los mensajes cada 5 s para que el emisor vea los ticks actualizados
+    // (el WS ya actualiza en tiempo real, esto es un respaldo por si se pierde algun evento)
+    LaunchedEffect(idChatCita) {
+        while (true) {
+            delay(5_000L)
+            viewModel.refrescarMensajes(idChatCita)
         }
     }
 
@@ -186,7 +206,8 @@ fun PantallaDetalleChat(
                         }
                         BurbujaMensaje(
                             mensaje = mensaje,
-                            esPropio = mensaje.idEmisor == uiState.idUsuarioActual
+                            esPropio = mensaje.idEmisor == uiState.idUsuarioActual,
+                            onLongPress = { mensajeInfoSeleccionado = mensaje }
                         )
                     }
                 }
@@ -392,6 +413,14 @@ fun PantallaDetalleChat(
         }
     }
 
+    // Modal de informacion del mensaje (long-press)
+    mensajeInfoSeleccionado?.let { msg ->
+        ModalInfoMensaje(
+            mensaje = msg,
+            onDismiss = { mensajeInfoSeleccionado = null }
+        )
+    }
+
     if (mostrarModalReporte && chat != null) {
         val tiposReporte = reportesViewModel.uiState.tiposReporte
         val tipoSeleccionado = tiposReporte.firstOrNull { it.idTipoReporte == idTipoReporteSeleccionado }
@@ -513,11 +542,12 @@ private fun CabeceraChat(
                 val subtitulo = if (chat == null) {
                     ""
                 } else {
-                    "@${chat.usernameContacto.ifBlank { "usuario" }}"
+                    chat.usernameContacto.ifBlank { "usuario" }
                 }
                 Text(
                     text = subtitulo,
                     style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
                     color = Color.White.copy(alpha = 0.92f)
                 )
             }
@@ -552,11 +582,36 @@ private fun CabeceraChat(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BurbujaMensaje(
     mensaje: MensajeChat,
-    esPropio: Boolean
+    esPropio: Boolean,
+    onLongPress: () -> Unit = {}
 ) {
+    // Mensajes de sistema: pastilla gris centrada (sin burbuja de usuario)
+    if (mensaje.tipo == 1) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.90f)
+            ) {
+                Text(
+                    text = mensaje.contenido,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        return
+    }
+
     val colorBurbuja = if (esPropio) {
         Color(0xFFE7F0FF)
     } else {
@@ -571,7 +626,11 @@ private fun BurbujaMensaje(
     ) {
         Surface(
             shape = RoundedCornerShape(14.dp),
-            color = colorBurbuja
+            color = colorBurbuja,
+            modifier = Modifier.combinedClickable(
+                onClick = {},
+                onLongClick = onLongPress
+            )
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                 Text(
@@ -584,7 +643,7 @@ private fun BurbujaMensaje(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = mensaje.fechaEnvio.takeLast(5),
+                        text = extraerHoraMensaje(mensaje.fechaEnvio),
                         style = MaterialTheme.typography.labelSmall,
                         color = colorMeta
                     )
@@ -894,6 +953,93 @@ private fun ModalValoracionCierre(
     }
 }
 
+@Composable
+private fun ModalInfoMensaje(
+    mensaje: MensajeChat,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Informacion del mensaje") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilaInfoMensaje(
+                    etiqueta = "Enviado",
+                    valor = formatearFechaCompleta(mensaje.fechaEnvio),
+                    simbolo = "✓",
+                    colorSimbolo = Color(0xFF8A95A3)
+                )
+                FilaInfoMensaje(
+                    etiqueta = "Entregado",
+                    valor = mensaje.fechaRecibido?.let { formatearFechaCompleta(it) } ?: "Pendiente",
+                    simbolo = "✓✓",
+                    colorSimbolo = if (mensaje.fechaRecibido != null) Color(0xFF8A95A3) else Color(0xFFB0B7BF)
+                )
+                FilaInfoMensaje(
+                    etiqueta = "Leido",
+                    valor = mensaje.fechaLeido?.let { formatearFechaCompleta(it) } ?: "Pendiente",
+                    simbolo = "✓✓",
+                    colorSimbolo = if (mensaje.fechaLeido != null) Color(0xFF00A8C8) else Color(0xFFB0B7BF)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Cerrar") }
+        }
+    )
+}
+
+@Composable
+private fun FilaInfoMensaje(
+    etiqueta: String,
+    valor: String,
+    simbolo: String,
+    colorSimbolo: Color
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = simbolo,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colorSimbolo,
+            modifier = Modifier.padding(end = 2.dp)
+        )
+        Column {
+            Text(
+                text = etiqueta,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = valor,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+/**
+ * Formatea una cadena ISO 8601 como "dd/MM/yyyy a las HH:mm".
+ * Si no puede parsear, devuelve la cadena original.
+ */
+private fun formatearFechaCompleta(fecha: String): String {
+    for (fmt in FORMATOS_FECHA_MENSAJE) {
+        try {
+            val dt = LocalDateTime.parse(fecha, fmt)
+            val hoy = LocalDate.now()
+            return if (dt.toLocalDate() == hoy) {
+                "Hoy a las ${dt.format(DateTimeFormatter.ofPattern("HH:mm"))}"
+            } else {
+                dt.format(DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm"))
+            }
+        } catch (_: DateTimeParseException) { }
+    }
+    return fecha
+}
+
 private fun simboloEstadoMensaje(idEstado: Long): Pair<String, Color> = when (idEstado) {
     301L -> "✓" to Color(0xFF8A95A3)
     302L -> "✓✓" to Color(0xFF8A95A3)
@@ -934,12 +1080,37 @@ private fun SeparadorDiaChat(fecha: LocalDate) {
     }
 }
 
-private fun fechaSoloMensaje(fechaEnvio: String): LocalDate? {
-    return try {
-        LocalDateTime.parse(fechaEnvio, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")).toLocalDate()
-    } catch (_: DateTimeParseException) {
-        null
+/** Formatos que puede devolver el backend (ISO 8601) y el patron local de la BD. */
+private val FORMATOS_FECHA_MENSAJE = listOf(
+    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS"),
+    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS"),
+    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
+    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"),
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+)
+
+/**
+ * Parsea una cadena de fecha/hora usando los formatos conocidos y devuelve solo "HH:mm".
+ * Si ninguno coincide se devuelve la cadena original (fallback visible en lugar de crash).
+ */
+private fun extraerHoraMensaje(fecha: String): String {
+    for (fmt in FORMATOS_FECHA_MENSAJE) {
+        try {
+            return LocalDateTime.parse(fecha, fmt).format(DateTimeFormatter.ofPattern("HH:mm"))
+        } catch (_: DateTimeParseException) { }
     }
+    // Fallback: ultimos 5 caracteres (puede ser "HH:mm" si el formato es desconocido pero compatible)
+    return if (fecha.length >= 5) fecha.takeLast(5) else fecha
+}
+
+private fun fechaSoloMensaje(fechaEnvio: String): LocalDate? {
+    for (fmt in FORMATOS_FECHA_MENSAJE) {
+        try {
+            return LocalDateTime.parse(fechaEnvio, fmt).toLocalDate()
+        } catch (_: DateTimeParseException) { }
+    }
+    return null
 }
 
 private fun etiquetaDiaChat(fecha: LocalDate): String {

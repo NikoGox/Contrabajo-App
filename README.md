@@ -15,20 +15,31 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.10.1-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.11.0-Pre-Alpha
 
 
 
-> <br>• Se implementó el flujo de verificación como trabajador con OCR real: bienvenida, captura, procesando y resultado.
-> <br>• Pantalla de bienvenida con ilustración estilizada de cédula e instrucciones en tres pasos.
-> <br>• Pantalla de captura con vista de cámara en vivo y marco guía animado sobre overlay oscuro.
-> <br>• Extracción automática de RUT y N° de documento del carnet usando ML Kit Text Recognition on-device.
-> <br>• Rotación de imagen corregida: se pasa el ángulo real del sensor a ML Kit para leer texto en cualquier orientación.
-> <br>• Extractor de RUT con cuatro patrones (con puntos, sin puntos, con espacios, zona MRZ) y normalización de caracteres OCR confundibles.
-> <br>• N° de documento reconocido en formato XXX.XXX.XXX propio de la cédula chilena, con fallback a dígitos consecutivos.
-> <br>• Diagnóstico incluido en el error de RUT no encontrado: muestra el texto reconocido para facilitar depuración.
-> <br>• Validación local del RUT antes de consultar el backend; pantalla de resultado diferenciada para éxito y rechazo.
-> <br>• Corrección de compatibilidad con dispositivos Android de 16 KB de tamaño de página (useLegacyPackaging = false).
+> <br>• Se completó la migración de HU-09/HU-10/HU-11/HU-12 a backend real con `comunicaciones_api` + `servicios_api`.
+> <br>• Se integró chat remoto con listado de conversaciones, historial, vinculación de cita y flujo de mensajes en tiempo real.
+> <br>• Se consolidó la máquina de estados de citas con 9 estados (`401..409`) y transiciones por rol cliente/trabajador.
+> <br>• Se habilitó WebSocket STOMP nativo Android (`/ws-comunicaciones-native`) con reconexión automática y consumo en `ChatsViewModel`.
+> <br>• Se añadió polling de respaldo con WorkManager para mensajes en segundo plano y notificación local por pendientes.
+> <br>• Se corrigió `NetworkOnMainThreadException` moviendo operaciones de chat/cita a `Dispatchers.IO`.
+> <br>• Se corrigió el parseo de fecha/hora de mensajes (ISO 8601), separadores por día y render correcto de hora en burbujas.
+> <br>• Se corrigió el sistema de ticks estilo WhatsApp (`enviado/entregado/leído`) con marcado de recibidos y leídos sincronizado.
+> <br>• Se agregó refresco periódico de historial en chat para reflejar entrega/lectura cuando se pierden eventos puntuales de socket.
+> <br>• Se incorporó interacción de mantener apretado mensaje (`long-press`) para abrir modal con trazabilidad de estado (enviado/entregado/leído) y fecha/hora.
+> <br>• Se consolidaron separadores por día en el historial del chat (`Hoy`, `Ayer`, fecha) para lectura cronológica más clara.
+> <br>• Se mantuvo la cabecera de chat con título de servicio + acceso táctil al detalle del servicio asociado.
+> <br>• Se mantuvo el resumen de cita como panel expandible/colapsable dentro del chat para priorizar la conversación.
+> <br>• Se aseguró modo solo lectura cuando el chat está cerrado (se oculta input de envío y se mantiene historial visible).
+> <br>• Se incorporó metadata de cabecera de chat (`tituloServicio`, `usernameTrabajador`, `usernameCliente`) para mostrar contexto real.
+> <br>• Se estabilizó la app al volver de segundo plano: reconexión/resync en `ON_RESUME` y recarga de chats con marcado de recibidos.
+> <br>• Se introdujo cifrado backend de mensajes nuevos en `comunicaciones_api` (`AES/GCM`, prefijo `ENCv1`) con compatibilidad para históricos en claro.
+> <br>• Se corrigió compilación crítica en `PantallaDetalleServicio` por cierre de bloque/alcance de funciones utilitarias.
+> <br>• Se ajustó UX de usernames: en chat/listados/notificaciones se muestra `username` sin `@`; en detalle de servicio se mantiene `@usuario`.
+> <br>• Se eliminó la galería secundaria y la subida de fotos desde detalle de servicio: queda una sola imagen principal visible por oferta.
+> <br>• Se mantuvo compatibilidad funcional de flujos existentes sin migrar mensajes históricos ni romper contratos previos.
 
 ---
 

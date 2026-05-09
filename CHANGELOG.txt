@@ -1,3 +1,31 @@
+VERSION 0.11.0-Pre-Alpha
+───────
+├─• Se completó la migración de HU-09/HU-10/HU-11/HU-12 a backend real con `comunicaciones_api` + `servicios_api`.
+├─• Se integró chat remoto con listado de conversaciones, historial, vinculación de cita y flujo de mensajes en tiempo real.
+├─• Se consolidó la máquina de estados de citas con 9 estados (`401..409`) y transiciones por rol cliente/trabajador.
+├─• Se habilitó WebSocket STOMP nativo Android (`/ws-comunicaciones-native`) con reconexión automática y consumo en `ChatsViewModel`.
+├─• Se añadió polling de respaldo con WorkManager para mensajes en segundo plano y notificación local por pendientes.
+├─• Se corrigió `NetworkOnMainThreadException` moviendo operaciones de chat/cita a `Dispatchers.IO`.
+├─• Se corrigió el parseo de fecha/hora de mensajes (ISO 8601), separadores por día y render correcto de hora en burbujas.
+├─• Se corrigió el sistema de ticks estilo WhatsApp (`enviado/entregado/leído`) con marcado de recibidos y leídos sincronizado.
+├─• Se agregó refresco periódico de historial en chat para reflejar entrega/lectura cuando se pierden eventos puntuales de socket.
+├─• Se incorporó interacción de mantener apretado mensaje (`long-press`) para abrir modal con trazabilidad de estado (enviado/entregado/leído) y fecha/hora.
+├─• Se consolidaron separadores por día en el historial del chat (`Hoy`, `Ayer`, fecha) para lectura cronológica más clara.
+├─• Se mantuvo la cabecera de chat con título de servicio + acceso táctil al detalle del servicio asociado.
+├─• Se mantuvo el resumen de cita como panel expandible/colapsable dentro del chat para priorizar la conversación.
+├─• Se aseguró modo solo lectura cuando el chat está cerrado (se oculta input de envío y se mantiene historial visible).
+├─• Se incorporó metadata de cabecera de chat (`tituloServicio`, `usernameTrabajador`, `usernameCliente`) para mostrar contexto real.
+├─• Se estabilizó la app al volver de segundo plano: reconexión/resync en `ON_RESUME` y recarga de chats con marcado de recibidos.
+├─• Se introdujo cifrado backend de mensajes nuevos en `comunicaciones_api` (`AES/GCM`, prefijo `ENCv1`) con compatibilidad para históricos en claro.
+├─• Se corrigió compilación crítica en `PantallaDetalleServicio` por cierre de bloque/alcance de funciones utilitarias.
+├─• Se ajustó UX de usernames: en chat/listados/notificaciones se muestra `username` sin `@`; en detalle de servicio se mantiene `@usuario`.
+├─• Se eliminó la galería secundaria y la subida de fotos desde detalle de servicio: queda una sola imagen principal visible por oferta.
+└─• Se mantuvo compatibilidad funcional de flujos existentes sin migrar mensajes históricos ni romper contratos previos.
+
+->>> Pendiente para siguiente iteración: valoraciones desde chat (guardarValoracionChat) y reportes desde chat sobre backend.
+->>> Pendiente para Beta: notificaciones push instantáneas de segundo plano con FCM (reemplazo del límite de 15 min de WorkManager).
+->>> Pendiente para seguridad avanzada: evolucionar de cifrado backend a E2EE real cuando se definan claves por cliente.
+
 VERSION 0.10.2-Pre-Alpha
 ───────
 ├─• Se implementó la subida real de foto de perfil al backend: ya no se guarda solo el URI local, ahora se hace upload multipart a POST /api/usuarios/foto-perfil y se almacena la URL remota.

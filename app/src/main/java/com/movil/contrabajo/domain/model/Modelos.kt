@@ -90,7 +90,9 @@ data class MensajeChat(
     val idReceptor: Long,
     val idChatCita: Long,
     val idEstado: Long,
-    val contenido: String
+    val contenido: String,
+    /** 0 = normal, 1 = sistema (se renderiza como pastilla gris centrada) */
+    val tipo: Int = 0
 )
 
 data class NotificacionMensajePendiente(

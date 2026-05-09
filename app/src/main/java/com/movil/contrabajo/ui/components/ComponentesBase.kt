@@ -828,7 +828,7 @@ fun TarjetaChat(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "@${chat.usernameContacto.ifBlank { "usuario" }}",
+                    text = chat.usernameContacto.ifBlank { "usuario" },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

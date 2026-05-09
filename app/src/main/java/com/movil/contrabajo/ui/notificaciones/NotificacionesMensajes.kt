@@ -14,6 +14,9 @@ import com.movil.contrabajo.MainActivity
 import com.movil.contrabajo.R
 import com.movil.contrabajo.domain.model.NotificacionMensajePendiente
 
+// Offset para evitar colision de requestCode entre PendingIntents de abrir-chat y marcar-leido
+private const val OFFSET_NOTIF_MARCAR_LEIDO = 100_000
+
 object NotificacionesMensajes {
     private const val CANAL_ID_MENSAJES = "contrabajo_mensajes"
     private const val CANAL_NOMBRE_MENSAJES = "Mensajes"
@@ -49,6 +52,9 @@ object NotificacionesMensajes {
         crearCanalSiNoExiste(context)
         val manager = NotificationManagerCompat.from(context)
         pendientes.forEach { notificacion ->
+            val notifId = notificacion.idMensajeChat.toInt()
+
+            // Intent principal: abrir el chat al tocar la notificacion
             val intent = Intent(context, MainActivity::class.java).apply {
                 action = MainActivity.ACCION_ABRIR_CHAT
                 putExtra(MainActivity.EXTRA_ID_CHAT_CITA, notificacion.idChatCita)
@@ -56,10 +62,24 @@ object NotificacionesMensajes {
             }
             val pendingIntent = PendingIntent.getActivity(
                 context,
-                notificacion.idMensajeChat.toInt(),
+                notifId,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
+
+            // Intent de accion: "Marcar como leido" sin abrir la app
+            val marcarIntent = Intent(context, MarcarLeidoReceiver::class.java).apply {
+                action = MarcarLeidoReceiver.ACCION_MARCAR_LEIDO
+                putExtra(MarcarLeidoReceiver.EXTRA_ID_CHAT_CITA, notificacion.idChatCita)
+                putExtra(MarcarLeidoReceiver.EXTRA_NOTIF_ID, notifId)
+            }
+            val marcarPendingIntent = PendingIntent.getBroadcast(
+                context,
+                notifId + OFFSET_NOTIF_MARCAR_LEIDO,
+                marcarIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
             val contenido = notificacion.contenido.trim().ifBlank { "Tienes un nuevo mensaje." }
             val builder = NotificationCompat.Builder(context, CANAL_ID_MENSAJES)
                 .setSmallIcon(android.R.drawable.stat_notify_chat)
@@ -69,9 +89,10 @@ object NotificacionesMensajes {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .setContentIntent(pendingIntent)
+                .addAction(android.R.drawable.ic_menu_view, "Marcar como leido", marcarPendingIntent)
                 .setColorized(true)
                 .setColor(context.getColor(R.color.teal_700))
-            manager.notify(notificacion.idMensajeChat.toInt(), builder.build())
+            manager.notify(notifId, builder.build())
         }
     }
 }

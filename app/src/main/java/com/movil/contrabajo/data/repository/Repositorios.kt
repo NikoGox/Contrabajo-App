@@ -102,7 +102,12 @@ interface RepositorioChats {
     fun obtenerIdUsuarioActual(): Long?
     fun obtenerChatsActuales(): List<ChatCita>
     fun obtenerMensajes(idChatCita: Long): List<MensajeChat>
-    fun iniciarConversacionDesdeOferta(idOfertaServicio: Long): Result<ChatCita>
+    fun iniciarConversacionDesdeOferta(
+        idOfertaServicio: Long,
+        tituloServicio: String = "",
+        usernameTrabajador: String = "",
+        usernameCliente: String = ""
+    ): Result<ChatCita>
     fun obtenerChat(idChatCita: Long): ChatCita?
     fun enviarMensaje(idChatCita: Long, contenido: String): Result<MensajeChat>
     fun crearCitaDesdeChat(idChatCita: Long, fechaProgramada: String, comentario: String, precioAcordado: Int = 0): Result<CitaServicio>
@@ -119,6 +124,10 @@ interface RepositorioChats {
     fun guardarValoracionChat(idChatCita: Long, voto: Int, comentario: String): Result<Valoracion>
     fun obtenerNotificacionesPendientes(): List<NotificacionMensajePendiente>
     fun marcarNotificacionesComoMostradas(idsMensaje: List<Long>)
+    /** Notifica al servidor que los mensajes del chat llegaron al dispositivo (tick entregado). */
+    fun marcarRecibidos(idChatCita: Long)
+    /** Notifica al servidor que el usuario leyo los mensajes del chat (tick azul). */
+    fun marcarLeidos(idChatCita: Long)
 }
 
 class RepositorioAutenticacionLocal(
@@ -826,7 +835,22 @@ class RepositorioChatsLocal(
         return db.obtenerMensajesPorChat(idChatCita)
     }
 
-    override fun iniciarConversacionDesdeOferta(idOfertaServicio: Long): Result<ChatCita> {
+    override fun marcarRecibidos(idChatCita: Long) {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return
+        db.marcarMensajesRecibidos(idReceptor = usuario.idUsuario)
+    }
+
+    override fun marcarLeidos(idChatCita: Long) {
+        val usuario = db.obtenerUsuarioSesionActiva() ?: return
+        db.marcarMensajesLeidos(idChatCita = idChatCita, idReceptor = usuario.idUsuario)
+    }
+
+    override fun iniciarConversacionDesdeOferta(
+        idOfertaServicio: Long,
+        tituloServicio: String,
+        usernameTrabajador: String,
+        usernameCliente: String
+    ): Result<ChatCita> {
         val usuario = db.obtenerUsuarioSesionActiva()
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         val ofertaContacto = db.obtenerOfertaParaContacto(idOfertaServicio)

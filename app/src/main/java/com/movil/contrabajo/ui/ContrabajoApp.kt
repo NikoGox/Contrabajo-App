@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
@@ -73,6 +77,9 @@ import com.movil.contrabajo.ui.viewmodel.PerfilViewModel
 import com.movil.contrabajo.ui.viewmodel.PrincipalViewModel
 import com.movil.contrabajo.ui.viewmodel.RegistroViewModel
 import com.movil.contrabajo.ui.viewmodel.ReportesViewModel
+import com.movil.contrabajo.data.remote.RemoteSessionStore
+import com.movil.contrabajo.data.remote.WsManager
+import com.movil.contrabajo.data.workers.MensajesPollWorker
 import com.movil.contrabajo.domain.model.TipoPerfil
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -84,6 +91,7 @@ fun ContrabajoApp(
     onConsumirChatNotificacionPendiente: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val repositorios = remember(context) { ProveedorRepositorios(context) }
     val factory = remember(repositorios) { ContrabajoViewModelFactory(repositorios) }
     val navController = rememberNavController()
@@ -104,6 +112,10 @@ fun ContrabajoApp(
 
     LaunchedEffect(sesionCerrada) {
         if (sesionCerrada) {
+            // Desconectar WebSocket y cancelar polling al cerrar sesion
+            WsManager.desconectar()
+            MensajesPollWorker.cancelar(context)
+
             mensajeCargaGlobal = "Cerrando sesion..."
             progresoCargaGlobal = 1f
             mostrarIndicadorCargaGlobal = false
@@ -141,7 +153,7 @@ fun ContrabajoApp(
                 delay(90)
                 mensajeCargaGlobal = "Cargando chats..."
                 progresoCargaGlobal = 0.52f
-                chatsViewModel.recargar()
+                chatsViewModel.recargar(notificarNoLeidos = true)
 
                 delay(90)
                 mensajeCargaGlobal = "Cargando perfil..."
@@ -169,6 +181,14 @@ fun ContrabajoApp(
                 mostrarCargaGlobal = false
                 modoSuaveCargaGlobal = false
                 navegacionEnCarga = false
+
+                // Conectar WebSocket y programar polling de fondo tras login exitoso
+                val token = RemoteSessionStore.obtenerTokenEstatico(context)
+                val idUsuario = RemoteSessionStore.obtenerIdUsuarioEstatico(context)
+                if (token != null && idUsuario != null) {
+                    WsManager.conectar(token, idUsuario)
+                    MensajesPollWorker.programar(context)
+                }
             }
         }
     }
@@ -188,11 +208,21 @@ fun ContrabajoApp(
         }
     }
 
-    val abrirChatDesdeOferta: (Long) -> Unit = { idOferta ->
-        chatsViewModel.iniciarConversacionDesdeOferta(idOferta)
-            .onSuccess { chat ->
-                navController.navigate(RutasApp.ChatDetalle.crearRuta(chat.idChatCita))
-            }
+    // Recibe (idOferta, tituloServicio, usernameTrabajador) desde PantallaDetalleServicio
+    val abrirChatDesdeOferta: (Long, String, String) -> Unit = { idOferta, titulo, usernameTrab ->
+        chatsViewModel.iniciarConversacionDesdeOferta(
+            idOfertaServicio   = idOferta,
+            tituloServicio     = titulo,
+            usernameTrabajador = usernameTrab
+            // usernameCliente lo obtiene el repositorio del store de sesion
+        )
+    }
+
+    // Navega al chat recien creado cuando el ViewModel señala el ID
+    LaunchedEffect(chatsViewModel.uiState.pendingNavChatId) {
+        val idChat = chatsViewModel.uiState.pendingNavChatId ?: return@LaunchedEffect
+        chatsViewModel.consumirNavChatId()
+        navController.navigate(RutasApp.ChatDetalle.crearRuta(idChat))
     }
 
     LaunchedEffect(chatNotificacionPendienteId) {
@@ -204,6 +234,26 @@ fun ContrabajoApp(
             launchSingleTop = true
         }
         onConsumirChatNotificacionPendiente()
+    }
+
+    // Al volver del segundo plano, forzar reconexion/resync de mensajeria.
+    // Evita sockets "zombie" que quedan sin recibir eventos al reanudar la app.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val token = RemoteSessionStore.obtenerTokenEstatico(context)
+                val idUsuario = RemoteSessionStore.obtenerIdUsuarioEstatico(context)
+                if (token != null && idUsuario != null) {
+                    if (!WsManager.estaConectado()) {
+                        WsManager.desconectar()
+                        WsManager.conectar(token, idUsuario)
+                    }
+                    chatsViewModel.recargar(notificarNoLeidos = true)
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -432,7 +482,9 @@ fun ContrabajoApp(
                     onEditarServicio = { idOfertaServicio ->
                         navController.navigate(RutasApp.ServicioEditor.crearRuta("editar", idOfertaServicio))
                     },
-                    onContactarServicio = abrirChatDesdeOferta,
+                    onContactarServicio = { idOferta, titulo, usernameTrab ->
+                        abrirChatDesdeOferta(idOferta, titulo, usernameTrab)
+                    },
                     onVolver = { navController.popBackStack() }
                 )
             }
