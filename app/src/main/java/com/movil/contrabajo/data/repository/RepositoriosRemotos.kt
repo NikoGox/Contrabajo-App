@@ -16,19 +16,24 @@ import com.movil.contrabajo.data.remote.ChatDto
 import com.movil.contrabajo.data.remote.ChatIniciarRequestDto
 import com.movil.contrabajo.data.remote.CitaServicioDto
 import com.movil.contrabajo.data.remote.ComunicacionesApiService
+import com.movil.contrabajo.data.remote.CrearReporteRequestDto
 import com.movil.contrabajo.data.remote.MensajeChatDto
 import com.movil.contrabajo.data.remote.MensajeChatEnviarDto
 import com.movil.contrabajo.data.remote.RemoteSessionStore
 import com.movil.contrabajo.data.remote.FotoOfertaResponseDto
 import com.movil.contrabajo.data.remote.FotoPerfilResponseDto
+import com.movil.contrabajo.data.remote.ReporteResponseDto
 import com.movil.contrabajo.data.remote.ServiciosApiService
 import com.movil.contrabajo.data.remote.SolicitarCitaRequestDto
 import com.movil.contrabajo.data.remote.OfertaServicioDto
+import com.movil.contrabajo.data.remote.ValoracionServicioDto
 import com.movil.contrabajo.data.remote.OfertaServicioRequestDto
 import com.movil.contrabajo.data.remote.OfertaServicioUpdateRequestDto
+import com.movil.contrabajo.data.remote.TipoReporteDto
 import com.movil.contrabajo.data.remote.UsuarioRegistroRequestDto
 import com.movil.contrabajo.data.remote.UsuarioUpdateRequestDto
 import com.movil.contrabajo.data.remote.UsuariosApiService
+import com.movil.contrabajo.data.remote.ValoracionRequestDto
 import com.movil.contrabajo.data.remote.VincularCitaRequestDto
 import com.movil.contrabajo.data.remote.bearer
 import com.movil.contrabajo.data.remote.ejecutarApi
@@ -542,7 +547,7 @@ class RepositorioOfertasRemoto(
 
     override fun obtenerOfertasMarketplace(busqueda: String): List<OfertaServicio> {
         val token = sessionStore.obtenerToken() ?: return emptyList()
-        return ejecutarApiServicios(api.listarOfertas(bearer(token)))
+        val ofertasBase = ejecutarApiServicios(api.listarOfertas(bearer(token)))
             .getOrDefault(emptyList())
             .map { it.toOfertaServicio() }
             .filter { !it.eliminada && it.disponible }
@@ -553,29 +558,60 @@ class RepositorioOfertasRemoto(
                     it.descripcion.contains(filtro, ignoreCase = true) ||
                     it.nombreCategoria.contains(filtro, ignoreCase = true)
             }
+        return enriquecerPuntuacionPromedioPorServicio(ofertasBase, token)
     }
 
     override fun obtenerOfertaPorId(idOfertaServicio: Long, incluirEliminadas: Boolean): OfertaServicio? {
         val token = sessionStore.obtenerToken() ?: return null
-        return ejecutarApiServicios(api.buscarOferta(bearer(token), idOfertaServicio.toInt()))
+        val oferta = ejecutarApiServicios(api.buscarOferta(bearer(token), idOfertaServicio.toInt()))
             .getOrNull()
             ?.toOfertaServicio()
             ?.takeIf { incluirEliminadas || !it.eliminada }
+            ?: return null
+        return enriquecerPuntuacionPromedioPorServicio(listOf(oferta), token).firstOrNull()
     }
 
     override fun obtenerOfertasPropias(): List<OfertaServicio> {
         val token = sessionStore.obtenerToken() ?: return emptyList()
         val usuario = sessionStore.obtenerUsuario() ?: return emptyList()
-        return ejecutarApiServicios(api.listarOfertasTrabajador(bearer(token), usuario.idUsuario.toInt()))
+        val ofertasBase = ejecutarApiServicios(api.listarOfertasTrabajador(bearer(token), usuario.idUsuario.toInt()))
             .getOrDefault(emptyList())
             .map { it.toOfertaServicio() }
             .filter { !it.eliminada }
+        return enriquecerPuntuacionPromedioPorServicio(ofertasBase, token)
     }
 
     override fun obtenerOfertaPropiaActual(): OfertaServicio? = obtenerOfertasPropias().firstOrNull()
 
     override fun obtenerOfertaPropiaPorId(idOfertaServicio: Long): OfertaServicio? =
         obtenerOfertasPropias().firstOrNull { it.idOfertaServicio == idOfertaServicio }
+
+    private fun enriquecerPuntuacionPromedioPorServicio(
+        ofertas: List<OfertaServicio>,
+        token: String
+    ): List<OfertaServicio> {
+        if (ofertas.isEmpty()) return ofertas
+        val cacheValoracionesPorTrabajador = mutableMapOf<Long, List<ValoracionServicioDto>>()
+        val promedioPorOferta = mutableMapOf<Long, Double>()
+
+        ofertas.forEach { oferta ->
+            val valoracionesTrabajador = cacheValoracionesPorTrabajador.getOrPut(oferta.idTrabajador) {
+                ejecutarApiServicios(
+                    api.obtenerValoracionesTrabajador(bearer(token), oferta.idTrabajador.toInt())
+                ).getOrDefault(emptyList())
+            }
+            val votosOferta = valoracionesTrabajador.mapNotNull { dto ->
+                val idOfertaDto = dto.idOfertaServicio?.toLong() ?: return@mapNotNull null
+                if (idOfertaDto == oferta.idOfertaServicio) (dto.voto ?: 0).coerceIn(1, 5).toDouble() else null
+            }
+            promedioPorOferta[oferta.idOfertaServicio] =
+                if (votosOferta.isEmpty()) 0.0 else votosOferta.average()
+        }
+
+        return ofertas.map { oferta ->
+            oferta.copy(puntuacionPromedio = promedioPorOferta[oferta.idOfertaServicio] ?: 0.0)
+        }
+    }
 
     override fun obtenerDisponibilidadOfertaPropia(idOfertaServicio: Long): Result<Boolean> {
         val token = sessionStore.obtenerToken()
@@ -587,8 +623,48 @@ class RepositorioOfertasRemoto(
 
     override fun obtenerIdsOfertasConTrabajoEnCursoPropias(): Set<Long> = emptySet()
 
-    override fun obtenerValoracionesPropiasPorServicio(): List<ValoracionesServicio> =
-        obtenerOfertasPropias().map { ValoracionesServicio(oferta = it, valoraciones = emptyList()) }
+    override fun obtenerValoracionesPropiasPorServicio(): List<ValoracionesServicio> {
+        val token = sessionStore.obtenerToken() ?: return emptyList()
+        val usuario = sessionStore.obtenerUsuario() ?: return emptyList()
+
+        val valoracionesDto = ejecutarApiServicios(
+            api.obtenerValoracionesTrabajador(bearer(token), usuario.idUsuario.toInt())
+        ).getOrDefault(emptyList())
+
+        val valoraciones = valoracionesDto.mapNotNull { dto ->
+            val idOferta = dto.idOfertaServicio?.toLong() ?: return@mapNotNull null
+            Valoracion(
+                voto = (dto.voto ?: 0).coerceIn(1, 5),
+                fechaVoto = dto.fechaVoto.orEmpty(),
+                comentario = dto.comentario.orEmpty(),
+                idTrabajador = (dto.idTrabajador ?: usuario.idUsuario.toInt()).toLong(),
+                idCliente = (dto.idCliente ?: 0).toLong(),
+                idChatCita = 0L,
+                idOfertaServicio = idOferta
+            )
+        }
+
+        if (valoraciones.isEmpty()) return emptyList()
+
+        val ofertasPorId = mutableMapOf<Long, OfertaServicio>()
+        obtenerOfertasPropias().forEach { ofertasPorId[it.idOfertaServicio] = it }
+        valoraciones.map { it.idOfertaServicio }.distinct().forEach { idOferta ->
+            if (!ofertasPorId.containsKey(idOferta)) {
+                val ofertaDto = ejecutarApiServicios(api.buscarOferta(bearer(token), idOferta.toInt())).getOrNull()
+                if (ofertaDto != null) {
+                    ofertasPorId[idOferta] = ofertaDto.toOfertaServicio()
+                }
+            }
+        }
+
+        return valoraciones
+            .groupBy { it.idOfertaServicio }
+            .mapNotNull { (idOferta, lista) ->
+                val oferta = ofertasPorId[idOferta] ?: return@mapNotNull null
+                ValoracionesServicio(oferta = oferta, valoraciones = lista.sortedByDescending { it.fechaVoto })
+            }
+            .sortedByDescending { it.valoraciones.firstOrNull()?.fechaVoto.orEmpty() }
+    }
 
     override fun obtenerCategoriasServicio(): List<CategoriaServicio> {
         val token = sessionStore.obtenerToken() ?: return emptyList()
@@ -710,6 +786,7 @@ class RepositorioChatRemoto(
     // Se rellena cada vez que se cargan los chats o se crea/vincula una cita.
     private val citaIdPorChat: MutableMap<Long, Long> = mutableMapOf()
     private val ofertaIdPorChat: MutableMap<Long, Long> = mutableMapOf()
+    private val valoracionPorChat: MutableMap<Long, Valoracion> = mutableMapOf()
 
     override fun obtenerIdUsuarioActual(): Long? = sessionStore.obtenerUsuario()?.idUsuario
 
@@ -730,7 +807,11 @@ class RepositorioChatRemoto(
     }
 
     override fun obtenerChat(idChatCita: Long): ChatCita? {
-        return obtenerChatsActuales().firstOrNull { it.idChatCita == idChatCita }
+        val chat = obtenerChatsActuales().firstOrNull { it.idChatCita == idChatCita } ?: return null
+        val token = sessionStore.obtenerToken() ?: return chat
+        val idOferta = chat.idOfertaServicio?.toInt() ?: return chat
+        val ofertaDto = ejecutarApiServicios(serviciosApi.buscarOferta(bearer(token), idOferta)).getOrNull()
+        return chat.copy(servicioEliminado = ofertaDto?.borrado == true)
     }
 
     // ────────────────────────────────────────────────────────────────────────────
@@ -792,13 +873,14 @@ class RepositorioChatRemoto(
             .mapNotNull { it.toMensajeChat() }
     }
 
-    override fun enviarMensaje(idChatCita: Long, contenido: String): Result<MensajeChat> {
+    override fun enviarMensaje(idChatCita: Long, contenido: String, tipo: Int): Result<MensajeChat> {
         val token = sessionStore.obtenerToken()
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         val texto = contenido.trim()
         if (texto.isBlank()) return Result.failure(IllegalArgumentException("Escribe un mensaje"))
+        val tipoSeguro = if (tipo == 1) 1 else 0
         return ejecutarApiComunicaciones(
-            comunicacionesApi.enviarMensaje(bearer(token), MensajeChatEnviarDto(idChatCita, texto))
+            comunicacionesApi.enviarMensaje(bearer(token), MensajeChatEnviarDto(idChatCita, texto, tipoSeguro))
         ).mapCatching { it?.toMensajeChat() ?: throw IllegalStateException("Respuesta vacia al enviar mensaje") }
     }
 
@@ -825,7 +907,7 @@ class RepositorioChatRemoto(
                 authorization = bearer(token),
                 dto = SolicitarCitaRequestDto(
                     idOfertaServicio = idOferta.toInt(),
-                    comentario = comentario.trim(),
+                    comentario = construirComentarioCita(fechaProgramada, comentario),
                     idChatOferta = idChatCita
                 )
             )
@@ -847,7 +929,15 @@ class RepositorioChatRemoto(
 
     override fun obtenerCitaPorChat(idChatCita: Long): CitaServicio? {
         val token = sessionStore.obtenerToken() ?: return null
-        val idCita = citaIdPorChat[idChatCita] ?: return null
+        var idCita = citaIdPorChat[idChatCita]
+        if (idCita == null) {
+            val chat = obtenerChat(idChatCita)
+            idCita = chat?.idCita
+            if (idCita != null) {
+                citaIdPorChat[idChatCita] = idCita
+            }
+        }
+        idCita ?: return null
         return ejecutarApiServicios(serviciosApi.obtenerCita(bearer(token), idCita.toInt()))
             .getOrNull()?.toCitaServicio(idChatCita)
     }
@@ -896,20 +986,27 @@ class RepositorioChatRemoto(
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         val idUsuario = sessionStore.obtenerUsuario()?.idUsuario ?: 0L
 
-        // Cancelar la cita si existe y sigue activa
+        // Regla de cierre:
+        // - Si la cita aun no ha finalizado, al finalizar chat se cancela (estado CANCELADO).
+        // - Si ya esta finalizada, se conserva FINALIZADO.
         citaIdPorChat[idChatCita]?.let { idCita ->
-            ejecutarApiServicios(serviciosApi.cancelarCita(bearer(token), idCita.toInt()))
+            val citaActual = ejecutarApiServicios(serviciosApi.obtenerCita(bearer(token), idCita.toInt()))
+                .getOrNull()
+            if (citaActual != null) {
+                val estadoLocal = citaActual.codigoEstado.toEstadoCitaLocal(citaActual.idEstado)
+                val debeCancelar = estadoLocal !in setOf(EstadoCita.FINALIZADO, EstadoCita.CANCELADO, EstadoCita.CERRADO)
+                if (debeCancelar) {
+                    ejecutarApiServicios(serviciosApi.cancelarCita(bearer(token), idCita.toInt()))
+                }
+            } else {
+                ejecutarApiServicios(serviciosApi.cancelarCita(bearer(token), idCita.toInt()))
+            }
         }
-        // Desactivar el chat — reutilizamos el endpoint existente solo si tenemos idTrabajador/oferta
-        // El endpoint desactivar recibe idTrabajador + idOferta; lo obtenemos del chat actual
+        // Desactivar por idChat para cerrar exactamente este hilo (evita ambiguedad con chats historicos).
+        ejecutarApiComunicaciones(comunicacionesApi.desactivarChatPorId(bearer(token), idChatCita))
+            .getOrElse { return Result.failure(it) }
+
         val chat = obtenerChat(idChatCita)
-        if (chat != null) {
-            val desactivarDto = ChatIniciarRequestDto(
-                idTrabajador = chat.idTrabajador.toInt(),
-                idOfertaServicio = chat.idOfertaServicio?.toInt() ?: 0
-            )
-            ejecutarApiComunicaciones(comunicacionesApi.desactivarChat(bearer(token), desactivarDto))
-        }
 
         // Devolver el chat actualizado (chatCerrado = true)
         return Result.success(
@@ -925,10 +1022,46 @@ class RepositorioChatRemoto(
     // ────────────────────────────────────────────────────────────────────────────
     // Valoraciones y notificaciones — pendientes para siguiente iteracion
     // ────────────────────────────────────────────────────────────────────────────
-    override fun obtenerValoracionPorChat(idChatCita: Long): Valoracion? = null
+    override fun obtenerValoracionPorChat(idChatCita: Long): Valoracion? = valoracionPorChat[idChatCita]
 
-    override fun guardarValoracionChat(idChatCita: Long, voto: Int, comentario: String): Result<Valoracion> =
-        Result.failure(IllegalStateException("Valoraciones se integraran en la siguiente iteracion"))
+    override fun guardarValoracionChat(idChatCita: Long, voto: Int, comentario: String): Result<Valoracion> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val idCliente = sessionStore.obtenerUsuario()?.idUsuario
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        val idCita = citaIdPorChat[idChatCita]?.toInt()
+            ?: return Result.failure(IllegalStateException("No se encontro la cita del chat. Abre el chat primero."))
+        val chat = obtenerChat(idChatCita)
+            ?: return Result.failure(IllegalArgumentException("Chat no encontrado"))
+        val idOferta = chat.idOfertaServicio
+            ?: return Result.failure(IllegalStateException("No se encontro la oferta asociada al chat"))
+        if (voto !in 1..5) {
+            return Result.failure(IllegalArgumentException("La valoracion debe estar entre 1 y 5 estrellas"))
+        }
+
+        return ejecutarApiServicios(
+            serviciosApi.crearValoracion(
+                authorization = bearer(token),
+                dto = ValoracionRequestDto(
+                    idCita = idCita,
+                    voto = voto,
+                    comentario = comentario.trim()
+                )
+            )
+        ).map {
+            val valoracion = Valoracion(
+                voto = voto,
+                fechaVoto = java.time.LocalDateTime.now().toString(),
+                comentario = comentario.trim(),
+                idTrabajador = chat.idTrabajador,
+                idCliente = idCliente,
+                idChatCita = idChatCita,
+                idOfertaServicio = idOferta
+            )
+            valoracionPorChat[idChatCita] = valoracion
+            valoracion
+        }
+    }
 
     override fun obtenerNotificacionesPendientes(): List<NotificacionMensajePendiente> = emptyList()
 
@@ -991,17 +1124,49 @@ class RepositorioChatRemoto(
 }
 
 private fun CitaServicioDto.toCitaServicio(idChatCita: Long): CitaServicio {
+    val comentarioLimpio = comentario.orEmpty()
     return CitaServicio(
         idCita          = id?.toLong() ?: 0L,
         idChatCita      = idChatCita,
         fechaCreacion   = fechaSolicitud ?: "",
-        fechaProgramada = "",
-        comentario      = comentario ?: "",
+        fechaProgramada = extraerFechaProgramada(comentarioLimpio),
+        comentario      = limpiarComentarioCita(comentarioLimpio),
         precioAcordado  = 0,
         fechaInicioTrabajo = fechaInicioTrabajo,
         fechaFinTrabajo    = fechaFinTrabajo,
-        estado          = idEstado ?: EstadoCita.PENDIENTE
+        estado          = codigoEstado.toEstadoCitaLocal(idEstado)
     )
+}
+
+private fun construirComentarioCita(fechaProgramada: String, comentario: String): String {
+    val fecha = fechaProgramada.trim()
+    val detalle = comentario.trim()
+    return if (fecha.isBlank()) detalle else "[FECHA:$fecha] $detalle".trim()
+}
+
+private fun extraerFechaProgramada(comentario: String): String {
+    val regex = Regex("""^\[FECHA:([^\]]+)]\s*""")
+    return regex.find(comentario)?.groupValues?.getOrNull(1)?.trim().orEmpty()
+}
+
+private fun limpiarComentarioCita(comentario: String): String {
+    val regex = Regex("""^\[FECHA:[^\]]+]\s*""")
+    return comentario.replace(regex, "").trim()
+}
+
+private fun String?.toEstadoCitaLocal(idEstado: Int?): Int {
+    return when (this?.trim()?.uppercase()) {
+        "CITA_PENDIENTE" -> EstadoCita.PENDIENTE
+        "CITA_HANDSHAKE" -> EstadoCita.HANDSHAKE
+        "CITA_COMENZANDO" -> EstadoCita.COMENZANDO
+        "CITA_EN_PROCESO" -> EstadoCita.EN_PROCESO
+        "CITA_FINALIZANDO" -> EstadoCita.FINALIZANDO
+        "CITA_FINALIZADO" -> EstadoCita.FINALIZADO
+        "CITA_CANCELADO" -> EstadoCita.CANCELADO
+        "CITA_CERRADO" -> EstadoCita.CERRADO
+        "CITA_RECHAZADO" -> EstadoCita.RECHAZADA
+        else -> idEstado ?: EstadoCita.PENDIENTE
+    }
 }
 
 class RepositorioChatsRecortado(
@@ -1024,7 +1189,7 @@ class RepositorioChatsRecortado(
 
     override fun obtenerChat(idChatCita: Long): ChatCita? = null
 
-    override fun enviarMensaje(idChatCita: Long, contenido: String): Result<MensajeChat> =
+    override fun enviarMensaje(idChatCita: Long, contenido: String, tipo: Int): Result<MensajeChat> =
         Result.failure(IllegalStateException("Comunicaciones se integrara en una siguiente iteracion."))
 
     override fun crearCitaDesdeChat(
@@ -1075,6 +1240,92 @@ class RepositorioChatsRecortado(
     override fun marcarLeidos(idChatCita: Long) = Unit
 }
 
+class RepositorioReportesRemoto(
+    private val comunicacionesApi: ComunicacionesApiService,
+    private val sessionStore: RemoteSessionStore
+) : RepositorioReportes {
+
+    override fun obtenerTiposReporte(): List<TipoReporte> {
+        val token = sessionStore.obtenerToken() ?: return emptyList()
+        return ejecutarApiComunicaciones(comunicacionesApi.obtenerTiposReporte(bearer(token)))
+            .getOrDefault(emptyList())
+            .mapNotNull { dto ->
+                val id = dto.id?.toLong() ?: return@mapNotNull null
+                val nombre = dto.nombre?.trim().orEmpty()
+                if (nombre.isBlank()) return@mapNotNull null
+                TipoReporte(
+                    idTipoReporte = id,
+                    nombre = nombre,
+                    descripcion = nombre
+                )
+            }
+    }
+
+    override fun crearReporteDesdeOferta(
+        idOfertaServicio: Long,
+        idTipoReporte: Long,
+        comentario: String
+    ): Result<Reporte> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        if (comentario.trim().isBlank()) {
+            return Result.failure(IllegalArgumentException("Debes ingresar un comentario del reporte"))
+        }
+        return ejecutarApiComunicaciones(
+            comunicacionesApi.crearReporte(
+                auth = bearer(token),
+                dto = CrearReporteRequestDto(
+                    idTipoReporte = idTipoReporte.toInt(),
+                    idOfertaServicio = idOfertaServicio,
+                    comentario = comentario.trim()
+                )
+            )
+        ).map { it.toReporte() }
+    }
+
+    override fun crearReporteDesdeChat(
+        idChatCita: Long,
+        idTipoReporte: Long,
+        comentario: String
+    ): Result<Reporte> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        if (comentario.trim().isBlank()) {
+            return Result.failure(IllegalArgumentException("Debes ingresar un comentario del reporte"))
+        }
+        val chat = ejecutarApiComunicaciones(comunicacionesApi.listarChats(bearer(token)))
+            .getOrDefault(emptyList())
+            .firstOrNull { it.id == idChatCita }
+            ?: return Result.failure(IllegalStateException("No se encontro el chat a reportar"))
+        val idOferta = chat.idOfertaServicio?.toLong()
+            ?: return Result.failure(IllegalStateException("No se encontro servicio asociado a este chat"))
+
+        return ejecutarApiComunicaciones(
+            comunicacionesApi.crearReporte(
+                auth = bearer(token),
+                dto = CrearReporteRequestDto(
+                    idTipoReporte = idTipoReporte.toInt(),
+                    idOfertaServicio = idOferta,
+                    idChatCita = idChatCita,
+                    comentario = comentario.trim()
+                )
+            )
+        ).map { it.toReporte() }
+    }
+
+    override fun obtenerReportesModeracion(
+        busqueda: String,
+        idTipoReporte: Long?,
+        estadoRevision: String?,
+        ordenarRecientes: Boolean
+    ): List<Reporte> = emptyList()
+
+    override fun obtenerDetalleReporte(idReporte: Long): Reporte? = null
+
+    override fun aplicarMedidaModeracion(idReporte: Long, accion: String): Result<Reporte> =
+        Result.failure(IllegalStateException("Moderacion remota pendiente de integracion"))
+}
+
 class RepositorioReportesRecortado : RepositorioReportes {
 
     override fun obtenerTiposReporte(): List<TipoReporte> = emptyList()
@@ -1104,6 +1355,29 @@ class RepositorioReportesRecortado : RepositorioReportes {
 
     override fun aplicarMedidaModeracion(idReporte: Long, accion: String): Result<Reporte> =
         Result.failure(IllegalStateException("Moderacion de reportes se integrara en una siguiente iteracion."))
+}
+
+private fun ReporteResponseDto.toReporte(): Reporte {
+    return Reporte(
+        idReporte = idReporte ?: 0L,
+        idEmisor = (idEmisor ?: 0).toLong(),
+        idUsuarioReportado = idUsuarioReportado?.toLong(),
+        idOfertaServicio = idOfertaServicio,
+        idChatCita = idChatCita,
+        idTipoReporte = (idTipoReporte ?: 0).toLong(),
+        comentario = comentario.orEmpty(),
+        fechaCreacion = fechaCreacion.orEmpty(),
+        estadoRevision = estadoRevision.orEmpty().ifBlank { "PENDIENTE" },
+        idModeradorRevisor = idModeradorRevisor?.toLong(),
+        fechaRevision = fechaRevision,
+        medidaAplicada = medidaAplicada,
+        tipoReporteNombre = tipoReporteNombre.orEmpty(),
+        emisorUsername = emisorUsername.orEmpty(),
+        usuarioReportadoUsername = usuarioReportadoUsername.orEmpty(),
+        usuarioReportadoNombre = usuarioReportadoNombre.orEmpty(),
+        servicioTitulo = servicioTitulo.orEmpty(),
+        servicioFotoUrl = servicioFotoUrl.orEmpty()
+    )
 }
 
 private fun RegistroPendiente.toRegistroRequest(): UsuarioRegistroRequestDto {

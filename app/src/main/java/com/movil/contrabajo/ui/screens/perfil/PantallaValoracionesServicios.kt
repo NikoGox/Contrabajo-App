@@ -227,6 +227,12 @@ private fun SelectorServicioValorado(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Text(
+                    text = "${promedioServicio(item)} ★",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
             Box(
                 modifier = Modifier
@@ -242,4 +248,9 @@ private fun SelectorServicioValorado(
             }
         }
     }
+}
+
+private fun promedioServicio(item: ValoracionesServicio): String {
+    if (item.valoraciones.isEmpty()) return "0.0"
+    return String.format("%.1f", item.valoraciones.map { it.voto }.average())
 }

@@ -73,6 +73,23 @@ interface ComunicacionesApiService {
         @Header("Authorization") auth: String,
         @Body dto: ChatIniciarRequestDto
     ): Call<Void>
+
+    @PATCH("api/chats/{idChat}/desactivar")
+    fun desactivarChatPorId(
+        @Header("Authorization") auth: String,
+        @Path("idChat") idChat: Long
+    ): Call<Void>
+
+    @GET("api/reportes/tipos")
+    fun obtenerTiposReporte(
+        @Header("Authorization") auth: String
+    ): Call<List<TipoReporteDto>>
+
+    @POST("api/reportes")
+    fun crearReporte(
+        @Header("Authorization") auth: String,
+        @Body dto: CrearReporteRequestDto
+    ): Call<ReporteResponseDto>
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -89,11 +106,20 @@ data class ChatIniciarRequestDto(
 
 data class MensajeChatEnviarDto(
     @SerializedName("idChatOferta")  val idChatOferta: Long,
-    @SerializedName("contenido")     val contenido: String
+    @SerializedName("contenido")     val contenido: String,
+    @SerializedName("tipo")          val tipo: Int = 0
 )
 
 data class VincularCitaRequestDto(
     @SerializedName("idCita")  val idCita: Int
+)
+
+data class CrearReporteRequestDto(
+    @SerializedName("idTipoReporte") val idTipoReporte: Int,
+    @SerializedName("idOfertaServicio") val idOfertaServicio: Long? = null,
+    @SerializedName("idUsuarioReportado") val idUsuarioReportado: Int? = null,
+    @SerializedName("idChatCita") val idChatCita: Long? = null,
+    @SerializedName("comentario") val comentario: String
 )
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -127,6 +153,32 @@ data class MensajeChatDto(
     @SerializedName("fechaLeido")    val fechaLeido: String?,
     /** 0 = normal, 1 = sistema (generado automaticamente por el backend) */
     @SerializedName("tipo")          val tipo: Int? = null
+)
+
+data class TipoReporteDto(
+    @SerializedName("id") val id: Int?,
+    @SerializedName("nombre") val nombre: String?
+)
+
+data class ReporteResponseDto(
+    @SerializedName("idReporte") val idReporte: Long?,
+    @SerializedName("idEmisor") val idEmisor: Int?,
+    @SerializedName("idUsuarioReportado") val idUsuarioReportado: Int?,
+    @SerializedName("idOfertaServicio") val idOfertaServicio: Long?,
+    @SerializedName("idChatCita") val idChatCita: Long?,
+    @SerializedName("idTipoReporte") val idTipoReporte: Int?,
+    @SerializedName("comentario") val comentario: String?,
+    @SerializedName("fechaCreacion") val fechaCreacion: String?,
+    @SerializedName("estadoRevision") val estadoRevision: String?,
+    @SerializedName("idModeradorRevisor") val idModeradorRevisor: Int?,
+    @SerializedName("fechaRevision") val fechaRevision: String?,
+    @SerializedName("medidaAplicada") val medidaAplicada: String?,
+    @SerializedName("tipoReporteNombre") val tipoReporteNombre: String?,
+    @SerializedName("emisorUsername") val emisorUsername: String?,
+    @SerializedName("usuarioReportadoUsername") val usuarioReportadoUsername: String?,
+    @SerializedName("usuarioReportadoNombre") val usuarioReportadoNombre: String?,
+    @SerializedName("servicioTitulo") val servicioTitulo: String?,
+    @SerializedName("servicioFotoUrl") val servicioFotoUrl: String?
 )
 
 // ──────────────────────────────────────────────────────────────────────────────

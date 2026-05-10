@@ -12,13 +12,19 @@ android {
         applicationId = "com.movil.contrabajo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.11.0-Pre-Alpha"
+        versionCode = 10
+        versionName = "0.12.0-Pre-Alpha"
         buildConfigField("String", "USUARIOS_BASE_URL", "\"http://10.0.2.2:8081/\"")
         buildConfigField("String", "SERVICIOS_BASE_URL", "\"http://10.0.2.2:8082/\"")
         buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"http://10.0.2.2:8083/\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Play Console valida 16 KB page size en libs nativas para Android 15+.
+        // Empaquetamos solo ABIs ARM para distribucion (dispositivos reales).
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+        }
     }
 
     buildTypes {
@@ -71,10 +77,10 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("org.osmdroid:osmdroid-android:6.1.18")
     implementation("com.google.android.gms:play-services-location:21.3.0")
-    // CameraX
-    implementation("androidx.camera:camera-camera2:1.3.4")
-    implementation("androidx.camera:camera-lifecycle:1.3.4")
-    implementation("androidx.camera:camera-view:1.3.4")
+    // CameraX (actualizado para compatibilidad moderna de NDK/page-size)
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
     // ML Kit Text Recognition
     implementation("com.google.mlkit:text-recognition:16.0.1")
     // WorkManager — tareas en segundo plano (polling de mensajes)

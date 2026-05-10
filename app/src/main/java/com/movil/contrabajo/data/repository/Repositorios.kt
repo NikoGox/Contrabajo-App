@@ -109,7 +109,7 @@ interface RepositorioChats {
         usernameCliente: String = ""
     ): Result<ChatCita>
     fun obtenerChat(idChatCita: Long): ChatCita?
-    fun enviarMensaje(idChatCita: Long, contenido: String): Result<MensajeChat>
+    fun enviarMensaje(idChatCita: Long, contenido: String, tipo: Int = 0): Result<MensajeChat>
     fun crearCitaDesdeChat(idChatCita: Long, fechaProgramada: String, comentario: String, precioAcordado: Int = 0): Result<CitaServicio>
     fun obtenerCitaPorChat(idChatCita: Long): CitaServicio?
     fun aceptarCitaTrabajador(idChatCita: Long): Result<CitaServicio>
@@ -913,7 +913,7 @@ class RepositorioChatsLocal(
         return db.obtenerChatPorId(idChatCita, usuario.idUsuario)
     }
 
-    override fun enviarMensaje(idChatCita: Long, contenido: String): Result<MensajeChat> {
+    override fun enviarMensaje(idChatCita: Long, contenido: String, tipo: Int): Result<MensajeChat> {
         val usuario = db.obtenerUsuarioSesionActiva()
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         val chat = db.obtenerChatPorId(idChatCita, usuario.idUsuario)

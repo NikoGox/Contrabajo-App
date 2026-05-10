@@ -170,8 +170,10 @@ fun PantallaDetalleChat(
                     style = MaterialTheme.typography.titleMedium
                 )
             } else {
+                val chatSoloLectura = chat.chatCerrado || chat.servicioEliminado
+                val chatAcciones = if (chatSoloLectura) chat.copy(chatCerrado = true) else chat
                 ResumenCitaChat(
-                    chat = chat,
+                    chat = chatAcciones,
                     cita = uiState.citaActiva,
                     esCliente = esCliente,
                     esTrabajador = esTrabajador,
@@ -213,11 +215,15 @@ fun PantallaDetalleChat(
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
-                if (chat.chatCerrado) {
+                if (chatSoloLectura) {
                     Text(
-                        text = "Chat cerrado: puedes leer mensajes, pero no escribir.",
+                        text = if (chat.servicioEliminado) {
+                            "Servicio eliminado: chat disponible solo como historial."
+                        } else {
+                            "Chat cerrado: puedes leer mensajes, pero no escribir."
+                        },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (chat.servicioEliminado) Color(0xFFB00020) else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
                     Row(
@@ -245,13 +251,6 @@ fun PantallaDetalleChat(
                     Text(
                         text = it,
                         color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                uiState.mensajeSistema?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }

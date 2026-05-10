@@ -28,5 +28,8 @@ class ProveedorRepositorios(context: Context) {
         serviciosApi = ServiciosApiClient.api,
         sessionStore = sessionStore
     )
-    val reportes: RepositorioReportes = RepositorioReportesRecortado()
+    val reportes: RepositorioReportes = RepositorioReportesRemoto(
+        comunicacionesApi = ComunicacionesApiClient.api,
+        sessionStore = sessionStore
+    )
 }

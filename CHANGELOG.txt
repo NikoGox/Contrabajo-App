@@ -1,3 +1,24 @@
+VERSION 0.12.0-Pre-Alpha
+───────
+├─• Se cerró la iteración N5 con consolidación de HU-11/HU-12/HU-13 sobre backend real.
+├─• Se habilitó cierre bidireccional de chat (cliente y trabajador) por `idChat` con comportamiento idempotente.
+├─• Se agregó propagación en tiempo real del cierre de chat a ambas partes mediante evento WS `CHAT_CERRADO`.
+├─• Se reforzó recarga instantánea del chat activo al cerrar: estado de chat, cita y bloqueo de escritura sin reingresar.
+├─• Se normalizó reapertura: al contactar tras un chat cerrado, siempre se crea un chat nuevo (no se reutiliza histórico inactivo).
+├─• Se incorporó trazabilidad de cierre y cambios de cita como mensajes de sistema (`tipo=1`) en el historial.
+├─• Se ajustó sincronización de citas en vivo para contraparte (creación/transiciones visibles en chat abierto).
+├─• Se eliminó texto legacy de estado bajo el input del chat para evitar residuos entre conversaciones.
+├─• Se mantuvo política HU-13: modal de valoración solo para cliente + chat cerrado + cita finalizada/cerrada + sin valoración previa.
+├─• Se incorporó soporte de servicios eliminados en chats históricos (solo lectura + aviso explícito en chat).
+├─• Se reforzó detalle de servicio eliminado en modo inhabilitado y sin acciones de contacto nuevas.
+├─• Se habilitó reporte de contacto con carga remota de tipos de reporte y creación estable desde chat.
+├─• Se amplió API de valoraciones para consulta por trabajador/cliente con control de token.
+├─• Se añadió `idOfertaServicio` al DTO de valoraciones para cálculo robusto de rating por servicio.
+├─• Se corrigió promedio de estrellas por servicio en marketplace/detalle (no solo promedio global del trabajador).
+├─• Se habilitó visibilidad de valoraciones de terceros también para clientes y trabajadores al navegar tarjetas/servicios.
+├─• En pantalla de valoraciones por servicio se muestran estado (activo/eliminado) y promedio en estrellas por cada servicio.
+└─• Se validó compilación de app y microservicios impactados durante la iteración.
+
 VERSION 0.11.0-Pre-Alpha
 ───────
 ├─• Se completó la migración de HU-09/HU-10/HU-11/HU-12 a backend real con `comunicaciones_api` + `servicios_api`.

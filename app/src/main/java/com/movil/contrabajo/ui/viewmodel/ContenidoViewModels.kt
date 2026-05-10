@@ -342,6 +342,7 @@ class ChatsViewModel(
         escucharWebSocket()
         escucharRecibos()
         escucharConexion()
+        escucharCierreChat()
     }
 
     /**
@@ -368,10 +369,14 @@ class ChatsViewModel(
                     // Agrega el mensaje de inmediato para que aparezca sin esperar al servidor
                     uiState = uiState.copy(mensajesActivos = uiState.mensajesActivos + mensaje)
                     // Recarga desde el servidor: aplica marks y devuelve ticks actualizados
-                    val mensajesActualizados = withContext(Dispatchers.IO) {
-                        repositorioChats.obtenerMensajes(chatActivo.idChatCita)
+                    val (mensajesActualizados, citaActualizada) = withContext(Dispatchers.IO) {
+                        repositorioChats.obtenerMensajes(chatActivo.idChatCita) to
+                            repositorioChats.obtenerCitaPorChat(chatActivo.idChatCita)
                     }
-                    uiState = uiState.copy(mensajesActivos = mensajesActualizados)
+                    uiState = uiState.copy(
+                        mensajesActivos = mensajesActualizados,
+                        citaActiva = citaActualizada ?: uiState.citaActiva
+                    )
                 } else {
                     // El chat no esta abierto: registrar entrega
                     withContext(Dispatchers.IO) {
@@ -463,6 +468,17 @@ class ChatsViewModel(
         }
     }
 
+    private fun escucharCierreChat() {
+        viewModelScope.launch {
+            com.movil.contrabajo.data.remote.WsManager.chatsCerrados.collect { idChat ->
+                recargar()
+                if (uiState.chatActivo?.idChatCita == idChat) {
+                    recargarEstadoChatActivo(idChat)
+                }
+            }
+        }
+    }
+
     /**
      * Recarga la lista de chats y contadores.
      *
@@ -523,6 +539,33 @@ class ChatsViewModel(
                 uiState = uiState.copy(mensajesActivos = mensajes)
             }
         }
+    }
+
+    private suspend fun recargarEstadoChatActivo(idChatCita: Long) {
+        val chat = withContext(Dispatchers.IO) { repositorioChats.obtenerChat(idChatCita) } ?: return
+        val idActual = repositorioChats.obtenerIdUsuarioActual()
+        val esCliente = chat.idCliente == idActual
+        val (valoracion, cita, mensajes) = withContext(Dispatchers.IO) {
+            Triple(
+                repositorioChats.obtenerValoracionPorChat(idChatCita),
+                repositorioChats.obtenerCitaPorChat(idChatCita),
+                repositorioChats.obtenerMensajes(idChatCita)
+            )
+        }
+        val mensajesVisibles = anexarAvisoServicioEliminado(chat, mensajes)
+        val permiteValorar = cita?.estado in setOf(EstadoCita.FINALIZADO, EstadoCita.CERRADO)
+        val mostrarModalValoracion = chat.chatCerrado && esCliente && valoracion == null && permiteValorar
+        uiState = uiState.copy(
+            chatActivo = chat,
+            mensajesActivos = mensajesVisibles,
+            citaActiva = cita,
+            valoracionExistente = valoracion,
+            mostrarModalValoracion = mostrarModalValoracion,
+            votoValoracion = valoracion?.voto ?: uiState.votoValoracion,
+            comentarioValoracion = valoracion?.comentario.orEmpty(),
+            idUsuarioActual = idActual,
+            error = null
+        )
     }
 
     fun actualizarFiltroChatsContacto(activo: Boolean) {
@@ -590,11 +633,12 @@ class ChatsViewModel(
                     repositorioChats.obtenerMensajes(idChatCita)
                 )
             }
+            val mensajesVisibles = anexarAvisoServicioEliminado(chat, mensajes)
             val permiteValorar = cita?.estado in setOf(EstadoCita.FINALIZADO, EstadoCita.CERRADO)
             val mostrarModalValoracion = chat.chatCerrado && esCliente && valoracion == null && permiteValorar
             uiState = uiState.copy(
                 chatActivo = chat,
-                mensajesActivos = mensajes,
+                mensajesActivos = mensajesVisibles,
                 citaActiva = cita,
                 valoracionExistente = valoracion,
                 mostrarModalValoracion = mostrarModalValoracion,
@@ -643,6 +687,10 @@ class ChatsViewModel(
                 )
             }
             resultado.onSuccess { cita ->
+                enviarMensajeSistemaCambioCita(
+                    idChatCita = chat.idChatCita,
+                    texto = "Se creo una cita para ${fechaProgramada.trim()}."
+                )
                 uiState = uiState.copy(
                     citaActiva = cita,
                     mensajeSistema = "Cita creada correctamente.",
@@ -660,7 +708,8 @@ class ChatsViewModel(
         procesarTransicionCita(
             idChatCita = chat.idChatCita,
             accion = { repositorioChats.aceptarCitaTrabajador(chat.idChatCita) },
-            mensajeExito = "Cita aceptada. Estado: Handshake."
+            mensajeExito = "Cita aceptada. Estado: Handshake.",
+            mensajeSistemaChat = "El trabajador acepto la cita."
         )
     }
 
@@ -669,7 +718,8 @@ class ChatsViewModel(
         procesarTransicionCita(
             idChatCita = chat.idChatCita,
             accion = { repositorioChats.rechazarCitaTrabajador(chat.idChatCita) },
-            mensajeExito = "Propuesta rechazada. Puedes seguir negociando sobre la misma cita."
+            mensajeExito = "Propuesta rechazada. Puedes seguir negociando sobre la misma cita.",
+            mensajeSistemaChat = "El trabajador rechazo la propuesta de cita."
         )
     }
 
@@ -678,7 +728,8 @@ class ChatsViewModel(
         procesarTransicionCita(
             idChatCita = chat.idChatCita,
             accion = { repositorioChats.reenviarPropuestaCitaCliente(chat.idChatCita) },
-            mensajeExito = "Propuesta reenviada. Estado actualizado a pendiente."
+            mensajeExito = "Propuesta reenviada. Estado actualizado a pendiente.",
+            mensajeSistemaChat = "El cliente reenvi\u00f3 la propuesta de cita."
         )
     }
 
@@ -687,7 +738,8 @@ class ChatsViewModel(
         procesarTransicionCita(
             idChatCita = chat.idChatCita,
             accion = { repositorioChats.solicitarInicioTrabajoTrabajador(chat.idChatCita) },
-            mensajeExito = "Solicitud de inicio enviada al cliente."
+            mensajeExito = "Solicitud de inicio enviada al cliente.",
+            mensajeSistemaChat = "El trabajador solicito iniciar el servicio."
         )
     }
 
@@ -696,7 +748,8 @@ class ChatsViewModel(
         procesarTransicionCita(
             idChatCita = chat.idChatCita,
             accion = { repositorioChats.aceptarInicioTrabajoCliente(chat.idChatCita) },
-            mensajeExito = "Inicio del trabajo confirmado."
+            mensajeExito = "Inicio del trabajo confirmado.",
+            mensajeSistemaChat = "El cliente confirmo el inicio del servicio."
         )
     }
 
@@ -705,7 +758,8 @@ class ChatsViewModel(
         procesarTransicionCita(
             idChatCita = chat.idChatCita,
             accion = { repositorioChats.solicitarFinalizarTrabajoTrabajador(chat.idChatCita) },
-            mensajeExito = "Solicitud de finalizacion enviada al cliente."
+            mensajeExito = "Solicitud de finalizacion enviada al cliente.",
+            mensajeSistemaChat = "El trabajador solicito finalizar el servicio."
         )
     }
 
@@ -714,7 +768,8 @@ class ChatsViewModel(
         procesarTransicionCita(
             idChatCita = chat.idChatCita,
             accion = { repositorioChats.aceptarFinalizarTrabajoCliente(chat.idChatCita) },
-            mensajeExito = "Trabajo finalizado correctamente."
+            mensajeExito = "Trabajo finalizado correctamente.",
+            mensajeSistemaChat = "El cliente confirmo la finalizacion del servicio."
         )
     }
 
@@ -773,11 +828,13 @@ class ChatsViewModel(
     private fun procesarTransicionCita(
         idChatCita: Long,
         accion: () -> Result<CitaServicio>,
-        mensajeExito: String
+        mensajeExito: String,
+        mensajeSistemaChat: String
     ) {
         viewModelScope.launch {
             val resultado = withContext(Dispatchers.IO) { accion() }
             resultado.onSuccess { citaActualizada ->
+                enviarMensajeSistemaCambioCita(idChatCita, mensajeSistemaChat)
                 uiState = uiState.copy(
                     citaActiva = citaActualizada,
                     mensajeSistema = mensajeExito,
@@ -788,6 +845,33 @@ class ChatsViewModel(
                 uiState = uiState.copy(error = it.message ?: "No se pudo actualizar la cita")
             }
         }
+    }
+
+    private suspend fun enviarMensajeSistemaCambioCita(idChatCita: Long, texto: String) {
+        withContext(Dispatchers.IO) {
+            repositorioChats.enviarMensaje(idChatCita, texto, tipo = 1)
+        }
+    }
+
+    private fun anexarAvisoServicioEliminado(chat: ChatCita, mensajes: List<MensajeChat>): List<MensajeChat> {
+        if (!chat.servicioEliminado) return mensajes
+        val yaExiste = mensajes.any {
+            it.tipo == 1 && it.contenido.contains("servicio eliminado", ignoreCase = true)
+        }
+        if (yaExiste) return mensajes
+        val aviso = MensajeChat(
+            idMensajeChat = -chat.idChatCita,
+            fechaEnvio = java.time.LocalDateTime.now().toString(),
+            fechaRecibido = null,
+            fechaLeido = null,
+            idEmisor = 0L,
+            idReceptor = 0L,
+            idChatCita = chat.idChatCita,
+            idEstado = 0L,
+            contenido = "Servicio eliminado. Este chat se mantiene solo como historial.",
+            tipo = 1
+        )
+        return mensajes + aviso
     }
 
     fun consumirMensajes() {

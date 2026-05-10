@@ -176,6 +176,18 @@ interface ServiciosApiService {
         @Header("Authorization") authorization: String,
         @Path("id") id: Int
     ): Call<CitaServicioDto>
+
+    @POST("api/valoraciones")
+    fun crearValoracion(
+        @Header("Authorization") authorization: String,
+        @Body dto: ValoracionRequestDto
+    ): Call<Map<String, String>>
+
+    @GET("api/valoraciones/trabajador/{idTrabajador}")
+    fun obtenerValoracionesTrabajador(
+        @Header("Authorization") authorization: String,
+        @Path("idTrabajador") idTrabajador: Int
+    ): Call<List<ValoracionServicioDto>>
 }
 
 data class CategoriaServicioDto(
@@ -258,6 +270,23 @@ data class CitaServicioDto(
     @SerializedName("idEstado")          val idEstado: Int?,
     @SerializedName("codigoEstado")      val codigoEstado: String?,
     @SerializedName("estado")            val estado: String?
+)
+
+data class ValoracionRequestDto(
+    @SerializedName("idCita") val idCita: Int,
+    @SerializedName("voto") val voto: Int,
+    @SerializedName("comentario") val comentario: String
+)
+
+data class ValoracionServicioDto(
+    @SerializedName("id") val id: Int?,
+    @SerializedName("idCita") val idCita: Int?,
+    @SerializedName("idOfertaServicio") val idOfertaServicio: Int?,
+    @SerializedName("idCliente") val idCliente: Int?,
+    @SerializedName("idTrabajador") val idTrabajador: Int?,
+    @SerializedName("voto") val voto: Int?,
+    @SerializedName("comentario") val comentario: String?,
+    @SerializedName("fechaVoto") val fechaVoto: String?
 )
 
 object ServiciosApiClient {

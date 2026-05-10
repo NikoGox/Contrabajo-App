@@ -78,6 +78,7 @@ data class ChatCita(
     val mensajesNoLeidos: Int = 0,
     val estadoCita: Int? = null,
     val chatCerrado: Boolean = false,
+    val servicioEliminado: Boolean = false,
     val bloqueadoHastaMs: Long? = null
 )
 
