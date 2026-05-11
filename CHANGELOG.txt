@@ -1,3 +1,14 @@
+VERSION 0.12.1-Pre-Alpha
+───────
+├─• Mejoramos el centro de moderación para gestionar reportes de servicios de forma más clara y confiable.
+├─• Ahora es posible resolver reportes con acciones directas: desactivar servicio, eliminar servicio o ignorar reporte.
+├─• Se agregaron mas opciones de resolucion para reportes, pero aun faltan correcciones.
+├─• La selección de fecha para suspensión ahora usa calendario visual para facilitar el proceso.
+├─• Se mejoró la presentación de resoluciones para que se lean en lenguaje natural.
+├─• Se reforzó la estabilidad del flujo de reportes para evitar errores al enviar o resolver acciones.
+├─• Se ajustó la experiencia de “Reportar servicio” para que sea consistente en chat y detalle de servicio.
+└─• Correcciones generales de estabilidad y consistencia en la experiencia de moderación.
+
 VERSION 0.12.0-Pre-Alpha
 ───────
 ├─• Se cerró la iteración N5 con consolidación de HU-11/HU-12/HU-13 sobre backend real.
@@ -340,3 +351,4 @@ VERSION 0.1-Pre-Alpha
 ->>> Pendiente para v0.3: enriquecer el flujo principal con mas contenido en Home y mejor interaccion en Chats.
 ->>> Pendiente para v0.3: reforzar continuidad entre navegacion, estados visuales y acciones del usuario.
 ->>> Pendiente para futuro: preparar la transicion desde SQLite local hacia integracion con backend.
+

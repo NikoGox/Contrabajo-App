@@ -1,5 +1,6 @@
 package com.movil.contrabajo.ui.screens.reportes
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,6 +67,7 @@ import com.movil.contrabajo.ui.components.OverlayPantallaCarga
 import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaBase
 import com.movil.contrabajo.ui.viewmodel.ReportesViewModel
+import java.util.Calendar
 
 @Composable
 fun PantallaReportesModerador(
@@ -347,6 +350,9 @@ fun PantallaDetalleReporteModerador(
     val uiState = viewModel.uiState
     val reporte = uiState.reporteActivo
     var confirmarAccion by remember { mutableStateOf<String?>(null) }
+    var mostrarDialogoSuspension by remember { mutableStateOf(false) }
+    var fechaSuspension by rememberSaveable { mutableStateOf("") }
+    val contexto = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(idReporte) {
         viewModel.abrirDetalle(idReporte)
@@ -403,7 +409,7 @@ fun PantallaDetalleReporteModerador(
                             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.75f)
                         ) {
                             Text(
-                                text = "Medida: ${reporte.medidaAplicada}",
+                                text = "Medida: ${reporte.medidaAplicada.formatoHumanoMedida()}",
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -429,6 +435,39 @@ fun PantallaDetalleReporteModerador(
                 ) {
                     Text("Eliminar servicio")
                 }
+                OutlinedButton(
+                    onClick = { confirmarAccion = AccionModeracion.IGNORAR_REPORTE },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = reporte.estadoRevision != EstadoReporte.RESUELTO
+                ) {
+                    Text("Ignorar reporte")
+                }
+                OutlinedButton(
+                    onClick = {
+                        val c = Calendar.getInstance()
+                        DatePickerDialog(
+                            contexto,
+                            { _, y, m, d ->
+                                fechaSuspension = String.format("%04d-%02d-%02dT23:59:59", y, m + 1, d)
+                                mostrarDialogoSuspension = true
+                            },
+                            c.get(Calendar.YEAR),
+                            c.get(Calendar.MONTH),
+                            c.get(Calendar.DAY_OF_MONTH)
+                        ).show()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = reporte.estadoRevision != EstadoReporte.RESUELTO
+                ) {
+                    Text("Suspender usuario hasta fecha")
+                }
+                OutlinedButton(
+                    onClick = { confirmarAccion = AccionModeracion.BANEAR_USUARIO },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = reporte.estadoRevision != EstadoReporte.RESUELTO
+                ) {
+                    Text("Banear usuario")
+                }
             }
         }
     }
@@ -441,15 +480,29 @@ fun PantallaDetalleReporteModerador(
                 Text(
                     if (confirmarAccion == AccionModeracion.DESACTIVAR_SERVICIO) {
                         "Se desactivara la disponibilidad del servicio y el reporte quedara resuelto."
-                    } else {
+                    } else if (confirmarAccion == AccionModeracion.ELIMINAR_SERVICIO) {
                         "Se eliminara logicamente el servicio y el reporte quedara resuelto."
+                    } else if (confirmarAccion == AccionModeracion.BANEAR_USUARIO) {
+                        "Se baneara al usuario reportado de forma permanente y el reporte quedara resuelto."
+                    } else if (confirmarAccion == AccionModeracion.IGNORAR_REPORTE) {
+                        "El reporte quedara marcado como ignorado/resuelto sin aplicar castigos."
+                    } else {
+                        "Se aplicara la accion seleccionada."
                     }
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val accion = confirmarAccion ?: return@TextButton
+                        val accionBase = confirmarAccion ?: return@TextButton
+                        val accion = if (
+                            accionBase == AccionModeracion.BANEAR_USUARIO &&
+                            reporte.idUsuarioReportado != null
+                        ) {
+                            "${AccionModeracion.BANEAR_USUARIO}|USR:${reporte.idUsuarioReportado}"
+                        } else {
+                            accionBase
+                        }
                         viewModel.aplicarMedidaModeracion(reporte.idReporte, accion)
                         confirmarAccion = null
                     }
@@ -465,10 +518,65 @@ fun PantallaDetalleReporteModerador(
         )
     }
 
+    if (mostrarDialogoSuspension && reporte != null) {
+        AlertDialog(
+            onDismissRequest = { mostrarDialogoSuspension = false },
+            title = { Text("Suspender usuario") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Fecha seleccionada:")
+                    OutlinedTextField(
+                        value = fechaSuspension,
+                        onValueChange = {},
+                        singleLine = true,
+                        readOnly = true,
+                        label = { Text("Fecha fin") }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val fecha = fechaSuspension.trim()
+                        if (fecha.isNotBlank()) {
+                            val accionBase = "${AccionModeracion.SUSPENDER_USUARIO_HASTA}:$fecha"
+                            val accion = if (reporte.idUsuarioReportado != null) {
+                                "$accionBase|USR:${reporte.idUsuarioReportado}"
+                            } else {
+                                accionBase
+                            }
+                            viewModel.aplicarMedidaModeracion(reporte.idReporte, accion)
+                            mostrarDialogoSuspension = false
+                            fechaSuspension = ""
+                        }
+                    }
+                ) { Text("Aplicar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarDialogoSuspension = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
     OverlayPantallaCarga(
         visible = uiState.cargando,
         mensaje = "Aplicando medida..."
     )
+}
+
+private fun String?.formatoHumanoMedida(): String {
+    val valor = this?.trim().orEmpty()
+    return when {
+        valor.equals(AccionModeracion.IGNORAR_REPORTE, ignoreCase = true) -> "Ignorar reporte"
+        valor.equals(AccionModeracion.DESACTIVAR_SERVICIO, ignoreCase = true) -> "Desactivar servicio"
+        valor.equals(AccionModeracion.ELIMINAR_SERVICIO, ignoreCase = true) -> "Eliminar servicio"
+        valor.equals(AccionModeracion.BANEAR_USUARIO, ignoreCase = true) -> "Banear usuario"
+        valor.startsWith(AccionModeracion.SUSPENDER_USUARIO_HASTA, ignoreCase = true) -> {
+            val fecha = valor.substringAfter(':', "").trim()
+            if (fecha.isBlank()) "Suspender usuario" else "Suspender usuario hasta $fecha"
+        }
+        else -> valor.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
+    }
 }
 
 @Composable

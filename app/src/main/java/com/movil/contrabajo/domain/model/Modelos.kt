@@ -253,6 +253,9 @@ object EstadoReporte {
 object AccionModeracion {
     const val DESACTIVAR_SERVICIO = "DESACTIVAR_SERVICIO"
     const val ELIMINAR_SERVICIO = "ELIMINAR_SERVICIO"
+    const val IGNORAR_REPORTE = "IGNORAR_REPORTE"
+    const val SUSPENDER_USUARIO_HASTA = "SUSPENDER_USUARIO_HASTA"
+    const val BANEAR_USUARIO = "BANEAR_USUARIO"
 }
 
 data class SesionLocal(

@@ -101,8 +101,10 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -321,7 +323,12 @@ fun PantallaDetalleServicio(
                     menuAbierto = menuOpcionesAbierto,
                     onCambiarMenu = { menuOpcionesAbierto = it },
                     mostrarAccionReportar = puedeReportarBarra,
-                    onReportar = { mostrarModalReporte = true }
+                    onReportar = {
+                        if (reportesViewModel.uiState.tiposReporte.isEmpty()) {
+                            reportesViewModel.recargar()
+                        }
+                        mostrarModalReporte = true
+                    }
                 )
 
                 val oferta = uiState.ofertaActual
@@ -619,7 +626,7 @@ fun PantallaDetalleServicio(
             val tipoSeleccionado = tiposReporte.firstOrNull { it.idTipoReporte == idTipoReporteSeleccionado }
             AlertDialog(
                 onDismissRequest = { mostrarModalReporte = false },
-                title = { Text("Reportar publicacion") },
+                title = { Text("Reportar servicio") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Box {
@@ -672,21 +679,26 @@ fun PantallaDetalleServicio(
                                 ).show()
                                 return@TextButton
                             }
-                            reportesViewModel.crearReporteDesdeOferta(
-                                idOfertaServicio = ofertaCta.idOfertaServicio,
-                                idTipoReporte = idTipo,
-                                comentario = comentarioReporte
-                            ).onSuccess {
-                                Toast.makeText(context, "Reporte enviado correctamente.", Toast.LENGTH_SHORT).show()
-                                comentarioReporte = ""
-                                idTipoReporteSeleccionado = null
-                                mostrarModalReporte = false
-                            }.onFailure {
-                                Toast.makeText(
-                                    context,
-                                    it.message ?: "No se pudo enviar el reporte",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                            scope.launch {
+                                val resultado = withContext(Dispatchers.IO) {
+                                    reportesViewModel.crearReporteDesdeOferta(
+                                        idOfertaServicio = ofertaCta.idOfertaServicio,
+                                        idTipoReporte = idTipo,
+                                        comentario = comentarioReporte
+                                    )
+                                }
+                                resultado.onSuccess {
+                                    Toast.makeText(context, "Reporte enviado correctamente.", Toast.LENGTH_SHORT).show()
+                                    comentarioReporte = ""
+                                    idTipoReporteSeleccionado = null
+                                    mostrarModalReporte = false
+                                }.onFailure {
+                                    Toast.makeText(
+                                        context,
+                                        it.message ?: "No se pudo enviar el reporte",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                             }
                         }
                     ) {

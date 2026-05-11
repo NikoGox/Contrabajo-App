@@ -90,6 +90,28 @@ interface ComunicacionesApiService {
         @Header("Authorization") auth: String,
         @Body dto: CrearReporteRequestDto
     ): Call<ReporteResponseDto>
+
+    @GET("api/reportes")
+    fun listarReportesModeracion(
+        @Header("Authorization") auth: String,
+        @Query("busqueda") busqueda: String? = null,
+        @Query("estadoRevision") estadoRevision: String? = null,
+        @Query("idTipoReporte") idTipoReporte: Int? = null,
+        @Query("ordenarRecientes") ordenarRecientes: Boolean = true
+    ): Call<List<ReporteResponseDto>>
+
+    @GET("api/reportes/{idReporte}")
+    fun obtenerDetalleReporte(
+        @Header("Authorization") auth: String,
+        @Path("idReporte") idReporte: Long
+    ): Call<ReporteResponseDto>
+
+    @PATCH("api/reportes/{idReporte}/revision")
+    fun revisarReporte(
+        @Header("Authorization") auth: String,
+        @Path("idReporte") idReporte: Long,
+        @Body dto: RevisarReporteRequestDto
+    ): Call<ReporteResponseDto>
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -120,6 +142,10 @@ data class CrearReporteRequestDto(
     @SerializedName("idUsuarioReportado") val idUsuarioReportado: Int? = null,
     @SerializedName("idChatCita") val idChatCita: Long? = null,
     @SerializedName("comentario") val comentario: String
+)
+
+data class RevisarReporteRequestDto(
+    @SerializedName("medidaAplicada") val medidaAplicada: String
 )
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -156,8 +182,8 @@ data class MensajeChatDto(
 )
 
 data class TipoReporteDto(
-    @SerializedName("id") val id: Int?,
-    @SerializedName("nombre") val nombre: String?
+    @SerializedName(value = "id", alternate = ["idTipoReporte", "id_tipo_reporte"]) val id: Int?,
+    @SerializedName(value = "nombre", alternate = ["tipoReporteNombre", "nombre_tipo"]) val nombre: String?
 )
 
 data class ReporteResponseDto(

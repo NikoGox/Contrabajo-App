@@ -12,8 +12,8 @@ android {
         applicationId = "com.movil.contrabajo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 10
-        versionName = "0.12.0-Pre-Alpha"
+        versionCode = 11
+        versionName = "0.12.1-Pre-Alpha"
         buildConfigField("String", "USUARIOS_BASE_URL", "\"http://10.0.2.2:8081/\"")
         buildConfigField("String", "SERVICIOS_BASE_URL", "\"http://10.0.2.2:8082/\"")
         buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"http://10.0.2.2:8083/\"")

@@ -1646,15 +1646,22 @@ class ReportesViewModel(
     }
 
     fun recargar() {
-        uiState = uiState.copy(
-            tiposReporte = repositorioReportes.obtenerTiposReporte(),
-            reportes = repositorioReportes.obtenerReportesModeracion(
-                busqueda = uiState.busqueda,
-                idTipoReporte = uiState.filtroTipoReporteId,
-                estadoRevision = uiState.filtroEstadoRevision,
-                ordenarRecientes = uiState.ordenarRecientes
+        viewModelScope.launch {
+            val snapshot = uiState
+            val (tipos, reportes) = withContext(Dispatchers.IO) {
+                repositorioReportes.obtenerTiposReporte() to
+                    repositorioReportes.obtenerReportesModeracion(
+                        busqueda = snapshot.busqueda,
+                        idTipoReporte = snapshot.filtroTipoReporteId,
+                        estadoRevision = snapshot.filtroEstadoRevision,
+                        ordenarRecientes = snapshot.ordenarRecientes
+                    )
+            }
+            uiState = uiState.copy(
+                tiposReporte = tipos,
+                reportes = reportes
             )
-        )
+        }
     }
 
     fun actualizarBusqueda(valor: String) {
@@ -1678,12 +1685,16 @@ class ReportesViewModel(
     }
 
     fun abrirDetalle(idReporte: Long) {
-        val detalle = repositorioReportes.obtenerDetalleReporte(idReporte)
-        if (detalle == null) {
-            uiState = uiState.copy(error = "No se pudo cargar el detalle del reporte")
-            return
+        viewModelScope.launch {
+            val detalle = withContext(Dispatchers.IO) {
+                repositorioReportes.obtenerDetalleReporte(idReporte)
+            }
+            if (detalle == null) {
+                uiState = uiState.copy(error = "No se pudo cargar el detalle del reporte")
+                return@launch
+            }
+            uiState = uiState.copy(reporteActivo = detalle, error = null)
         }
-        uiState = uiState.copy(reporteActivo = detalle, error = null)
     }
 
     fun cerrarDetalle() {
@@ -1738,12 +1749,21 @@ class ReportesViewModel(
         viewModelScope.launch {
             uiState = uiState.copy(cargando = true)
             delay(120)
-            repositorioReportes.aplicarMedidaModeracion(idReporte, accion)
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioReportes.aplicarMedidaModeracion(idReporte, accion)
+            }
+            resultado
                 .onSuccess { actualizado ->
                     val etiquetaAccion = when (accion) {
                         AccionModeracion.DESACTIVAR_SERVICIO -> "Servicio desactivado y reporte resuelto."
                         AccionModeracion.ELIMINAR_SERVICIO -> "Servicio eliminado logicamente y reporte resuelto."
-                        else -> "Reporte resuelto."
+                        AccionModeracion.IGNORAR_REPORTE -> "Reporte marcado como ignorado."
+                        AccionModeracion.BANEAR_USUARIO -> "Usuario baneado y reporte resuelto."
+                        else -> if (accion.startsWith(AccionModeracion.SUSPENDER_USUARIO_HASTA)) {
+                            "Usuario suspendido hasta fecha definida y reporte resuelto."
+                        } else {
+                            "Reporte resuelto."
+                        }
                     }
                     recargar()
                     uiState = uiState.copy(

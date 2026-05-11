@@ -23,6 +23,7 @@ import com.movil.contrabajo.data.remote.RemoteSessionStore
 import com.movil.contrabajo.data.remote.FotoOfertaResponseDto
 import com.movil.contrabajo.data.remote.FotoPerfilResponseDto
 import com.movil.contrabajo.data.remote.ReporteResponseDto
+import com.movil.contrabajo.data.remote.RevisarReporteRequestDto
 import com.movil.contrabajo.data.remote.ServiciosApiService
 import com.movil.contrabajo.data.remote.SolicitarCitaRequestDto
 import com.movil.contrabajo.data.remote.OfertaServicioDto
@@ -1318,12 +1319,46 @@ class RepositorioReportesRemoto(
         idTipoReporte: Long?,
         estadoRevision: String?,
         ordenarRecientes: Boolean
-    ): List<Reporte> = emptyList()
+    ): List<Reporte> {
+        val token = sessionStore.obtenerToken() ?: return emptyList()
+        return ejecutarApiComunicaciones(
+            comunicacionesApi.listarReportesModeracion(
+                auth = bearer(token),
+                busqueda = busqueda.trim().ifBlank { null },
+                estadoRevision = estadoRevision?.trim()?.ifBlank { null },
+                idTipoReporte = idTipoReporte?.toInt(),
+                ordenarRecientes = ordenarRecientes
+            )
+        ).getOrDefault(emptyList())
+            .map { it.toReporte() }
+    }
 
-    override fun obtenerDetalleReporte(idReporte: Long): Reporte? = null
+    override fun obtenerDetalleReporte(idReporte: Long): Reporte? {
+        val token = sessionStore.obtenerToken() ?: return null
+        return ejecutarApiComunicaciones(
+            comunicacionesApi.obtenerDetalleReporte(
+                auth = bearer(token),
+                idReporte = idReporte
+            )
+        ).getOrNull()?.toReporte()
+    }
 
     override fun aplicarMedidaModeracion(idReporte: Long, accion: String): Result<Reporte> =
-        Result.failure(IllegalStateException("Moderacion remota pendiente de integracion"))
+        run {
+            val token = sessionStore.obtenerToken()
+                ?: return@run Result.failure(IllegalStateException("No hay sesion activa"))
+            val medida = accion.trim()
+            if (medida.isBlank()) {
+                return@run Result.failure(IllegalArgumentException("Debes seleccionar una medida"))
+            }
+            ejecutarApiComunicaciones(
+                comunicacionesApi.revisarReporte(
+                    auth = bearer(token),
+                    idReporte = idReporte,
+                    dto = RevisarReporteRequestDto(medidaAplicada = medida)
+                )
+            ).map { it.toReporte() }
+        }
 }
 
 class RepositorioReportesRecortado : RepositorioReportes {

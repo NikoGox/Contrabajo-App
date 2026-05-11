@@ -44,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -72,6 +73,9 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun PantallaDetalleChat(
@@ -118,6 +122,7 @@ fun PantallaDetalleChat(
     var comentarioReporte by rememberSaveable(chat?.idChatCita) { mutableStateOf("") }
     val estadoListaMensajes = rememberLazyListState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     val errorCita = validarFormularioCita(
         fecha = fechaSeleccionada,
@@ -153,7 +158,12 @@ fun PantallaDetalleChat(
             menuAbierto = mostrarMenuOpciones,
             onCambiarMenu = { mostrarMenuOpciones = it },
             onFinalizarChat = { confirmarCerrarChat = true },
-            onReportarChat = { mostrarModalReporte = true },
+            onReportarChat = {
+                if (reportesViewModel.uiState.tiposReporte.isEmpty()) {
+                    reportesViewModel.recargar()
+                }
+                mostrarModalReporte = true
+            },
             onAbrirServicioAsociado = {
                 val idOferta = chat?.idOfertaServicio
                 if (idOferta != null) onAbrirServicioAsociado(idOferta)
@@ -425,7 +435,7 @@ fun PantallaDetalleChat(
         val tipoSeleccionado = tiposReporte.firstOrNull { it.idTipoReporte == idTipoReporteSeleccionado }
         AlertDialog(
             onDismissRequest = { mostrarModalReporte = false },
-            title = { Text("Reportar contacto") },
+            title = { Text("Reportar servicio") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Box {
@@ -471,21 +481,26 @@ fun PantallaDetalleChat(
                             ).show()
                             return@TextButton
                         }
-                        reportesViewModel.crearReporteDesdeChat(
-                            idChatCita = chat.idChatCita,
-                            idTipoReporte = idTipo,
-                            comentario = comentarioReporte
-                        ).onSuccess {
-                            Toast.makeText(context, "Reporte enviado correctamente.", Toast.LENGTH_SHORT).show()
-                            comentarioReporte = ""
-                            idTipoReporteSeleccionado = null
-                            mostrarModalReporte = false
-                        }.onFailure {
-                            Toast.makeText(
-                                context,
-                                it.message ?: "No se pudo enviar el reporte",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                        scope.launch {
+                            val resultado = withContext(Dispatchers.IO) {
+                                reportesViewModel.crearReporteDesdeChat(
+                                    idChatCita = chat.idChatCita,
+                                    idTipoReporte = idTipo,
+                                    comentario = comentarioReporte
+                                )
+                            }
+                            resultado.onSuccess {
+                                Toast.makeText(context, "Reporte enviado correctamente.", Toast.LENGTH_SHORT).show()
+                                comentarioReporte = ""
+                                idTipoReporteSeleccionado = null
+                                mostrarModalReporte = false
+                            }.onFailure {
+                                Toast.makeText(
+                                    context,
+                                    it.message ?: "No se pudo enviar el reporte",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
                     }
                 ) {
@@ -570,7 +585,7 @@ private fun CabeceraChat(
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text("Reportar contacto") },
+                    text = { Text("Reportar servicio") },
                     onClick = {
                         onCambiarMenu(false)
                         onReportarChat()
