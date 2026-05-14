@@ -107,6 +107,7 @@ class RepositorioAutenticacionRemoto(
                 val usuarioDto = response.usuario
                     ?: throw IllegalStateException("El backend no devolvio datos de usuario")
                 val usuario = RemoteSessionStore.usuarioDesdeDto(usuarioDto, passwordTemporal = password)
+                    .copy(baneoFechaFin = response.baneoActivo?.fechaFin)
                 sessionStore.guardarSesion(token, usuario)
                 usuario
             }
@@ -1390,6 +1391,39 @@ class RepositorioReportesRecortado : RepositorioReportes {
 
     override fun aplicarMedidaModeracion(idReporte: Long, accion: String): Result<Reporte> =
         Result.failure(IllegalStateException("Moderacion de reportes se integrara en una siguiente iteracion."))
+}
+
+class RepositorioBaneosRemoto(
+    private val api: com.movil.contrabajo.data.remote.UsuariosApiService,
+    private val sessionStore: RemoteSessionStore
+) : RepositorioBaneos {
+
+    override fun listarBaneados(): List<com.movil.contrabajo.domain.model.UsuarioBaneado> {
+        val token = sessionStore.obtenerToken() ?: return emptyList()
+        return ejecutarApi(api.listarBaneados(bearer(token)))
+            .getOrDefault(emptyList())
+            .mapNotNull { dto ->
+                val id = dto.idUsuario ?: return@mapNotNull null
+                com.movil.contrabajo.domain.model.UsuarioBaneado(
+                    idUsuario = id,
+                    username = dto.username.orEmpty(),
+                    nombre = dto.nombre.orEmpty(),
+                    apellidos = dto.apellidos.orEmpty(),
+                    idEstado = dto.idEstado ?: 103,
+                    tipoSancion = dto.tipoSancion.orEmpty(),
+                    permanente = dto.permanente ?: true,
+                    fechaInicio = dto.fechaInicio,
+                    fechaFin = dto.fechaFin,
+                    motivo = dto.motivo
+                )
+            }
+    }
+
+    override fun desbanearUsuario(idUsuario: Int): Result<Unit> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        return ejecutarApi(api.desbanearUsuario(bearer(token), idUsuario)).map { }
+    }
 }
 
 private fun ReporteResponseDto.toReporte(): Reporte {

@@ -1959,3 +1959,63 @@ class DetalleServicioViewModel(
         uiState = uiState.copy(errorFoto = null)
     }
 }
+
+// ── Pantalla de moderacion de baneos ──────────────────────────────────────────
+
+data class BaneosUiState(
+    val cargando: Boolean = false,
+    val usuarios: List<com.movil.contrabajo.domain.model.UsuarioBaneado> = emptyList(),
+    val error: String? = null,
+    val mensajeExito: String? = null,
+    val desbaneoEnCurso: Set<Int> = emptySet()
+)
+
+class BaneosViewModel(
+    private val repositorioBaneos: com.movil.contrabajo.data.repository.RepositorioBaneos
+) : ViewModel() {
+
+    var uiState by mutableStateOf(BaneosUiState())
+        private set
+
+    init {
+        cargar()
+    }
+
+    fun cargar() {
+        viewModelScope.launch {
+            uiState = uiState.copy(cargando = true, error = null)
+            val lista = withContext(Dispatchers.IO) {
+                repositorioBaneos.listarBaneados()
+            }
+            uiState = uiState.copy(cargando = false, usuarios = lista)
+        }
+    }
+
+    fun desbanear(idUsuario: Int) {
+        if (idUsuario in uiState.desbaneoEnCurso) return
+        viewModelScope.launch {
+            uiState = uiState.copy(desbaneoEnCurso = uiState.desbaneoEnCurso + idUsuario, error = null)
+            val resultado = withContext(Dispatchers.IO) {
+                repositorioBaneos.desbanearUsuario(idUsuario)
+            }
+            resultado
+                .onSuccess {
+                    uiState = uiState.copy(
+                        mensajeExito = "Usuario desbaneado correctamente.",
+                        usuarios = uiState.usuarios.filter { it.idUsuario != idUsuario },
+                        desbaneoEnCurso = uiState.desbaneoEnCurso - idUsuario
+                    )
+                }
+                .onFailure {
+                    uiState = uiState.copy(
+                        error = it.message ?: "No se pudo desbanear al usuario.",
+                        desbaneoEnCurso = uiState.desbaneoEnCurso - idUsuario
+                    )
+                }
+        }
+    }
+
+    fun consumirMensaje() {
+        uiState = uiState.copy(mensajeExito = null, error = null)
+    }
+}

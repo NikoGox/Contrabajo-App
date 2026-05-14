@@ -28,7 +28,10 @@ data class Usuario(
     val direccionComuna: String = "",
     val direccionRegion: String = "Region Metropolitana",
     val direccionLatitud: Double? = null,
-    val direccionLongitud: Double? = null
+    val direccionLongitud: Double? = null,
+    // 101 = activo, 102 = suspendido, 103 = baneado
+    val idEstado: Int = 101,
+    val baneoFechaFin: String? = null
 )
 
 data class OfertaServicio(
@@ -257,6 +260,19 @@ object AccionModeracion {
     const val SUSPENDER_USUARIO_HASTA = "SUSPENDER_USUARIO_HASTA"
     const val BANEAR_USUARIO = "BANEAR_USUARIO"
 }
+
+data class UsuarioBaneado(
+    val idUsuario: Int,
+    val username: String,
+    val nombre: String,
+    val apellidos: String,
+    val idEstado: Int,
+    val tipoSancion: String,
+    val permanente: Boolean,
+    val fechaInicio: String?,
+    val fechaFin: String?,
+    val motivo: String?
+)
 
 data class SesionLocal(
     val idSesionLocal: Long = 0,

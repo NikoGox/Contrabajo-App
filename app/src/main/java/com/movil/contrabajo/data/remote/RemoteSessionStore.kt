@@ -106,7 +106,8 @@ class RemoteSessionStore(context: Context) {
                 direccionComuna = dto.direccion?.comuna?.nombre.orEmpty(),
                 direccionRegion = dto.direccion?.comuna?.region.orEmpty().ifBlank { "Region Metropolitana" },
                 direccionLatitud = dto.direccion?.latitud,
-                direccionLongitud = dto.direccion?.longitud
+                direccionLongitud = dto.direccion?.longitud,
+                idEstado = dto.idEstado ?: 101
             )
         }
     }

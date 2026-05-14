@@ -15,18 +15,20 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.12.1-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.12.2-Pre-Alpha
 
 
 
-> <br>• Mejoramos el centro de moderación para gestionar reportes de servicios de forma más clara y confiable.
-> <br>• Ahora es posible resolver reportes con acciones directas: desactivar servicio, eliminar servicio o ignorar reporte.
-> <br>• Se agregaron mas opciones de resolucion para reportes, pero aun faltan correcciones.
-> <br>• La selección de fecha para suspensión ahora usa calendario visual para facilitar el proceso.
-> <br>• Se mejoró la presentación de resoluciones para que se lean en lenguaje natural.
-> <br>• Se reforzó la estabilidad del flujo de reportes para evitar errores al enviar o resolver acciones.
-> <br>• Se ajustó la experiencia de “Reportar servicio” para que sea consistente en chat y detalle de servicio.
-> <br>• Correcciones generales de estabilidad y consistencia en la experiencia de moderación.
+> <br>• Al iniciar sesión con una cuenta baneada o suspendida, la app ahora muestra un aviso claro en lugar de dejar entrar al usuario.
+> <br>• El aviso de baneo permanente informa que la cuenta fue inhabilitada de forma definitiva.
+> <br>• El aviso de suspensión temporal muestra hasta cuándo está activa la restricción.
+> <br>• Al aplicar una suspensión, el moderador ahora puede elegir tanto fecha de inicio como fecha de fin usando un selector de calendario; la fecha de inicio es opcional y por 
+> <br>• Cuando se banea o suspende a un trabajador, su servicio activo se desactiva automáticamente para que no quede visible en el marketplace.
+> <br>• Las suspensiones temporales ahora se levantan solas cuando vence la fecha, sin necesidad de intervención manual.
+> <br>• Se corrigió un problema que generaba registros duplicados de baneo al sancionar más de una vez al mismo usuario.
+> <br>• Se agrega pantalla de gestión de baneos accesible desde Ajustes, visible únicamente para el moderador.
+> <br>• La pantalla de baneos muestra todos los usuarios baneados y suspendidos con tipo de sanción, duración y motivo.
+> <br>• Desde la pantalla de baneos, el moderador puede desbanear a un usuario con un solo botón.
 
 ---
 

@@ -130,6 +130,11 @@ interface RepositorioChats {
     fun marcarLeidos(idChatCita: Long)
 }
 
+interface RepositorioBaneos {
+    fun listarBaneados(): List<com.movil.contrabajo.domain.model.UsuarioBaneado>
+    fun desbanearUsuario(idUsuario: Int): Result<Unit>
+}
+
 class RepositorioAutenticacionLocal(
     private val db: ContrabajoSQLiteHelper
 ) : RepositorioAutenticacion {

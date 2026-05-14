@@ -1,3 +1,16 @@
+VERSION 0.12.2-Pre-Alpha
+───────
+├─• Al iniciar sesión con una cuenta baneada o suspendida, la app ahora muestra un aviso claro en lugar de dejar entrar al usuario.
+├─• El aviso de baneo permanente informa que la cuenta fue inhabilitada de forma definitiva.
+├─• El aviso de suspensión temporal muestra hasta cuándo está activa la restricción.
+├─• Al aplicar una suspensión, el moderador ahora puede elegir tanto fecha de inicio como fecha de fin usando un selector de calendario; la fecha de inicio es opcional y por defecto parte desde hoy.
+├─• Cuando se banea o suspende a un trabajador, su servicio activo se desactiva automáticamente para que no quede visible en el marketplace.
+├─• Las suspensiones temporales ahora se levantan solas cuando vence la fecha, sin necesidad de intervención manual.
+├─• Se corrigió un problema que generaba registros duplicados de baneo al sancionar más de una vez al mismo usuario.
+├─• Se agrega pantalla de gestión de baneos accesible desde Ajustes, visible únicamente para el moderador.
+├─• La pantalla de baneos muestra todos los usuarios baneados y suspendidos con tipo de sanción, duración y motivo.
+└─• Desde la pantalla de baneos, el moderador puede desbanear a un usuario con un solo botón.
+
 VERSION 0.12.1-Pre-Alpha
 ───────
 ├─• Mejoramos el centro de moderación para gestionar reportes de servicios de forma más clara y confiable.

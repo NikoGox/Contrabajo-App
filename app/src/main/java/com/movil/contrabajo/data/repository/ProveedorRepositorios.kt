@@ -32,4 +32,8 @@ class ProveedorRepositorios(context: Context) {
         comunicacionesApi = ComunicacionesApiClient.api,
         sessionStore = sessionStore
     )
+    val baneos: RepositorioBaneos = RepositorioBaneosRemoto(
+        api = UsuariosApiClient.api,
+        sessionStore = sessionStore
+    )
 }

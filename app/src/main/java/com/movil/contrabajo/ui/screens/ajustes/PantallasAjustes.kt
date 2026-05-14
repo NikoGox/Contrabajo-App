@@ -102,6 +102,8 @@ fun PantallaAjustes(
     onAbrirCuenta: () -> Unit,
     onAbrirUbicacion: () -> Unit,
     onCerrarSesion: () -> Unit,
+    esModerador: Boolean = false,
+    onAbrirBaneos: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     PantallaBase(modifier = modifier, mostrarFondo = false) {
@@ -133,6 +135,20 @@ fun PantallaAjustes(
                 onClick = {},
                 habilitado = false
             )
+        }
+
+        if (esModerador) {
+            TarjetaBase {
+                EncabezadoPantalla(
+                    titulo = "Moderacion",
+                    subtitulo = "Herramientas exclusivas del moderador."
+                )
+                ItemAjuste(
+                    titulo = "Gestionar baneos",
+                    subtitulo = "Ver usuarios baneados o suspendidos y desbanear",
+                    onClick = onAbrirBaneos
+                )
+            }
         }
 
         OutlinedButton(

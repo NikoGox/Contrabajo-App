@@ -118,6 +118,17 @@ interface UsuariosApiService {
     fun eliminarFotoPerfil(
         @Header("Authorization") authorization: String
     ): Call<Map<String, String>>
+
+    @GET("api/usuarios/baneados")
+    fun listarBaneados(
+        @Header("Authorization") authorization: String
+    ): Call<List<UsuarioBaneadoDto>>
+
+    @PATCH("api/usuarios/{id}/desbanear")
+    fun desbanearUsuario(
+        @Header("Authorization") authorization: String,
+        @Path("id") id: Int
+    ): Call<UsuarioResponseDto>
 }
 
 data class LoginRequestDto(
@@ -127,7 +138,15 @@ data class LoginRequestDto(
 
 data class LoginResponseDto(
     val token: String?,
-    val usuario: UsuarioResponseDto?
+    val usuario: UsuarioResponseDto?,
+    @SerializedName("baneoActivo")
+    val baneoActivo: BaneoActivoDto? = null
+)
+
+data class BaneoActivoDto(
+    val permanente: Boolean?,
+    val fechaFin: String?,
+    val motivo: String?
 )
 
 data class UsuarioResponseDto(
@@ -146,7 +165,8 @@ data class UsuarioResponseDto(
     val fechaNacimiento: String?,
     val perfil: String?,
     val verificado: Boolean?,
-    val direccion: DireccionResponseDto? = null
+    val direccion: DireccionResponseDto? = null,
+    val idEstado: Int? = null
 )
 
 data class ComunaDto(
@@ -243,4 +263,17 @@ data class FotoPerfilResponseDto(
     @SerializedName("alto_px")        val altoPx: Int?,
     @SerializedName("fecha_subida")   val fechaSubida: String?,
     @SerializedName("id_usuario")     val idUsuario: Int?
+)
+
+data class UsuarioBaneadoDto(
+    val idUsuario: Int?,
+    val username: String?,
+    val nombre: String?,
+    val apellidos: String?,
+    val idEstado: Int?,
+    val tipoSancion: String?,
+    val permanente: Boolean?,
+    val fechaInicio: String?,
+    val fechaFin: String?,
+    val motivo: String?
 )

@@ -52,6 +52,7 @@ import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoSegurid
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoUno
 import com.movil.contrabajo.ui.screens.ajustes.PantallaAjustes
 import com.movil.contrabajo.ui.screens.ajustes.PantallaAjustesSeguridad
+import com.movil.contrabajo.ui.screens.ajustes.PantallaBaneos
 import com.movil.contrabajo.ui.screens.ajustes.PantallaCuenta
 import com.movil.contrabajo.ui.screens.ajustes.PantallaPreguntasSeguridad
 import com.movil.contrabajo.ui.screens.ajustes.PantallaUbicacion
@@ -68,6 +69,7 @@ import com.movil.contrabajo.ui.screens.reportes.PantallaDetalleReporteModerador
 import com.movil.contrabajo.ui.screens.reportes.PantallaReportesModerador
 import com.movil.contrabajo.ui.screens.servicio.PantallaDetalleServicio
 import com.movil.contrabajo.ui.screens.servicio.PantallaEditorServicio
+import com.movil.contrabajo.ui.viewmodel.BaneosViewModel
 import com.movil.contrabajo.ui.viewmodel.ChatsViewModel
 import com.movil.contrabajo.ui.viewmodel.ContrabajoViewModelFactory
 import com.movil.contrabajo.ui.viewmodel.DetalleServicioViewModel
@@ -102,6 +104,7 @@ fun ContrabajoApp(
     val perfilViewModel: PerfilViewModel = viewModel(factory = factory)
     val reportesViewModel: ReportesViewModel = viewModel(factory = factory)
     val detalleServicioViewModel: DetalleServicioViewModel = viewModel(factory = factory)
+    val baneosViewModel: BaneosViewModel = viewModel(factory = factory)
     var mostrarCargaGlobal by rememberSaveable { mutableStateOf(false) }
     var mensajeCargaGlobal by rememberSaveable { mutableStateOf("Cargando...") }
     var progresoCargaGlobal by rememberSaveable { mutableStateOf(0f) }
@@ -390,7 +393,18 @@ fun ContrabajoApp(
                         navController.navigate(RutasApp.Inicio.ruta) {
                             popUpTo(navController.graph.id) { inclusive = true }
                         }
+                    },
+                    esModerador = perfilViewModel.uiState.usuario?.tipoPerfil == TipoPerfil.MODERADOR,
+                    onAbrirBaneos = {
+                        baneosViewModel.cargar()
+                        navController.navigate(RutasApp.AjustesModerarBaneos.ruta)
                     }
+                )
+            }
+            composable(RutasApp.AjustesModerarBaneos.ruta) {
+                PantallaBaneos(
+                    viewModel = baneosViewModel,
+                    onVolver = { navController.popBackStack() }
                 )
             }
             composable(RutasApp.AjustesSeguridad.ruta) {

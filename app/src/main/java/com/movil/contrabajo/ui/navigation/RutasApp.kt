@@ -29,6 +29,7 @@ sealed class RutasApp(val ruta: String) {
     data object AjustesPreguntas : RutasApp("ajustes/seguridad/preguntas")
     data object AjustesCuenta : RutasApp("ajustes/cuenta")
     data object AjustesUbicacion : RutasApp("ajustes/ubicacion")
+    data object AjustesModerarBaneos : RutasApp("ajustes/moderacion/baneos")
     data object ValoracionesServicios : RutasApp("perfil/valoraciones")
     data object ServicioEditor : RutasApp("servicio_editor/{modo}/{idOfertaServicio}") {
         fun crearRuta(modo: String, idOfertaServicio: Long): String = "servicio_editor/$modo/$idOfertaServicio"

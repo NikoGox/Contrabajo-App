@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -14,6 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,12 +46,61 @@ fun PantallaLogin(
 ) {
     val uiState = viewModel.uiState
     var menuAutorellenoAbierto by rememberSaveable { mutableStateOf(false) }
-
     LaunchedEffect(uiState.loginExitoso) {
         if (uiState.loginExitoso) {
             onLoginExitoso()
             viewModel.consumirNavegacionExitosa()
         }
+    }
+
+    // Dialogo: cuenta baneada permanentemente
+    if (uiState.cuentaBloqueada && uiState.tipoBloqueoCuenta == "BANEADO") {
+        AlertDialog(
+            onDismissRequest = { viewModel.consumirBloqueo() },
+            title = { Text("Cuenta baneada") },
+            text = {
+                Text("Tu cuenta ha sido baneada permanentemente de la plataforma. Si crees que es un error, contacta al soporte.")
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.consumirBloqueo() }) {
+                    Text("Entendido")
+                }
+            }
+        )
+    }
+
+    // Dialogo: cuenta suspendida temporalmente
+    if (uiState.cuentaBloqueada && uiState.tipoBloqueoCuenta == "SUSPENDIDO") {
+        val fechaTexto = uiState.fechaFinSuspension
+            ?.let { raw ->
+                // Formato entrada: "2026-06-01T23:59:59" o "2026-06-01T23:59:59.123"
+                val sinFraccion = raw.substringBefore(".")
+                val partes = sinFraccion.split("T")
+                val fecha = partes.getOrNull(0) // "2026-06-01"
+                val hora  = partes.getOrNull(1) // "23:59:59"
+                // Reordenar a dd/MM/yyyy
+                val fechaFormateada = fecha?.split("-")?.let { d ->
+                    if (d.size == 3) "${d[2]}/${d[1]}/${d[0]}" else fecha
+                } ?: fecha
+                val horaFormateada = hora?.substring(0, 5) // "23:59"
+                if (horaFormateada != null) "$fechaFormateada a las $horaFormateada" else fechaFormateada ?: raw
+            }
+        AlertDialog(
+            onDismissRequest = { viewModel.consumirBloqueo() },
+            title = { Text("Cuenta suspendida") },
+            text = {
+                if (fechaTexto != null) {
+                    Text("Tu cuenta ha sido suspendida hasta el $fechaTexto. Durante este periodo no podras acceder a la aplicacion.")
+                } else {
+                    Text("Tu cuenta ha sido suspendida temporalmente. Contacta al soporte para mas informacion.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.consumirBloqueo() }) {
+                    Text("Entendido")
+                }
+            }
+        )
     }
 
     PantallaBase(scrollable = false, mostrarFondo = false) {
@@ -131,11 +182,6 @@ fun PantallaLogin(
             )
             BotonSecundario(texto = "Crear cuenta", onClick = onRegistrarse)
             BotonSecundario(texto = "Recuperar cuenta", onClick = onRecuperarCuenta)
-            Text(
-                text = "Cuenta de prueba: cliente_prueba / Contrabajo123!",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
         Text(
             text = "No tienes cuenta? Registrate",

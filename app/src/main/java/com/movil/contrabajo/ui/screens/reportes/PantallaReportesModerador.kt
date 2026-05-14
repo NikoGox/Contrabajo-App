@@ -351,11 +351,32 @@ fun PantallaDetalleReporteModerador(
     val reporte = uiState.reporteActivo
     var confirmarAccion by remember { mutableStateOf<String?>(null) }
     var mostrarDialogoSuspension by remember { mutableStateOf(false) }
-    var fechaSuspension by rememberSaveable { mutableStateOf("") }
+    // fechaInicioSuspension: null = hoy (por defecto), string ISO = fecha elegida
+    var fechaInicioSuspension by rememberSaveable { mutableStateOf<String?>(null) }
+    var fechaFinSuspension by rememberSaveable { mutableStateOf("") }
     val contexto = androidx.compose.ui.platform.LocalContext.current
+
+    // Capturamos el error y el mensaje de éxito en estado local para mostrarlos
+    // aunque el ViewModel los limpie al instante con consumirMensajes()
+    var errorDialog by remember { mutableStateOf<String?>(null) }
+    var mensajeExitoDialog by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(idReporte) {
         viewModel.abrirDetalle(idReporte)
+    }
+
+    LaunchedEffect(uiState.error) {
+        if (uiState.error != null) {
+            errorDialog = uiState.error
+            viewModel.consumirMensajes()
+        }
+    }
+
+    LaunchedEffect(uiState.mensajeSistema) {
+        if (uiState.mensajeSistema != null) {
+            mensajeExitoDialog = uiState.mensajeSistema
+            viewModel.consumirMensajes()
+        }
     }
 
     PantallaBase(modifier = modifier, mostrarFondo = false) {
@@ -444,17 +465,9 @@ fun PantallaDetalleReporteModerador(
                 }
                 OutlinedButton(
                     onClick = {
-                        val c = Calendar.getInstance()
-                        DatePickerDialog(
-                            contexto,
-                            { _, y, m, d ->
-                                fechaSuspension = String.format("%04d-%02d-%02dT23:59:59", y, m + 1, d)
-                                mostrarDialogoSuspension = true
-                            },
-                            c.get(Calendar.YEAR),
-                            c.get(Calendar.MONTH),
-                            c.get(Calendar.DAY_OF_MONTH)
-                        ).show()
+                        fechaInicioSuspension = null
+                        fechaFinSuspension = ""
+                        mostrarDialogoSuspension = true
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = reporte.estadoRevision != EstadoReporte.RESUELTO
@@ -520,40 +533,127 @@ fun PantallaDetalleReporteModerador(
 
     if (mostrarDialogoSuspension && reporte != null) {
         AlertDialog(
-            onDismissRequest = { mostrarDialogoSuspension = false },
+            onDismissRequest = {
+                mostrarDialogoSuspension = false
+                fechaInicioSuspension = null
+                fechaFinSuspension = ""
+            },
             title = { Text("Suspender usuario") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Fecha seleccionada:")
-                    OutlinedTextField(
-                        value = fechaSuspension,
-                        onValueChange = {},
-                        singleLine = true,
-                        readOnly = true,
-                        label = { Text("Fecha fin") }
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // --- Fecha de inicio ---
+                    Text("Inicio de suspension", style = MaterialTheme.typography.labelMedium)
+                    OutlinedButton(
+                        onClick = {
+                            val c = Calendar.getInstance()
+                            DatePickerDialog(
+                                contexto,
+                                { _, y, m, d ->
+                                    fechaInicioSuspension = String.format("%04d-%02d-%02dT00:00:00", y, m + 1, d)
+                                },
+                                c.get(Calendar.YEAR),
+                                c.get(Calendar.MONTH),
+                                c.get(Calendar.DAY_OF_MONTH)
+                            ).show()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (fechaInicioSuspension != null)
+                                "Inicio: ${fechaInicioSuspension!!.substringBefore("T")}"
+                            else
+                                "Inicio: Hoy (por defecto)"
+                        )
+                    }
+                    // --- Fecha de fin ---
+                    Text("Fin de suspension", style = MaterialTheme.typography.labelMedium)
+                    OutlinedButton(
+                        onClick = {
+                            val c = Calendar.getInstance()
+                            DatePickerDialog(
+                                contexto,
+                                { _, y, m, d ->
+                                    fechaFinSuspension = String.format("%04d-%02d-%02dT23:59:59", y, m + 1, d)
+                                },
+                                c.get(Calendar.YEAR),
+                                c.get(Calendar.MONTH),
+                                c.get(Calendar.DAY_OF_MONTH)
+                            ).show()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (fechaFinSuspension.isNotBlank())
+                                "Fin: ${fechaFinSuspension.substringBefore("T")}"
+                            else
+                                "Seleccionar fecha de fin"
+                        )
+                    }
+                    if (fechaFinSuspension.isBlank()) {
+                        Text(
+                            "Debes seleccionar la fecha de fin.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
+                    enabled = fechaFinSuspension.isNotBlank(),
                     onClick = {
-                        val fecha = fechaSuspension.trim()
-                        if (fecha.isNotBlank()) {
-                            val accionBase = "${AccionModeracion.SUSPENDER_USUARIO_HASTA}:$fecha"
-                            val accion = if (reporte.idUsuarioReportado != null) {
-                                "$accionBase|USR:${reporte.idUsuarioReportado}"
-                            } else {
-                                accionBase
-                            }
-                            viewModel.aplicarMedidaModeracion(reporte.idReporte, accion)
-                            mostrarDialogoSuspension = false
-                            fechaSuspension = ""
+                        val fin = fechaFinSuspension.trim()
+                        val inicio = fechaInicioSuspension?.trim()
+                        // Formato: SUSPENDER_USUARIO_HASTA:{fechaFin}
+                        //      o:  SUSPENDER_USUARIO_HASTA:{fechaInicio}/{fechaFin}
+                        val parametro = if (inicio != null) "$inicio/$fin" else fin
+                        val accionBase = "${AccionModeracion.SUSPENDER_USUARIO_HASTA}:$parametro"
+                        val accion = if (reporte.idUsuarioReportado != null) {
+                            "$accionBase|USR:${reporte.idUsuarioReportado}"
+                        } else {
+                            accionBase
                         }
+                        viewModel.aplicarMedidaModeracion(reporte.idReporte, accion)
+                        mostrarDialogoSuspension = false
+                        fechaInicioSuspension = null
+                        fechaFinSuspension = ""
                     }
                 ) { Text("Aplicar") }
             },
             dismissButton = {
-                TextButton(onClick = { mostrarDialogoSuspension = false }) { Text("Cancelar") }
+                TextButton(onClick = {
+                    mostrarDialogoSuspension = false
+                    fechaInicioSuspension = null
+                    fechaFinSuspension = ""
+                }) { Text("Cancelar") }
+            }
+        )
+    }
+
+    // Dialogo de ERROR — se dispara cuando el ViewModel setea uiState.error
+    if (errorDialog != null) {
+        AlertDialog(
+            onDismissRequest = { errorDialog = null },
+            title = { Text("No se pudo aplicar la medida") },
+            text = { Text(errorDialog ?: "") },
+            confirmButton = {
+                TextButton(onClick = { errorDialog = null }) {
+                    Text("Entendido")
+                }
+            }
+        )
+    }
+
+    // Dialogo de EXITO — se dispara cuando el ViewModel setea uiState.mensajeSistema
+    if (mensajeExitoDialog != null) {
+        AlertDialog(
+            onDismissRequest = { mensajeExitoDialog = null },
+            title = { Text("Medida aplicada") },
+            text = { Text(mensajeExitoDialog ?: "") },
+            confirmButton = {
+                TextButton(onClick = { mensajeExitoDialog = null }) {
+                    Text("Aceptar")
+                }
             }
         )
     }

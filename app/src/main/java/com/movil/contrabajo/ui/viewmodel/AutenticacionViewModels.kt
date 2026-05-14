@@ -51,6 +51,10 @@ data class LoginUiState(
     val recordarme: Boolean = true,
     val error: String? = null,
     val loginExitoso: Boolean = false,
+    // Bloqueo de cuenta: se setea cuando idEstado es 102 (suspendido) o 103 (baneado)
+    val cuentaBloqueada: Boolean = false,
+    val tipoBloqueoCuenta: String? = null, // "BANEADO" | "SUSPENDIDO"
+    val fechaFinSuspension: String? = null,
     val recuperacionIdentificador: String = "",
     val recuperacionPreguntas: List<PreguntaSeguridadConfig> = emptyList(),
     val recuperacionRespuesta1: String = "",
@@ -89,8 +93,24 @@ class LoginViewModel(
                 repositorioAutenticacion.iniciarSesion(identificador, contrasena, recordarme)
             }
             resultado
-            .onSuccess {
-                uiState = uiState.copy(error = null, loginExitoso = true)
+            .onSuccess { usuario ->
+                when (usuario.idEstado) {
+                    103 -> uiState = uiState.copy(
+                        error = null,
+                        loginExitoso = false,
+                        cuentaBloqueada = true,
+                        tipoBloqueoCuenta = "BANEADO",
+                        fechaFinSuspension = null
+                    )
+                    102 -> uiState = uiState.copy(
+                        error = null,
+                        loginExitoso = false,
+                        cuentaBloqueada = true,
+                        tipoBloqueoCuenta = "SUSPENDIDO",
+                        fechaFinSuspension = usuario.baneoFechaFin
+                    )
+                    else -> uiState = uiState.copy(error = null, loginExitoso = true)
+                }
             }
             .onFailure {
                 uiState = uiState.copy(error = it.message, loginExitoso = false)
@@ -114,6 +134,14 @@ class LoginViewModel(
 
     fun consumirNavegacionExitosa() {
         uiState = uiState.copy(loginExitoso = false)
+    }
+
+    fun consumirBloqueo() {
+        uiState = uiState.copy(
+            cuentaBloqueada = false,
+            tipoBloqueoCuenta = null,
+            fechaFinSuspension = null
+        )
     }
 
     fun actualizarIdentificadorRecuperacion(valor: String) {
