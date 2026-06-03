@@ -80,10 +80,15 @@ class RepositorioAutenticacionRemoto(
         return when {
             validacion.getOrNull() == true -> usuario
             validacion.isSuccess && validacion.getOrNull() == false -> {
+                // Token invalido segun el backend → limpiar y retornar nulo
                 sessionStore.limpiarSesion()
                 null
             }
-            else -> usuario
+            else -> {
+                // Error de red (backend caido, timeout, etc.) → propagar para mostrar pantalla de error
+                throw validacion.exceptionOrNull()
+                    ?: RuntimeException("No se pudo contactar con el servidor")
+            }
         }
     }
 

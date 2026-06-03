@@ -91,7 +91,7 @@ fun PantallaEditarPerfil(
         TarjetaBase {
             if (usuario == null) {
                 Text(
-                    text = "No hay sesion activa.",
+                    text = "No hay sesión activa.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -169,7 +169,7 @@ fun PantallaEditarPerfil(
                     CampoContrabajo(
                         valor = uiState.telefonoPerfilInput,
                         onValueChange = viewModel::actualizarTelefonoPerfil,
-                        etiqueta = "Telefono",
+                        etiqueta = "Teléfono",
                         modifier = Modifier.fillMaxWidth(),
                         prefijo = "+56 9"
                     )
@@ -189,10 +189,10 @@ fun PantallaEditarPerfil(
                             listOf(calleNumero, usuario.direccionComuna, usuario.direccionRegion)
                                 .filter { it.isNotBlank() }
                                 .joinToString(", ")
-                                .ifBlank { "Sin direccion" }
+                                .ifBlank { "Sin dirección" }
                         },
                         onValueChange = {},
-                        etiqueta = "Direccion",
+                        etiqueta = "Dirección",
                         modifier = Modifier.fillMaxWidth(),
                         readOnly = true,
                         enabled = false

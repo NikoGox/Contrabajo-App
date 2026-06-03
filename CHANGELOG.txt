@@ -1,3 +1,16 @@
+VERSION 0.13.0-Pre-Alpha
+───────
+├─• La pantalla de información de cuenta fue rediseñada: datos agrupados con iconos, tarjetas de contacto lado a lado y sección de identificación con jerarquía visual clara.
+├─• El perfil muestra el prefijo +56 en gris antes del número de teléfono.
+├─• Se eliminaron RUN y Dirección del bloque de información visible en la pantalla de Perfil — solo se muestran Correo y Teléfono.
+├─• Se reemplazó el pull-to-refresh manual de Material1 por la API estándar de Material3 en PantallaPrincipal y PantallaPerfil: comportamiento más fluido, indicador centrado con fondo blanco y flecha en color primario.
+├─• El indicador de pull-to-refresh ya no lanzaba peticiones extra al volver a las pantallas; la carga inicial vive únicamente en el ViewModel.
+├─• Al abrir el chat, si los datos aún no cargaron se muestra un skeleton animado con la forma de las burbujas en lugar del mensaje de error incorrecto.
+├─• Se corrigieron todas las tildes faltantes en los textos visibles de la app (más de 90 cadenas en 11 archivos de pantallas).
+├─• Si el servidor está caído al iniciar la app, se muestra una pantalla de error con botones "Reintentar" y "Cerrar sesión" en lugar de entrar al home con pantallas vacías.
+├─• Si la sesión fue invalidada desde otro dispositivo, la app detecta el código 401 automáticamente y cierra sesión de forma ordenada en lugar de fallar silenciosamente.
+└─• La pantalla de lista de chats fue completamente rediseñada con estética moderna tipo WhatsApp/Messenger: buscador integrado en el contenedor, selector de tipo animado con pill deslizante, filas con avatar en degradado, preview de mensaje, badge de no leídos y chip de rol. Los clientes no ven el selector de tipo.
+
 VERSION 0.12.2-Pre-Alpha
 ───────
 ├─• Al iniciar sesión con una cuenta baneada o suspendida, la app ahora muestra un aviso claro en lugar de dejar entrar al usuario.

@@ -173,13 +173,13 @@ fun PantallaEditorServicio(
             CampoContrabajo(
                 valor = uiState.formularioServicio.titulo,
                 onValueChange = viewModel::actualizarTituloServicio,
-                etiqueta = "Titulo del servicio"
+                etiqueta = "Título del servicio"
             )
             OutlinedTextField(
                 value = uiState.formularioServicio.descripcion,
                 onValueChange = viewModel::actualizarDescripcionServicio,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Descripcion del servicio") },
+                label = { Text("Descripción del servicio") },
                 minLines = 4
             )
             SelectorTipoPrecio(
@@ -207,7 +207,7 @@ fun PantallaEditorServicio(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
-                    label = { Text("Categoria") },
+                    label = { Text("Categoría") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoriasDesplegadas) }
                 )
                 ExposedDropdownMenu(
@@ -270,7 +270,7 @@ fun PantallaEditorServicio(
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Outlined.PhotoCamera,
-                            contentDescription = "Abrir camara",
+                            contentDescription = "Abrir cámara",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -321,7 +321,7 @@ fun PantallaEditorServicio(
         AlertDialog(
             onDismissRequest = { mostrarConfirmacionEliminar = false },
             title = { Text("Eliminar servicio") },
-            text = { Text("Esta accion eliminara tu publicacion. ¿Deseas continuar?") },
+            text = { Text("Esta acción eliminará tu publicación. ¿Deseas continuar?") },
             confirmButton = {
                 TextButton(onClick = {
                     mostrarConfirmacionEliminar = false

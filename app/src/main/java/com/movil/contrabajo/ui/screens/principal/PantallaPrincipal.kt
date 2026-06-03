@@ -2,6 +2,8 @@ package com.movil.contrabajo.ui.screens.principal
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
@@ -24,15 +25,14 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -121,7 +121,7 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 
 @Composable
-@OptIn(ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 fun PantallaPrincipal(
     viewModel: PrincipalViewModel,
     onAbrirServicio: (Long) -> Unit,
@@ -189,17 +189,7 @@ fun PantallaPrincipal(
         label = "progresoBuscadorTopbar"
     )
 
-    val pullRefreshState = rememberPullRefreshState(
-        refreshing = uiState.refrescando,
-        onRefresh = viewModel::refrescarDesdeGesto,
-        refreshThreshold = 30.dp,
-        refreshingOffset = 30.dp
-    )
-    val estiramientoContenido = if (uiState.refrescando) {
-        24.dp
-    } else {
-        (pullRefreshState.progress.coerceIn(0f, 1.6f) * 34f).dp
-    }
+    val pullToRefreshState = rememberPullToRefreshState()
 
     LaunchedEffect(uiState.rangoBusquedaM, mostrarModalRango) {
         if (!mostrarModalRango) {
@@ -227,7 +217,6 @@ fun PantallaPrincipal(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> viewModel.recargar()
                 Lifecycle.Event.ON_PAUSE,
                 Lifecycle.Event.ON_STOP -> cerrarBusquedaFuera()
                 else -> Unit
@@ -239,8 +228,23 @@ fun PantallaPrincipal(
         }
     }
 
+    PullToRefreshBox(
+        isRefreshing = uiState.refrescando,
+        onRefresh = viewModel::refrescarDesdeGesto,
+        state = pullToRefreshState,
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter,
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = pullToRefreshState,
+                isRefreshing = uiState.refrescando,
+                containerColor = Color.White,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    ) {
     PantallaBase(
-        modifier = modifier,
+        modifier = Modifier,
         scrollable = false,
         mostrarFondo = false,
         respetarNavegacionInferior = false
@@ -385,7 +389,7 @@ fun PantallaPrincipal(
             Text(
                 text = buildAnnotatedString {
                     withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-                        append("Rango de busqueda actual: ")
+                        append("Rango de búsqueda actual: ")
                     }
                     append(EscalaRango.formatear(uiState.rangoBusquedaM))
                 },
@@ -405,7 +409,7 @@ fun PantallaPrincipal(
                 }) {
                     Icon(
                         imageVector = Icons.Filled.Place,
-                        contentDescription = "Ubicacion",
+                        contentDescription = "Ubicación",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(28.dp)
                     )
@@ -448,14 +452,7 @@ fun PantallaPrincipal(
                     }
                 }
                 .nestedScroll(cierreBusquedaPorScroll)
-                .pullRefresh(pullRefreshState)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clipToBounds()
-                    .offset(y = estiramientoContenido)
-            ) {
                 if (uiState.ofertas.isEmpty()) {
                     val hayBusquedaOFiltrosActivos =
                         uiState.busqueda.isNotBlank() ||
@@ -465,25 +462,26 @@ fun PantallaPrincipal(
                             uiState.filtroZonaComunaActivo
                     val textoEstado = if (uiState.filtroPorCoordenadasActivo) {
                         if (hayBusquedaOFiltrosActivos) {
-                            "No hay coincidencias. Ajusta tu busqueda, filtros o rango."
+                            "No hay coincidencias. Ajusta tu búsqueda, filtros o rango."
                         } else {
                             "No hay publicaciones dentro de tu rango actual."
                         }
                     } else if (hayBusquedaOFiltrosActivos) {
-                        "No hay coincidencias. Ajusta tu busqueda o filtros."
+                        "No hay coincidencias. Ajusta tu búsqueda o filtros."
                     } else {
                         "No hay publicaciones disponibles por ahora."
                     }
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .fillMaxSize(),
-                        contentAlignment = Alignment.TopCenter
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        Spacer(modifier = Modifier.height(86.dp))
                         Text(
                             text = textoEstado,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(top = 86.dp)
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 } else {
@@ -512,29 +510,20 @@ fun PantallaPrincipal(
                         }
                     }
                 }
-            }
-
-            PullRefreshIndicator(
-                refreshing = uiState.refrescando,
-                state = pullRefreshState,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = (-2).dp),
-                contentColor = MaterialTheme.colorScheme.primary
-            )
         }
+    }
     }
 
     if (mostrarModalRango) {
         AlertDialog(
             onDismissRequest = { mostrarModalRango = false },
-            title = { Text("Rango de busqueda") },
+            title = { Text("Rango de búsqueda") },
             text = {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "Selecciona hasta donde quieres buscar servicios cercanos.",
+                        text = "Selecciona hasta dónde quieres buscar servicios cercanos.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -584,7 +573,7 @@ fun PantallaPrincipal(
 
     OverlayPantallaCarga(
         visible = uiState.cargandoOperacion,
-        mensaje = "Guardando rango de busqueda..."
+        mensaje = "Guardando rango de búsqueda..."
     )
 
     if (mostrarModalFiltros) {
@@ -666,7 +655,7 @@ private fun FiltroMarketplaceDialog(
                         value = categorias.firstOrNull { it.first == categoriaSeleccionada }?.second ?: "Todas",
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Categoria") },
+                        label = { Text("Categoría") },
                         modifier = Modifier
                             .fillMaxWidth()
                             .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),

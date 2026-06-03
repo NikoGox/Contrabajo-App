@@ -15,20 +15,19 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.12.2-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.13.0-Pre-Alpha
 
 
 
-> <br>• Al iniciar sesión con una cuenta baneada o suspendida, la app ahora muestra un aviso claro en lugar de dejar entrar al usuario.
-> <br>• El aviso de baneo permanente informa que la cuenta fue inhabilitada de forma definitiva.
-> <br>• El aviso de suspensión temporal muestra hasta cuándo está activa la restricción.
-> <br>• Al aplicar una suspensión, el moderador ahora puede elegir tanto fecha de inicio como fecha de fin usando un selector de calendario; la fecha de inicio es opcional y por 
-> <br>• Cuando se banea o suspende a un trabajador, su servicio activo se desactiva automáticamente para que no quede visible en el marketplace.
-> <br>• Las suspensiones temporales ahora se levantan solas cuando vence la fecha, sin necesidad de intervención manual.
-> <br>• Se corrigió un problema que generaba registros duplicados de baneo al sancionar más de una vez al mismo usuario.
-> <br>• Se agrega pantalla de gestión de baneos accesible desde Ajustes, visible únicamente para el moderador.
-> <br>• La pantalla de baneos muestra todos los usuarios baneados y suspendidos con tipo de sanción, duración y motivo.
-> <br>• Desde la pantalla de baneos, el moderador puede desbanear a un usuario con un solo botón.
+> <br>• La pantalla de información de cuenta fue rediseñada: datos agrupados con iconos, tarjetas de contacto lado a lado y sección de identificación con jerarquía visual clara.
+> <br>• El perfil muestra el prefijo +56 en gris antes del número de teléfono.
+> <br>• Se eliminaron RUN y Dirección del bloque visible en la pantalla de Perfil; solo se muestran Correo y Teléfono.
+> <br>• Se reemplazó el pull-to-refresh por la API estándar de Material3 en PantallaPrincipal y PantallaPerfil: comportamiento más fluido, indicador centrado con fondo blanco y flecha en color primario.
+> <br>• Al abrir el chat, si los datos aún no cargaron se muestra un skeleton animado con la forma de las burbujas en lugar del mensaje de error incorrecto.
+> <br>• Se corrigieron todas las tildes faltantes en los textos visibles de la app (más de 90 cadenas en 11 archivos de pantallas).
+> <br>• Si el servidor está caído al iniciar la app, se muestra una pantalla de error con botones Reintentar y Cerrar sesión en lugar de entrar al home con pantallas vacías.
+> <br>• Si la sesión fue invalidada desde otro dispositivo, la app detecta el código 401 automáticamente y cierra sesión de forma ordenada.
+> <br>• La pantalla de lista de chats fue completamente rediseñada con estética moderna tipo WhatsApp/Messenger: buscador integrado en el contenedor, selector de tipo animado con pill deslizante, filas con avatar en degradado, badge de no leídos y chip de rol. Los clientes no ven el selector de tipo.
 
 ---
 

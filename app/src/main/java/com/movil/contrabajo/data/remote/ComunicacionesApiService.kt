@@ -220,6 +220,15 @@ object ComunicacionesApiClient {
         .readTimeout(20, TimeUnit.SECONDS)
         .writeTimeout(20, TimeUnit.SECONDS)
         .addInterceptor(loggingInterceptor)
+        .addInterceptor { chain ->
+            val response = chain.proceed(chain.request())
+            if (response.code == 401 &&
+                chain.request().header("Authorization")?.startsWith("Bearer ") == true
+            ) {
+                SesionEventos.emitirSesionInvalida()
+            }
+            response
+        }
         .build()
 
     val api: ComunicacionesApiService = Retrofit.Builder()

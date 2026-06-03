@@ -304,6 +304,10 @@ data class ChatsUiState(
     val chats: List<ChatCita> = emptyList(),
     val filtroChatsContacto: Boolean = false,
     val filtroChatsTrabajador: Boolean = false,
+    // Filtro de tipo moderno: null = todos, "contacto" = como cliente, "trabajador" = como prestador
+    val tipoFiltroChat: String? = null,
+    // Búsqueda en tiempo real por nombre de contacto, @username o título de servicio
+    val busquedaChats: String = "",
     val totalMensajesNoLeidos: Int = 0,
     val idPrimerChatPendiente: Long? = null,
     val notificacionesPendientes: List<NotificacionMensajePendiente> = emptyList(),
@@ -321,13 +325,31 @@ data class ChatsUiState(
     val pendingNavChatId: Long? = null
 ) {
     val chatsFiltrados: List<ChatCita> get() {
-        if (!filtroChatsContacto && !filtroChatsTrabajador) return chats
-        val idActual = idUsuarioActual ?: return chats
-        return chats.filter { chat ->
-            val comoContacto = chat.idCliente == idActual
-            val comoTrabajador = chat.idTrabajador == idActual
-            (filtroChatsContacto && comoContacto) || (filtroChatsTrabajador && comoTrabajador)
+        val idActual = idUsuarioActual
+        var resultado = chats
+
+        // Filtro por tipo (selector segmentado moderno)
+        if (tipoFiltroChat != null && idActual != null) {
+            resultado = resultado.filter { chat ->
+                when (tipoFiltroChat) {
+                    "contacto"   -> chat.idCliente == idActual
+                    "trabajador" -> chat.idTrabajador == idActual
+                    else         -> true
+                }
+            }
         }
+
+        // Filtro por búsqueda (nombre, username, título de servicio)
+        if (busquedaChats.isNotBlank()) {
+            val query = busquedaChats.trim().lowercase()
+            resultado = resultado.filter { chat ->
+                chat.nombreContacto.lowercase().contains(query) ||
+                    chat.usernameContacto.lowercase().contains(query) ||
+                    chat.tituloServicio.lowercase().contains(query)
+            }
+        }
+
+        return resultado
     }
 }
 
@@ -574,6 +596,14 @@ class ChatsViewModel(
 
     fun actualizarFiltroChatsTrabajador(activo: Boolean) {
         uiState = uiState.copy(filtroChatsTrabajador = activo)
+    }
+
+    fun actualizarTipoFiltroChat(tipo: String?) {
+        uiState = uiState.copy(tipoFiltroChat = tipo)
+    }
+
+    fun actualizarBusquedaChats(busqueda: String) {
+        uiState = uiState.copy(busquedaChats = busqueda)
     }
 
     /**
@@ -915,7 +945,8 @@ data class PerfilUiState(
     val errorVerificacion: String? = null,
     val mensajeVerificacion: String? = null,
     val cargandoPantalla: Boolean = false,
-    val subiendoFotoPerfil: Boolean = false
+    val subiendoFotoPerfil: Boolean = false,
+    val refrescando: Boolean = false
 )
 
 class PerfilViewModel(
@@ -993,6 +1024,16 @@ class PerfilViewModel(
                 },
                 ubicacionAjustes = ubicacionAjustes
             )
+        }
+    }
+
+    fun refrescarDesdeGesto() {
+        if (uiState.refrescando) return
+        uiState = uiState.copy(refrescando = true)
+        viewModelScope.launch {
+            delay(220)
+            recargar()
+            uiState = uiState.copy(refrescando = false)
         }
     }
 

@@ -76,6 +76,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.Dp
 
 @Composable
 fun PantallaDetalleChat(
@@ -175,10 +186,15 @@ fun PantallaDetalleChat(
             llenarAlto = true
         ) {
             if (chat == null) {
-                Text(
-                    text = "No se pudo cargar la conversacion.",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                if (uiState.error != null) {
+                    Text(
+                        text = "No se pudo cargar la conversación.",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    SkeletonDetalleChat()
+                }
             } else {
                 val chatSoloLectura = chat.chatCerrado || chat.servicioEliminado
                 val chatAcciones = if (chatSoloLectura) chat.copy(chatCerrado = true) else chat
@@ -378,7 +394,7 @@ fun PantallaDetalleChat(
         AlertDialog(
             onDismissRequest = { confirmarCerrarChat = false },
             title = { Text("Finalizar chat") },
-            text = { Text("Esta accion cerrara la conversacion y quedara en solo lectura. ¿Deseas continuar?") },
+            text = { Text("Esta acción cerrará la conversación y quedará en solo lectura. ¿Deseas continuar?") },
             confirmButton = {
                 BotonPrimario(
                     texto = "Finalizar",
@@ -476,7 +492,7 @@ fun PantallaDetalleChat(
                         if (idTipo == null || comentarioReporte.trim().isBlank()) {
                             Toast.makeText(
                                 context,
-                                "Debes seleccionar un tipo y escribir la descripcion.",
+                                "Debes seleccionar un tipo y escribir la descripción.",
                                 Toast.LENGTH_SHORT
                             ).show()
                             return@TextButton
@@ -548,7 +564,7 @@ private fun CabeceraChat(
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                 Text(
-                    text = chat?.tituloServicio?.ifBlank { "Conversacion" } ?: "Conversacion",
+                    text = chat?.tituloServicio?.ifBlank { "Conversación" } ?: "Conversación",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -775,7 +791,7 @@ private fun ResumenCitaChat(
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    text = "Categoria: ${chat.categoriaServicio.ifBlank { "General" }}",
+                    text = "Categoría: ${chat.categoriaServicio.ifBlank { "General" }}",
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
@@ -848,7 +864,7 @@ private fun AccionesTrabajador(
 
             EstadoCita.EN_PROCESO -> {
                 BotonPrimario(
-                    texto = "Solicitar finalizacion",
+                    texto = "Solicitar finalización",
                     onClick = onSolicitarFinalizar,
                     modifier = Modifier.weight(1f)
                 )
@@ -879,7 +895,7 @@ private fun AccionesCliente(
 
             EstadoCita.FINALIZANDO -> {
                 BotonPrimario(
-                    texto = "Aceptar finalizacion",
+                    texto = "Aceptar finalización",
                     onClick = onAceptarFinalizacion,
                     modifier = Modifier.weight(1f)
                 )
@@ -920,7 +936,7 @@ private fun ModalValoracionCierre(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "¿Que tal te parecio el contacto con \"$nombreContacto\"?",
+                text = "¿Qué tal te pareció el contacto con \"$nombreContacto\"?",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
@@ -953,7 +969,7 @@ private fun ModalValoracionCierre(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 BotonSecundario(
-                    texto = "Despues",
+                    texto = "Después",
                     onClick = onCerrar,
                     modifier = Modifier.weight(1f)
                 )
@@ -974,7 +990,7 @@ private fun ModalInfoMensaje(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Informacion del mensaje") },
+        title = { Text("Información del mensaje") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilaInfoMensaje(
@@ -990,7 +1006,7 @@ private fun ModalInfoMensaje(
                     colorSimbolo = if (mensaje.fechaRecibido != null) Color(0xFF8A95A3) else Color(0xFFB0B7BF)
                 )
                 FilaInfoMensaje(
-                    etiqueta = "Leido",
+                    etiqueta = "Leído",
                     valor = mensaje.fechaLeido?.let { formatearFechaCompleta(it) } ?: "Pendiente",
                     simbolo = "✓✓",
                     colorSimbolo = if (mensaje.fechaLeido != null) Color(0xFF00A8C8) else Color(0xFFB0B7BF)
@@ -1064,7 +1080,7 @@ private fun simboloEstadoMensaje(idEstado: Long): Pair<String, Color> = when (id
 private fun etiquetaEstadoCita(estado: Int): String = when (estado) {
     EstadoCita.PENDIENTE -> "Pendiente"
     EstadoCita.HANDSHAKE -> "Confirmada"
-    EstadoCita.COMENZANDO -> "Pendiente de confirmacion"
+    EstadoCita.COMENZANDO -> "Pendiente de confirmación"
     EstadoCita.EN_PROCESO -> "En proceso"
     EstadoCita.FINALIZANDO -> "Finalizando"
     EstadoCita.FINALIZADO -> "Finalizada"
@@ -1160,4 +1176,100 @@ private fun formatearFechaProgramada(fecha: LocalDate?, hora: LocalTime?): Strin
     if (fecha == null || hora == null) return null
     return LocalDateTime.of(fecha, hora)
         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+}
+
+@Composable
+private fun SkeletonDetalleChat() {
+    val transicion = rememberInfiniteTransition(label = "shimmerChat")
+    val shimmerX by transicion.animateFloat(
+        initialValue = -600f,
+        targetValue = 1400f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1300, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerXChat"
+    )
+    val shimmerBrush = Brush.linearGradient(
+        colors = listOf(
+            Color(0xFFE8ECF0),
+            Color(0xFFF5F7FA),
+            Color(0xFFE8ECF0)
+        ),
+        start = Offset(shimmerX, 0f),
+        end = Offset(shimmerX + 500f, 300f)
+    )
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Placeholder tarjeta de cita
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(70.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(shimmerBrush)
+        )
+
+        // Placeholder lista de mensajes
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Spacer(modifier = Modifier.height(4.dp))
+            BurbujaShimmer(brush = shimmerBrush, esPropia = false, fraccion = 0.55f, alto = 48.dp)
+            BurbujaShimmer(brush = shimmerBrush, esPropia = true,  fraccion = 0.70f, alto = 56.dp)
+            BurbujaShimmer(brush = shimmerBrush, esPropia = false, fraccion = 0.48f, alto = 40.dp)
+            BurbujaShimmer(brush = shimmerBrush, esPropia = true,  fraccion = 0.72f, alto = 64.dp)
+            BurbujaShimmer(brush = shimmerBrush, esPropia = false, fraccion = 0.60f, alto = 48.dp)
+            BurbujaShimmer(brush = shimmerBrush, esPropia = true,  fraccion = 0.52f, alto = 44.dp)
+            BurbujaShimmer(brush = shimmerBrush, esPropia = false, fraccion = 0.42f, alto = 40.dp)
+        }
+
+        // Placeholder campo de texto + botón enviar
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(shimmerBrush)
+            )
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(shimmerBrush)
+            )
+        }
+    }
+}
+
+@Composable
+private fun BurbujaShimmer(
+    brush: Brush,
+    esPropia: Boolean,
+    fraccion: Float,
+    alto: Dp
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (esPropia) Arrangement.End else Arrangement.Start
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(fraccion)
+                .height(alto)
+                .clip(RoundedCornerShape(14.dp))
+                .background(brush)
+        )
+    }
 }

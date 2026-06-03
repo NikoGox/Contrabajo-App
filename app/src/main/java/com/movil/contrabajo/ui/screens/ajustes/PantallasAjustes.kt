@@ -23,7 +23,16 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -111,11 +120,11 @@ fun PantallaAjustes(
 
         TarjetaBase {
             EncabezadoPantalla(
-                titulo = "Menu de opciones",
-                subtitulo = "Configura seguridad, cuenta y ubicacion."
+                titulo = "Menú de opciones",
+                subtitulo = "Configura seguridad, cuenta y ubicación."
             )
             ItemAjuste(
-                titulo = "Seguridad y verificacion",
+                titulo = "Seguridad y verificación",
                 subtitulo = "Verificar cuenta trabajador y preguntas de seguridad",
                 onClick = onAbrirSeguridad
             )
@@ -125,13 +134,13 @@ fun PantallaAjustes(
                 onClick = onAbrirCuenta
             )
             ItemAjuste(
-                titulo = "Ubicacion",
-                subtitulo = "Direccion, coordenadas y rango de disponibilidad",
+                titulo = "Ubicación",
+                subtitulo = "Dirección, coordenadas y rango de disponibilidad",
                 onClick = onAbrirUbicacion
             )
             ItemAjuste(
                 titulo = "Preferencias",
-                subtitulo = "Disponible mas adelante",
+                subtitulo = "Disponible más adelante",
                 onClick = {},
                 habilitado = false
             )
@@ -140,7 +149,7 @@ fun PantallaAjustes(
         if (esModerador) {
             TarjetaBase {
                 EncabezadoPantalla(
-                    titulo = "Moderacion",
+                    titulo = "Moderación",
                     subtitulo = "Herramientas exclusivas del moderador."
                 )
                 ItemAjuste(
@@ -159,7 +168,7 @@ fun PantallaAjustes(
             colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White)
         ) {
             Text(
-                text = "Cerrar sesion",
+                text = "Cerrar sesión",
                 color = Color(0xFFD32F2F),
                 fontWeight = FontWeight.SemiBold
             )
@@ -193,7 +202,7 @@ fun PantallaAjustesSeguridad(
             if (puedeVerificar) {
                 ItemAjuste(
                     titulo = "Verificar cuenta trabajador",
-                    subtitulo = "Ingresa RUN y numero de documento",
+                    subtitulo = "Ingresa RUN y número de documento",
                     onClick = onAbrirVerificacion
                 )
             }
@@ -218,11 +227,11 @@ fun PantallaAjustesSeguridad(
     if (mostrarModalContrasena) {
         AlertDialog(
             onDismissRequest = { mostrarModalContrasena = false },
-            title = { Text("Validar con contrasena") },
+            title = { Text("Validar con contraseña") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = "No fue posible usar biometria. Ingresa la contrasena de tu cuenta para continuar.",
+                        text = "No fue posible usar biometría. Ingresa la contraseña de tu cuenta para continuar.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -232,7 +241,7 @@ fun PantallaAjustesSeguridad(
                             contrasenaInput = it
                             errorContrasena = null
                         },
-                        etiqueta = "Contrasena de cuenta"
+                        etiqueta = "Contraseña de cuenta"
                     )
                     if (errorContrasena != null) {
                         Text(
@@ -253,7 +262,7 @@ fun PantallaAjustesSeguridad(
                                 onAbrirPreguntas()
                             }
                             .onFailure {
-                                errorContrasena = it.message ?: "No se pudo validar la contrasena"
+                                errorContrasena = it.message ?: "No se pudo validar la contraseña"
                             }
                     }
                 ) {
@@ -301,7 +310,7 @@ fun PantallaPreguntasSeguridad(
 
         TarjetaBase {
             Text(
-                text = "Configura 2 preguntas. Luego serviran para recuperar la cuenta.",
+                text = "Configura 2 preguntas. Luego servirán para recuperar la cuenta.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -452,25 +461,94 @@ fun PantallaCuenta(
     PantallaBase(modifier = modifier, mostrarFondo = false) {
         BarraSuperiorAjustes(titulo = "Cuenta", onVolver = onVolver, iconoDerecha = Icons.Filled.Person)
 
-        TarjetaBase {
-            if (usuario == null) {
+        if (usuario == null) {
+            TarjetaBase {
                 Text(
-                    text = "No hay sesion activa.",
+                    text = "No hay sesión activa.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            } else {
-                ResumenPerfilLinea("Tipo de cuenta", etiquetaPerfil(usuario.tipoPerfil))
-                ResumenPerfilLinea(
-                    "Nombre",
-                    "${usuario.nombre} ${usuario.apellidoPaterno} ${usuario.apellidoMaterno}"
+            }
+        } else {
+            TarjetaBase {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.size(52.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Filled.AccountCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(38.dp)
+                            )
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "${usuario.nombre} ${usuario.apellidoPaterno}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "@${usuario.username}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Surface(
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        ) {
+                            Text(
+                                text = etiquetaPerfil(usuario.tipoPerfil),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                // 2 tarjetas: correo ocupa el espacio sobrante, telefono es cuadrado perfecto
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Max),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    TarjetaCuadradoCuenta(
+                        icono = Icons.Filled.Email,
+                        etiqueta = "Correo",
+                        valor = usuario.correo,
+                        modifier = Modifier.weight(1f).fillMaxHeight()
+                    )
+                    TarjetaCuadradoCuenta(
+                        icono = Icons.Filled.Phone,
+                        etiqueta = "Teléfono",
+                        valor = usuario.telefono,
+                        prefijo = "+56 ",
+                        modifier = Modifier.fillMaxHeight().aspectRatio(1f)
+                    )
+                }
+
+                // Tarjeta horizontal de identificacion
+                TarjetaHorizontalCuenta(
+                    icono = Icons.Filled.Badge,
+                    titulo = "Identificación",
+                    filas = listOf(
+                        "RUN" to "${usuario.run}-${usuario.dv}",
+                        "Documento" to (usuario.numeroDocumentoIdentidad ?: "No registrado"),
+                        "Nacimiento" to usuario.fechaNacimiento
+                    )
                 )
-                ResumenPerfilLinea("Fecha de nacimiento", usuario.fechaNacimiento)
-                ResumenPerfilLinea("Correo", usuario.correo)
-                ResumenPerfilLinea("Telefono", usuario.telefono)
-                ResumenPerfilLinea("Usuario", "@${usuario.username}")
-                ResumenPerfilLinea("RUN", "${usuario.run}-${usuario.dv}")
-                ResumenPerfilLinea("Documento", usuario.numeroDocumentoIdentidad ?: "No registrado")
             }
         }
     }
@@ -491,7 +569,7 @@ fun PantallaUbicacion(
     val direccionLinea = listOf(ubicacion.calle, ubicacion.numero)
         .filter { it.isNotBlank() }
         .joinToString(" ")
-        .ifBlank { "Sin direccion" }
+        .ifBlank { "Sin dirección" }
     val resumenUbicacion = listOf(direccionLinea, ubicacion.comuna, ubicacion.region)
         .filter { it.isNotBlank() }
         .joinToString(" - ")
@@ -502,7 +580,7 @@ fun PantallaUbicacion(
     var posicionSliderDisponibilidad by rememberSaveable { mutableStateOf(0f) }
     val reportarSinUbicacion = {
         viewModel.reportarErrorUbicacion(
-            "No se pudo obtener la ubicacion actual. Mantuvimos tu ultima coordenada."
+            "No se pudo obtener la ubicación actual. Mantuvimos tu última coordenada."
         )
     }
     val actualizarUbicacionReal: () -> Unit = {
@@ -562,7 +640,7 @@ fun PantallaUbicacion(
         if (concedido) {
             actualizarUbicacionReal()
         } else {
-            viewModel.reportarErrorUbicacion("Debes conceder permiso de ubicacion para recalcular coordenadas.")
+            viewModel.reportarErrorUbicacion("Debes conceder permiso de ubicación para recalcular coordenadas.")
         }
     }
 
@@ -583,11 +661,11 @@ fun PantallaUbicacion(
     }
 
     PantallaBase(modifier = modifier, mostrarFondo = false, scrollable = false) {
-        BarraSuperiorAjustes(titulo = "Ubicacion", onVolver = onVolver, iconoDerecha = Icons.Filled.Tune)
+        BarraSuperiorAjustes(titulo = "Ubicación", onVolver = onVolver, iconoDerecha = Icons.Filled.Tune)
 
         TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
             Text(
-                text = "Direccion",
+                text = "Dirección",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
@@ -604,7 +682,7 @@ fun PantallaUbicacion(
                     mostrarModalDireccion = true
                 },
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Editar ubicacion") }
+            ) { Text("Editar ubicación") }
         }
 
         if (esTrabajador) {
@@ -665,7 +743,7 @@ fun PantallaUbicacion(
                         }
                     },
                     modifier = Modifier.weight(1f)
-                ) { Text("Obtener ubicacion") }
+                ) { Text("Obtener ubicación") }
                 BotonPrimario(
                     texto = "Guardar",
                     onClick = viewModel::guardarUbicacionAjustes,
@@ -696,19 +774,19 @@ fun PantallaUbicacion(
     if (mostrarModalDireccion) {
         AlertDialog(
             onDismissRequest = { mostrarModalDireccion = false },
-            title = { Text("Editar ubicacion") },
+            title = { Text("Editar ubicación") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = "Region Metropolitana",
+                        value = "Región Metropolitana",
                         onValueChange = {},
                         readOnly = true,
-                        label = { Text("Region") },
+                        label = { Text("Región") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
                     Text(
-                        text = "Pronto podras elegir otras regiones.",
+                        text = "Pronto podrás elegir otras regiones.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -718,12 +796,12 @@ fun PantallaUbicacion(
                         onSeleccionar = { comunaInput = it }
                     )
                     CampoContrabajo(valor = calleInput, onValueChange = { calleInput = it }, etiqueta = "Calle")
-                    CampoContrabajo(valor = numeroInput, onValueChange = { numeroInput = it }, etiqueta = "Numero")
+                    CampoContrabajo(valor = numeroInput, onValueChange = { numeroInput = it }, etiqueta = "Número")
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.actualizarRegionUbicacion("Region Metropolitana")
+                    viewModel.actualizarRegionUbicacion("Región Metropolitana")
                     viewModel.actualizarComunaUbicacion(comunaInput)
                     viewModel.actualizarCalleUbicacion(calleInput)
                     viewModel.actualizarNumeroUbicacion(numeroInput)
@@ -848,7 +926,7 @@ private fun MapaUbicacionOpenStreetMap(
             val marcador = Marker(map).apply {
                 position = centro
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                title = "Mi ubicacion"
+                title = "Mi ubicación"
                 icon = ContextCompat.getDrawable(context, R.drawable.ic_pin_marcador_azul)
             }
 
@@ -875,6 +953,165 @@ private fun calcularZoomPorRangoM(rangoM: Int): Int = when {
     rangoM <= 20_000 -> 10
     rangoM <= 35_000 -> 9
     else -> 9
+}
+
+@Composable
+private fun TarjetaCuadradoCuenta(
+    icono: androidx.compose.ui.graphics.vector.ImageVector,
+    etiqueta: String,
+    valor: String,
+    modifier: Modifier = Modifier,
+    prefijo: String? = null
+) {
+    Surface(
+        modifier = modifier,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icono,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = etiqueta,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (prefijo != null && valor.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = prefijo,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = valor,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                } else {
+                    Text(
+                        text = valor.ifBlank { "-" },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TarjetaHorizontalCuenta(
+    icono: androidx.compose.ui.graphics.vector.ImageVector,
+    titulo: String,
+    filas: List<Pair<String, String>>
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = icono,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Text(
+                    text = titulo,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            filas.forEach { (etiqueta, valor) ->
+                FilaInfoCuenta(etiqueta = etiqueta, valor = valor)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilaInfoCuenta(
+    etiqueta: String,
+    valor: String,
+    prefijo: String? = null
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = etiqueta,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (prefijo != null && valor.isNotBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = prefijo,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = valor,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        } else {
+            Text(
+                text = valor.ifBlank { "-" },
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
 }
 
 @Composable
@@ -979,7 +1216,7 @@ private fun solicitarAutenticacionPreguntasSeguridad(
 ) {
     val activity = context.findFragmentActivity()
     if (activity == null) {
-        Toast.makeText(context, "No fue posible iniciar autenticacion del dispositivo.", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "No fue posible iniciar autenticación del dispositivo.", Toast.LENGTH_SHORT).show()
         onRequiereFallbackContrasena()
         return
     }
@@ -990,7 +1227,7 @@ private fun solicitarAutenticacionPreguntasSeguridad(
     if (estado != BiometricManager.BIOMETRIC_SUCCESS) {
         Toast.makeText(
             context,
-            "Tu dispositivo no tiene autenticacion biometrica o credencial habilitada.",
+            "Tu dispositivo no tiene autenticación biométrica o credencial habilitada.",
             Toast.LENGTH_SHORT
         ).show()
         onRequiereFallbackContrasena()

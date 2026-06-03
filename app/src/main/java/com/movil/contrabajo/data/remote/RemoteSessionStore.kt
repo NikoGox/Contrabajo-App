@@ -63,6 +63,13 @@ class RemoteSessionStore(context: Context) {
                 .getSharedPreferences(NOMBRE_PREFERENCIAS, Context.MODE_PRIVATE)
                 .getString(CLAVE_TOKEN, null)?.takeIf { it.isNotBlank() }
 
+        /** Limpia la sesion sin instancia — usado tras deteccion de 401 por interceptor. */
+        fun limpiarSesionEstatica(context: Context) {
+            context.applicationContext
+                .getSharedPreferences(NOMBRE_PREFERENCIAS, Context.MODE_PRIVATE)
+                .edit().clear().apply()
+        }
+
         /** Acceso estatico al id del usuario — usado por WorkManager. */
         fun obtenerIdUsuarioEstatico(context: Context): Int? =
             runCatching {

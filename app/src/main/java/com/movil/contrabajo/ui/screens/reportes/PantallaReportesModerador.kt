@@ -312,7 +312,7 @@ fun PantallaReportesModerador(
                 onClick = { viewModel.actualizarOrdenRecientes(!uiState.ordenarRecientes) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (uiState.ordenarRecientes) "Orden: mas recientes" else "Orden: mas antiguos")
+                Text(if (uiState.ordenarRecientes) "Orden: más recientes" else "Orden: más antiguos")
             }
         }
 
@@ -492,15 +492,15 @@ fun PantallaDetalleReporteModerador(
             text = {
                 Text(
                     if (confirmarAccion == AccionModeracion.DESACTIVAR_SERVICIO) {
-                        "Se desactivara la disponibilidad del servicio y el reporte quedara resuelto."
+                        "Se desactivará la disponibilidad del servicio y el reporte quedará resuelto."
                     } else if (confirmarAccion == AccionModeracion.ELIMINAR_SERVICIO) {
-                        "Se eliminara logicamente el servicio y el reporte quedara resuelto."
+                        "Se eliminará lógicamente el servicio y el reporte quedará resuelto."
                     } else if (confirmarAccion == AccionModeracion.BANEAR_USUARIO) {
-                        "Se baneara al usuario reportado de forma permanente y el reporte quedara resuelto."
+                        "Se baneará al usuario reportado de forma permanente y el reporte quedará resuelto."
                     } else if (confirmarAccion == AccionModeracion.IGNORAR_REPORTE) {
-                        "El reporte quedara marcado como ignorado/resuelto sin aplicar castigos."
+                        "El reporte quedará marcado como ignorado/resuelto sin aplicar castigos."
                     } else {
-                        "Se aplicara la accion seleccionada."
+                        "Se aplicará la acción seleccionada."
                     }
                 )
             },
@@ -542,7 +542,7 @@ fun PantallaDetalleReporteModerador(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     // --- Fecha de inicio ---
-                    Text("Inicio de suspension", style = MaterialTheme.typography.labelMedium)
+                    Text("Inicio de suspensión", style = MaterialTheme.typography.labelMedium)
                     OutlinedButton(
                         onClick = {
                             val c = Calendar.getInstance()
@@ -566,7 +566,7 @@ fun PantallaDetalleReporteModerador(
                         )
                     }
                     // --- Fecha de fin ---
-                    Text("Fin de suspension", style = MaterialTheme.typography.labelMedium)
+                    Text("Fin de suspensión", style = MaterialTheme.typography.labelMedium)
                     OutlinedButton(
                         onClick = {
                             val c = Calendar.getInstance()
@@ -724,7 +724,7 @@ private fun TarjetaReporteModerador(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = reporte.servicioTitulo.ifBlank { "Servicio sin titulo disponible" },
+                    text = reporte.servicioTitulo.ifBlank { "Servicio sin título disponible" },
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -757,7 +757,7 @@ private fun TarjetaReporteExpandida(
 ) {
     TarjetaBase {
         Text(
-            text = "Publicacion reportada",
+            text = "Publicación reportada",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
@@ -786,7 +786,7 @@ private fun TarjetaReporteExpandida(
             }
         }
         Text(
-            text = reporte.servicioTitulo.ifBlank { "Servicio sin titulo disponible" },
+            text = reporte.servicioTitulo.ifBlank { "Servicio sin título disponible" },
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )

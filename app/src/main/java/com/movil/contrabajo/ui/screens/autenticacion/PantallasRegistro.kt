@@ -115,13 +115,13 @@ fun PantallaRegistroPasoUno(
     val errorNombre = if (registro.nombre.isBlank()) "Ingresa tu nombre" else null
     val errorApellidoPaterno = if (registro.apellidoPaterno.isBlank()) "Ingresa tu apellido paterno" else null
     val errorRun = when {
-        registro.run.length !in 7..8 -> "El RUN debe tener 7 u 8 digitos"
+        registro.run.length !in 7..8 -> "El RUN debe tener 7 u 8 dígitos"
         registro.dv.isBlank() -> null
-        !validarRut(registro.run, registro.dv) -> "El RUN no es valido"
+        !validarRut(registro.run, registro.dv) -> "El RUN no es válido"
         else -> null
     }
     val errorDv = if (registro.dv.isBlank()) "Ingresa el DV" else null
-    val errorTelefono = if (registro.telefono.length != 8) "Ingresa los 8 digitos restantes del celular" else null
+    val errorTelefono = if (registro.telefono.length != 8) "Ingresa los 8 dígitos restantes del celular" else null
     val errorFecha = validarFechaNacimientoRegistro(
         fechaTexto = registro.fechaNacimiento,
         anioTexto = anioInput,
@@ -227,7 +227,7 @@ fun PantallaRegistroPasoUno(
                         desbloquearValidacionPaso()
                         viewModel.actualizarTelefono(it)
                     },
-                    etiqueta = "Telefono (+56)",
+                    etiqueta = "Teléfono (+56)",
                     visualTransformation = FormatoTelefonoVisualTransformation,
                     prefijo = "+56 9"
                 )
@@ -315,14 +315,14 @@ fun PantallaRegistroPasoDireccion(
     LaunchedEffect(Unit) {
         viewModel.cargarComunas()
         if (registro.region.isBlank()) {
-            viewModel.actualizarRegion("Region Metropolitana")
+            viewModel.actualizarRegion("Región Metropolitana")
         }
     }
 
     val reportarErrorUbicacion: () -> Unit = {
         Toast.makeText(
             context,
-            "No se pudo obtener ubicacion actual. Puedes continuar igual.",
+            "No se pudo obtener ubicación actual. Puedes continuar igual.",
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -341,13 +341,13 @@ fun PantallaRegistroPasoDireccion(
             .addOnSuccessListener { location ->
                 if (location != null) {
                     viewModel.actualizarCoordenadasRegistro(location.latitude, location.longitude)
-                    Toast.makeText(context, "Ubicacion actual capturada.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Ubicación actual capturada.", Toast.LENGTH_SHORT).show()
                 } else {
                     fusedLocationClient.lastLocation
                         .addOnSuccessListener { ultima ->
                             if (ultima != null) {
                                 viewModel.actualizarCoordenadasRegistro(ultima.latitude, ultima.longitude)
-                                Toast.makeText(context, "Ubicacion actual capturada.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Ubicación actual capturada.", Toast.LENGTH_SHORT).show()
                             } else {
                                 reportarErrorUbicacion()
                             }
@@ -387,13 +387,13 @@ fun PantallaRegistroPasoDireccion(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 IndicadorPasos(pasoActual = 2, totalPasos = 4)
-                EncabezadoPantalla(titulo = "Crear cuenta", subtitulo = "Direccion (opcional)")
+                EncabezadoPantalla(titulo = "Crear cuenta", subtitulo = "Dirección (opcional)")
 
                 OutlinedTextField(
-                    value = "Region Metropolitana",
+                    value = "Región Metropolitana",
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Region") },
+                    label = { Text("Región") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -469,7 +469,7 @@ fun PantallaRegistroPasoDireccion(
                 }
 
                 BotonPrimario(
-                    texto = "Obtener ubicacion actual",
+                    texto = "Obtener ubicación actual",
                     onClick = {
                         val tieneFine = ContextCompat.checkSelfPermission(
                             context,
@@ -493,7 +493,7 @@ fun PantallaRegistroPasoDireccion(
                 )
 
                 Text(
-                    text = "La direccion es opcional. Si no la ingresas, usaremos datos genericos para continuar.",
+                    text = "La dirección es opcional. Si no la ingresas, usaremos datos genéricos para continuar.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -504,7 +504,7 @@ fun PantallaRegistroPasoDireccion(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 BotonSecundario(
-                    texto = "Atras",
+                    texto = "Atrás",
                     onClick = onVolver,
                     modifier = Modifier.weight(1f)
                 )
@@ -530,9 +530,9 @@ fun PantallaRegistroPasoDos(
     var intentoRegistro by rememberSaveable { mutableStateOf(false) }
 
     val errorUsername = if (registro.username.isBlank()) "Ingresa un nombre de usuario" else null
-    val errorCorreo = if (registro.correo.isBlank() || !registro.correo.contains("@")) "Ingresa un correo valido" else null
+    val errorCorreo = if (registro.correo.isBlank() || !registro.correo.contains("@")) "Ingresa un correo válido" else null
     val errorContrasena = validarContrasenaRegistro(registro.contrasena)
-    val errorConfirmacion = if (registro.contrasena != registro.confirmarContrasena) "Las contrasenas no coinciden" else null
+    val errorConfirmacion = if (registro.contrasena != registro.confirmarContrasena) "Las contraseñas no coinciden" else null
     val formularioPasoTresValido = listOf(
         errorUsername,
         errorCorreo,
@@ -582,7 +582,7 @@ fun PantallaRegistroPasoDos(
                         intentoRegistro = false
                         viewModel.actualizarCorreo(it)
                     },
-                    etiqueta = "Correo electronico"
+                    etiqueta = "Correo electrónico"
                 )
                 if (intentoRegistro) {
                     TextoErrorCampo(errorCorreo)
@@ -595,7 +595,7 @@ fun PantallaRegistroPasoDos(
                         intentoRegistro = false
                         viewModel.actualizarContrasena(it)
                     },
-                    etiqueta = "Contrasena"
+                    etiqueta = "Contraseña"
                 )
                 if (intentoRegistro) {
                     TextoErrorCampo(errorContrasena)
@@ -607,10 +607,10 @@ fun PantallaRegistroPasoDos(
                         intentoRegistro = false
                         viewModel.actualizarConfirmarContrasena(it)
                     },
-                    etiqueta = "Confirmar contrasena"
+                    etiqueta = "Confirmar contraseña"
                 )
                 Text(
-                    text = "La contrasena debe tener minimo 8 caracteres, 1 mayuscula, 1 numero y 1 simbolo.",
+                    text = "La contraseña debe tener mínimo 8 caracteres, 1 mayúscula, 1 número y 1 símbolo.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -900,9 +900,9 @@ private fun validarFechaNacimientoRegistro(
     if (anioTexto.length == 4 && anioNumerico != null && (anioNumerico < anioMinimo || anioNumerico > anioMaximo)) {
         return "El año debe estar entre $anioMinimo y $anioMaximo"
     }
-    if (fechaTexto.isBlank()) return "Ingresa una fecha de nacimiento valida"
+    if (fechaTexto.isBlank()) return "Ingresa una fecha de nacimiento válida"
     val fecha = runCatching { LocalDate.parse(fechaTexto) }.getOrNull()
-        ?: return "Ingresa una fecha de nacimiento valida"
+        ?: return "Ingresa una fecha de nacimiento válida"
     val anio = fecha.year
     return when {
         anio !in anioMinimo..anioMaximo -> "El año debe estar entre $anioMinimo y $anioMaximo"
@@ -939,10 +939,10 @@ private fun validarRut(runRaw: String, dvRaw: String): Boolean {
 
 private fun validarContrasenaRegistro(contrasena: String): String? {
     return when {
-        contrasena.length < 8 -> "La contrasena debe tener al menos 8 caracteres"
-        contrasena.none { it.isUpperCase() } -> "La contrasena debe incluir al menos 1 mayuscula"
-        contrasena.none { it.isDigit() } -> "La contrasena debe incluir al menos 1 numero"
-        contrasena.none { !it.isLetterOrDigit() } -> "La contrasena debe incluir al menos 1 simbolo"
+        contrasena.length < 8 -> "La contraseña debe tener al menos 8 caracteres"
+        contrasena.none { it.isUpperCase() } -> "La contraseña debe incluir al menos 1 mayúscula"
+        contrasena.none { it.isDigit() } -> "La contraseña debe incluir al menos 1 número"
+        contrasena.none { !it.isLetterOrDigit() } -> "La contraseña debe incluir al menos 1 símbolo"
         else -> null
     }
 }

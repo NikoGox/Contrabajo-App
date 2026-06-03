@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.movil.contrabajo.recordarVersionApp
 import com.movil.contrabajo.ui.components.BotonPrimario
@@ -55,53 +56,99 @@ fun PantallaInicial(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (uiState.revisandoSesion) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-        } else {
-            AnimatedVisibility(
-                visible = visible,
-                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 5 })
-            ) {
-                PantallaBase(
-                    modifier = Modifier.fillMaxSize(),
-                    scrollable = false
+        when {
+            uiState.revisandoSesion -> {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+            uiState.errorConexion -> {
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn() + slideInVertically(initialOffsetY = { it / 5 })
                 ) {
-                    Spacer(modifier = Modifier.weight(0.35f))
-                    Text(
-                        text = "Bienvenido",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    )
-                    LogoContrabajo(
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                        tamanoPersonalizado = 148.dp
-                    )
-                    TarjetaBase {
-                        Text(
-                            text = "Servicios y oficios cerca de ti",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Encuentra trabajadores, revisa publicaciones destacadas y entra rapido a tus conversaciones desde una experiencia simple y directa.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    PantallaBase(
+                        modifier = Modifier.fillMaxSize(),
+                        scrollable = false
+                    ) {
+                        Spacer(modifier = Modifier.weight(0.30f))
+                        LogoContrabajo(
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                            tamanoPersonalizado = 96.dp
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        BotonPrimario(texto = "Iniciar sesion", onClick = irALogin)
-                        BotonSecundario(texto = "Crear cuenta", onClick = irARegistro)
+                        TarjetaBase {
+                            Text(
+                                text = "Sin conexión al servidor",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "No se pudo verificar tu sesión. Asegúrate de tener conexión a internet y de que el servidor esté disponible.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Start
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            BotonPrimario(texto = "Reintentar", onClick = { viewModel.revisarSesionActiva() })
+                            BotonSecundario(texto = "Cerrar sesion", onClick = { viewModel.cerrarSesionLocal() })
+                        }
+                        Text(
+                            text = "Versión actual: $versionApp",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(top = 4.dp)
+                        )
+                        Spacer(modifier = Modifier.weight(0.30f))
                     }
-                    Text(
-                        text = "Version actual: $versionApp",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .padding(top = 4.dp)
-                    )
-                    Spacer(modifier = Modifier.weight(0.30f))
+                }
+            }
+            else -> {
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn() + slideInVertically(initialOffsetY = { it / 5 })
+                ) {
+                    PantallaBase(
+                        modifier = Modifier.fillMaxSize(),
+                        scrollable = false
+                    ) {
+                        Spacer(modifier = Modifier.weight(0.35f))
+                        Text(
+                            text = "Bienvenido",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+                        LogoContrabajo(
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                            tamanoPersonalizado = 148.dp
+                        )
+                        TarjetaBase {
+                            Text(
+                                text = "Servicios y oficios cerca de ti",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Encuentra trabajadores, revisa publicaciones destacadas y entra rápido a tus conversaciones desde una experiencia simple y directa.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            BotonPrimario(texto = "Iniciar sesion", onClick = irALogin)
+                            BotonSecundario(texto = "Crear cuenta", onClick = irARegistro)
+                        }
+                        Text(
+                            text = "Versión actual: $versionApp",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(top = 4.dp)
+                        )
+                        Spacer(modifier = Modifier.weight(0.30f))
+                    }
                 }
             }
         }

@@ -80,6 +80,7 @@ import com.movil.contrabajo.ui.viewmodel.PrincipalViewModel
 import com.movil.contrabajo.ui.viewmodel.RegistroViewModel
 import com.movil.contrabajo.ui.viewmodel.ReportesViewModel
 import com.movil.contrabajo.data.remote.RemoteSessionStore
+import com.movil.contrabajo.data.remote.SesionEventos
 import com.movil.contrabajo.data.remote.WsManager
 import com.movil.contrabajo.data.workers.MensajesPollWorker
 import com.movil.contrabajo.domain.model.TipoPerfil
@@ -133,11 +134,33 @@ fun ContrabajoApp(
         }
     }
 
+    // Interceptor 401 → sesion invalidada desde otro dispositivo o por el backend
+    LaunchedEffect(Unit) {
+        SesionEventos.flujoSesionInvalida.collect {
+            WsManager.desconectar()
+            MensajesPollWorker.cancelar(context)
+            RemoteSessionStore.limpiarSesionEstatica(context)
+
+            mensajeCargaGlobal = "Sesion cerrada"
+            progresoCargaGlobal = 1f
+            mostrarIndicadorCargaGlobal = false
+            modoSuaveCargaGlobal = true
+            mostrarCargaGlobal = true
+            delay(900)
+            navController.navigate(RutasApp.Inicio.ruta) {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
+            mostrarCargaGlobal = false
+            SesionEventos.resetear()
+        }
+    }
+
     val abrirPrincipalConCarga: () -> Unit = {
         if (!navegacionEnCarga) {
             scope.launch {
                 val inicioCargaMs = System.currentTimeMillis()
                 navegacionEnCarga = true
+                SesionEventos.resetear() // Limpiar flag por si hubo 401 en segundo plano sin subscriber
                 mensajeCargaGlobal = "Iniciando sesion..."
                 progresoCargaGlobal = 0.08f
                 mostrarIndicadorCargaGlobal = true
@@ -645,6 +668,8 @@ private fun ShellPrincipal(
                         PantallaChats(
                             viewModel = chatsViewModel,
                             onAbrirChat = onAbrirChat,
+                            esTrabajador = perfilViewModel.uiState.usuario?.tipoPerfil in
+                                listOf(TipoPerfil.TRABAJADOR, TipoPerfil.PREMIUM),
                             modifier = Modifier.padding(innerPadding)
                         )
                     }

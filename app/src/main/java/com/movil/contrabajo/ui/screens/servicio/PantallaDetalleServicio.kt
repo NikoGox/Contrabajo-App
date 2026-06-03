@@ -575,7 +575,7 @@ fun PantallaDetalleServicio(
                 color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.88f)
             ) {
                 Text(
-                    text = "Fuera de servicio. Esta publicacion no admite nuevos contactos.",
+                    text = "Fuera de servicio. Esta publicación no admite nuevos contactos.",
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer,
@@ -674,7 +674,7 @@ fun PantallaDetalleServicio(
                             if (idTipo == null || comentarioReporte.trim().isBlank()) {
                                 Toast.makeText(
                                     context,
-                                    "Debes seleccionar un tipo y escribir la descripcion.",
+                                    "Debes seleccionar un tipo y escribir la descripción.",
                                     Toast.LENGTH_SHORT
                                 ).show()
                                 return@TextButton
@@ -874,7 +874,7 @@ private fun TarjetaDetalleOferta(
                 )
                 if (oferta.puntuacionPromedio <= 0.0) {
                     Text(
-                        text = "Sin valoraciones todavia",
+                        text = "Sin valoraciones todavía",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -895,14 +895,14 @@ private fun TarjetaDetalleOferta(
             )
             if (!oferta.eliminada) {
                 Text(
-                    text = "${calcularDistanciaKm(oferta, latitudUsuario, longitudUsuario, idUsuarioActual)} km - ${oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" }}",
+                    text = "${calcularDistanciaKm(oferta, latitudUsuario, longitudUsuario, idUsuarioActual)} km - ${oferta.ubicacionReferencia.ifBlank { "Región Metropolitana" }}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             Text(
-                text = "Descripcion:",
+                text = "Descripción:",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -913,13 +913,13 @@ private fun TarjetaDetalleOferta(
 
             if (oferta.eliminada) {
                 Text(
-                    text = "Ubicacion no disponible para publicaciones eliminadas.",
+                    text = "Ubicación no disponible para publicaciones eliminadas.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
                 Text(
-                    text = "Ubicacion:",
+                    text = "Ubicación:",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1059,7 +1059,7 @@ private fun TarjetaDetallePrevisualizacion(
                 )
                 if (oferta.puntuacionPromedio <= 0.0) {
                     Text(
-                        text = "Sin valoraciones todavia",
+                        text = "Sin valoraciones todavía",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1080,13 +1080,13 @@ private fun TarjetaDetallePrevisualizacion(
             )
             if (!oferta.eliminada) {
                 Text(
-                    text = "${calcularDistanciaKm(oferta, latitudUsuario, longitudUsuario, idUsuarioActual)} km - ${oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" }}",
+                    text = "${calcularDistanciaKm(oferta, latitudUsuario, longitudUsuario, idUsuarioActual)} km - ${oferta.ubicacionReferencia.ifBlank { "Región Metropolitana" }}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
-                text = "Descripcion:",
+                text = "Descripción:",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1097,13 +1097,13 @@ private fun TarjetaDetallePrevisualizacion(
             )
             if (oferta.eliminada) {
                 Text(
-                    text = "Ubicacion no disponible para publicaciones eliminadas.",
+                    text = "Ubicación no disponible para publicaciones eliminadas.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
                 Text(
-                    text = "Ubicacion:",
+                    text = "Ubicación:",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1329,7 +1329,7 @@ private fun MapaRangoOpenStreetMap(
             val marcador = Marker(map).apply {
                 position = centro
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                title = "Ubicacion del servicio"
+                title = "Ubicación del servicio"
                 icon = ContextCompat.getDrawable(context, R.drawable.ic_pin_marcador_azul)
             }
 

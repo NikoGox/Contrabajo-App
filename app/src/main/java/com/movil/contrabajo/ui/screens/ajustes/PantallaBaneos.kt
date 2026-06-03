@@ -51,7 +51,7 @@ fun PantallaBaneos(
 
     PantallaBase(modifier = modifier, mostrarFondo = false) {
         BarraSuperiorAjustes(
-            titulo = "Moderacion de baneos",
+            titulo = "Moderación de baneos",
             onVolver = onVolver,
             iconoDerecha = Icons.Filled.Gavel
         )

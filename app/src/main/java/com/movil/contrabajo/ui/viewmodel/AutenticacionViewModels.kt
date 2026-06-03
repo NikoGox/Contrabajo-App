@@ -18,7 +18,8 @@ import kotlinx.coroutines.withContext
 
 data class InicioUiState(
     val revisandoSesion: Boolean = true,
-    val sesionActivaDetectada: Boolean = false
+    val sesionActivaDetectada: Boolean = false,
+    val errorConexion: Boolean = false
 )
 
 class InicioViewModel(
@@ -32,15 +33,38 @@ class InicioViewModel(
     fun revisarSesionActiva() {
         if (sesionRevisada) return
         sesionRevisada = true
+        uiState = uiState.copy(revisandoSesion = true, errorConexion = false)
 
         viewModelScope.launch {
-            val sesionActiva = withContext(Dispatchers.IO) {
-                repositorioAutenticacion.obtenerSesionActiva() != null
+            try {
+                val sesionActiva = withContext(Dispatchers.IO) {
+                    repositorioAutenticacion.obtenerSesionActiva() != null
+                }
+                uiState = uiState.copy(
+                    revisandoSesion = false,
+                    sesionActivaDetectada = sesionActiva,
+                    errorConexion = false
+                )
+            } catch (e: Exception) {
+                // Error de red (backend caido): mantener token, mostrar pantalla de reintento
+                sesionRevisada = false
+                uiState = uiState.copy(
+                    revisandoSesion = false,
+                    sesionActivaDetectada = false,
+                    errorConexion = true
+                )
             }
-            uiState = uiState.copy(
-                revisandoSesion = false,
-                sesionActivaDetectada = sesionActiva
-            )
+        }
+    }
+
+    /** Cierra la sesion local (limpia el token) y vuelve a la pantalla de bienvenida. */
+    fun cerrarSesionLocal() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                repositorioAutenticacion.cerrarSesion()
+            }
+            sesionRevisada = false
+            uiState = InicioUiState(revisandoSesion = false, sesionActivaDetectada = false, errorConexion = false)
         }
     }
 }

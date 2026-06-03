@@ -94,7 +94,7 @@ fun PantallaCitaServicio(
                 }
                 Text("Servicio: ${chat.tituloServicio}")
                 Text("Trabajador: ${chat.nombreContacto}")
-                Text("Categoria: ${chat.categoriaServicio.ifBlank { "General" }}")
+                Text("Categoría: ${chat.categoriaServicio.ifBlank { "General" }}")
                 Text("Fecha solicitud: ${cita.fechaCreacion}")
                 Text("Fecha programada: ${cita.fechaProgramada}")
                 Text("Comentario: ${cita.comentario}")
@@ -127,7 +127,7 @@ fun PantallaCitaServicio(
                         )
 
                         EstadoCita.EN_PROCESO -> BotonPrimario(
-                            texto = "Solicitar finalizacion",
+                            texto = "Solicitar finalización",
                             onClick = viewModel::solicitarFinalizarTrabajoTrabajador
                         )
                     }
@@ -141,7 +141,7 @@ fun PantallaCitaServicio(
                         )
 
                         EstadoCita.FINALIZANDO -> BotonPrimario(
-                            texto = "Aceptar finalizacion",
+                            texto = "Aceptar finalización",
                             onClick = viewModel::aceptarFinalizarTrabajoCliente
                         )
 
@@ -174,7 +174,7 @@ fun PantallaCitaServicio(
 private fun etiquetaEstadoCita(estado: Int): String = when (estado) {
     EstadoCita.PENDIENTE -> "Pendiente"
     EstadoCita.HANDSHAKE -> "Confirmada"
-    EstadoCita.COMENZANDO -> "Pendiente de confirmacion"
+    EstadoCita.COMENZANDO -> "Pendiente de confirmación"
     EstadoCita.EN_PROCESO -> "En proceso"
     EstadoCita.FINALIZANDO -> "Finalizando"
     EstadoCita.FINALIZADO -> "Finalizada"

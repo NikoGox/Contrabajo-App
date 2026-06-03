@@ -4,6 +4,10 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +35,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +54,7 @@ import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaBase
 import com.movil.contrabajo.ui.viewmodel.PerfilViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PantallaPerfil(
     viewModel: PerfilViewModel,
@@ -87,12 +91,26 @@ fun PantallaPerfil(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.recargar()
-    }
+    val pullToRefreshState = rememberPullToRefreshState()
 
+    Box(modifier = modifier.fillMaxSize()) {
+    PullToRefreshBox(
+        isRefreshing = uiState.refrescando,
+        onRefresh = viewModel::refrescarDesdeGesto,
+        state = pullToRefreshState,
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter,
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = pullToRefreshState,
+                isRefreshing = uiState.refrescando,
+                containerColor = Color.White,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    ) {
     PantallaBase(
-        modifier = modifier,
+        modifier = Modifier,
         mostrarFondo = false
     ) {
         TarjetaBase {
@@ -222,24 +240,9 @@ fun PantallaPerfil(
                             valor = usuario?.correo.orEmpty()
                         )
                         InfoPerfilFila(
-                            etiqueta = "Telefono",
-                            valor = usuario?.telefono.orEmpty()
-                        )
-                        InfoPerfilFila(
-                            etiqueta = "RUN",
-                            valor = usuario?.let { "${it.run}-${it.dv}" }.orEmpty()
-                        )
-                        InfoPerfilFila(
-                            etiqueta = "Direccion",
-                            valor = usuario?.let {
-                                val calleNumero = listOf(it.direccionCalle, it.direccionNumero)
-                                    .filter { parte -> parte.isNotBlank() }
-                                    .joinToString(" ")
-                                listOf(calleNumero, it.direccionComuna, it.direccionRegion)
-                                    .filter { parte -> parte.isNotBlank() }
-                                    .joinToString(", ")
-                                    .ifBlank { "Sin direccion" }
-                            }.orEmpty()
+                            etiqueta = "Teléfono",
+                            valor = usuario?.telefono.orEmpty(),
+                            prefijo = "+56 "
                         )
                     }
                 }
@@ -314,9 +317,9 @@ fun PantallaPerfil(
                 if (uiState.ofertasPropias.isEmpty()) {
                     Text(
                         text = if (uiState.usuario?.tipoPerfil == TipoPerfil.USUARIO_BASE) {
-                            "Tu perfil actual no puede publicar servicios aun."
+                            "Tu perfil actual no puede publicar servicios aún."
                         } else {
-                            "Aun no has creado tu primer servicio."
+                            "Aún no has creado tu primer servicio."
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -425,7 +428,7 @@ fun PantallaPerfil(
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
-                                    text = oferta.ubicacionReferencia.ifBlank { "Region Metropolitana" },
+                                    text = oferta.ubicacionReferencia.ifBlank { "Región Metropolitana" },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -464,23 +467,26 @@ fun PantallaPerfil(
                 }
 
                 if (uiState.usuario?.tipoPerfil == TipoPerfil.USUARIO_BASE) {
-                    EtiquetaEstado("Para verificarte ve a Ajustes > Seguridad y verificacion")
+                    EtiquetaEstado("Para verificarte ve a Ajustes > Seguridad y verificación")
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
+    }
 
-    OverlayPantallaCarga(
-        visible = uiState.cargandoPantalla,
-        mensaje = "Actualizando perfil..."
-    )
+        OverlayPantallaCarga(
+            visible = uiState.cargandoPantalla,
+            mensaje = "Actualizando perfil..."
+        )
+    }
 }
 
 @Composable
 private fun InfoPerfilFila(
     etiqueta: String,
-    valor: String
+    valor: String,
+    prefijo: String? = null
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -492,13 +498,30 @@ private fun InfoPerfilFila(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(
-            text = valor.ifBlank { "-" },
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        if (prefijo != null && valor.isNotBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = prefijo,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = valor,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        } else {
+            Text(
+                text = valor.ifBlank { "-" },
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
