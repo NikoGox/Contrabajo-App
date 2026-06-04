@@ -453,7 +453,8 @@ fun ContrabajoApp(
             composable(RutasApp.AjustesCuenta.ruta) {
                 PantallaCuenta(
                     viewModel = perfilViewModel,
-                    onVolver = { navController.popBackStack() }
+                    onVolver = { navController.popBackStack() },
+                    onCerrarSesion = { perfilViewModel.cerrarSesion() }
                 )
             }
             composable(RutasApp.AjustesUbicacion.ruta) {
@@ -680,6 +681,9 @@ private fun ShellPrincipal(
                         onAbrirEditarServicio = onAbrirEditarServicio,
                         onAbrirValoraciones = onAbrirValoraciones,
                         onEditarPerfil = onAbrirEditarPerfil,
+                        onCerrarSesion = {
+                            perfilViewModel.cerrarSesion()
+                        },
                         modifier = Modifier.padding(innerPadding)
                     )
 

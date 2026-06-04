@@ -1,3 +1,12 @@
+VERSION 0.13.1-Pre-Alpha
+───────
+├─• Se corrigieron los bloques de información en Perfil y Ajustes para que el correo use una sola fila y no se superponga con sus etiquetas.
+├─• Se agregó un botón de cerrar sesión en la parte inferior del perfil y también en la pantalla de cuenta de Ajustes.
+├─• Se corrigió el texto de acceso para español: "¿No tienes cuenta? Regístrate".
+├─• Se restauró el scroll en el flujo de creación de cuenta para evitar que el contenido se corte en pantallas pequeñas.
+├─• Se reforzó el comportamiento de scroll en pantallas clave como inicio, login y registro para que los mensajes de error no tapen toda la vista.
+└─• Se revisaron los puntos más sensibles de superposición visual para mantener la lectura clara en textos largos y campos de perfil.
+
 VERSION 0.13.0-Pre-Alpha
 ───────
 ├─• La pantalla de información de cuenta fue rediseñada: datos agrupados con iconos, tarjetas de contacto lado a lado y sección de identificación con jerarquía visual clara.
@@ -377,4 +386,3 @@ VERSION 0.1-Pre-Alpha
 ->>> Pendiente para v0.3: enriquecer el flujo principal con mas contenido en Home y mejor interaccion en Chats.
 ->>> Pendiente para v0.3: reforzar continuidad entre navegacion, estados visuales y acciones del usuario.
 ->>> Pendiente para futuro: preparar la transicion desde SQLite local hacia integracion con backend.
-

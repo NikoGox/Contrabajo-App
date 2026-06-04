@@ -139,7 +139,6 @@ fun PantallaRegistroPasoUno(
     ).all { it == null } && registro.apellidoMaterno.isNotBlank()
 
     PantallaBase(
-        scrollable = false,
         mostrarFondo = false
     ) {
         EncabezadoRegistroAnimado()
@@ -370,7 +369,6 @@ fun PantallaRegistroPasoDireccion(
     }
 
     PantallaBase(
-        scrollable = false,
         mostrarFondo = false
     ) {
         EncabezadoRegistroAnimado()
@@ -541,7 +539,6 @@ fun PantallaRegistroPasoDos(
     ).all { it == null }
 
     PantallaBase(
-        scrollable = false,
         mostrarFondo = false
     ) {
         EncabezadoRegistroAnimado()
@@ -685,7 +682,6 @@ fun PantallaRegistroPasoSeguridad(
     }
 
     PantallaBase(
-        scrollable = false,
         mostrarFondo = false
     ) {
         EncabezadoRegistroAnimado()

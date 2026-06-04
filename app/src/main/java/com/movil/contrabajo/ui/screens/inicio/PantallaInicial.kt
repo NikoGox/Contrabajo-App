@@ -66,8 +66,7 @@ fun PantallaInicial(
                     enter = fadeIn() + slideInVertically(initialOffsetY = { it / 5 })
                 ) {
                     PantallaBase(
-                        modifier = Modifier.fillMaxSize(),
-                        scrollable = false
+                        modifier = Modifier.fillMaxSize()
                     ) {
                         Spacer(modifier = Modifier.weight(0.30f))
                         LogoContrabajo(
@@ -109,8 +108,7 @@ fun PantallaInicial(
                     enter = fadeIn() + slideInVertically(initialOffsetY = { it / 5 })
                 ) {
                     PantallaBase(
-                        modifier = Modifier.fillMaxSize(),
-                        scrollable = false
+                        modifier = Modifier.fillMaxSize()
                     ) {
                         Spacer(modifier = Modifier.weight(0.35f))
                         Text(

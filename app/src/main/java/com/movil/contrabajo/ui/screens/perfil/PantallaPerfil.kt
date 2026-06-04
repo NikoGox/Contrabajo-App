@@ -48,6 +48,7 @@ import coil.compose.AsyncImage
 import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.ui.components.BotonPrimario
 import com.movil.contrabajo.ui.components.EtiquetaEstado
+import com.movil.contrabajo.ui.components.FilaEtiquetaValor
 import com.movil.contrabajo.ui.components.LogoContrabajo
 import com.movil.contrabajo.ui.components.OverlayPantallaCarga
 import com.movil.contrabajo.ui.components.PantallaBase
@@ -62,6 +63,7 @@ fun PantallaPerfil(
     onAbrirEditarServicio: (Long) -> Unit,
     onAbrirValoraciones: () -> Unit,
     onEditarPerfil: () -> Unit,
+    onCerrarSesion: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState = viewModel.uiState
@@ -235,11 +237,13 @@ fun PantallaPerfil(
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        InfoPerfilFila(
+                        FilaEtiquetaValor(
                             etiqueta = "Correo",
-                            valor = usuario?.correo.orEmpty()
+                            valor = usuario?.correo.orEmpty(),
+                            etiquetaAncho = 76.dp,
+                            valorMaxLines = 1
                         )
-                        InfoPerfilFila(
+                        FilaEtiquetaValor(
                             etiqueta = "Teléfono",
                             valor = usuario?.telefono.orEmpty(),
                             prefijo = "+56 "
@@ -287,6 +291,21 @@ fun PantallaPerfil(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Editar perfil")
+                }
+
+                OutlinedButton(
+                    onClick = onCerrarSesion,
+                    modifier = Modifier.fillMaxWidth(),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        Color(0xFFD32F2F)
+                    )
+                ) {
+                    Text(
+                        text = "Cerrar sesión",
+                        color = Color(0xFFD32F2F),
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }
@@ -479,49 +498,6 @@ fun PantallaPerfil(
             visible = uiState.cargandoPantalla,
             mensaje = "Actualizando perfil..."
         )
-    }
-}
-
-@Composable
-private fun InfoPerfilFila(
-    etiqueta: String,
-    valor: String,
-    prefijo: String? = null
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = etiqueta,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (prefijo != null && valor.isNotBlank()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = prefijo,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = valor,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        } else {
-            Text(
-                text = valor.ifBlank { "-" },
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
     }
 }
 

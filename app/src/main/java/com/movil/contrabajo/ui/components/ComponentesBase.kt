@@ -915,13 +915,71 @@ fun BarraInferior(actual: String, alNavegar: (String) -> Unit) {
 
 @Composable
 fun ResumenPerfilLinea(etiqueta: String, valor: String) {
+    FilaEtiquetaValor(
+        etiqueta = etiqueta,
+        valor = valor,
+        etiquetaAncho = 88.dp,
+        valorAlineadoEnd = true,
+        valorMaxLines = 1,
+        valorFontWeight = FontWeight.SemiBold
+    )
+}
+
+@Composable
+fun FilaEtiquetaValor(
+    etiqueta: String,
+    valor: String,
+    modifier: Modifier = Modifier,
+    etiquetaAncho: Dp = 88.dp,
+    valorAlineadoEnd: Boolean = true,
+    valorMaxLines: Int = 1,
+    valorFontWeight: FontWeight = FontWeight.SemiBold,
+    prefijo: String? = null
+) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(etiqueta, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        Text(valor, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(
+            text = etiqueta,
+            modifier = Modifier.width(etiquetaAncho),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (prefijo != null && valor.isNotBlank()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = if (valorAlineadoEnd) Arrangement.End else Arrangement.Start
+            ) {
+                Text(
+                    text = prefijo,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = valor,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = valorFontWeight,
+                    textAlign = if (valorAlineadoEnd) TextAlign.End else TextAlign.Start,
+                    maxLines = valorMaxLines,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        } else {
+            Text(
+                text = valor.ifBlank { "-" },
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = valorFontWeight,
+                textAlign = if (valorAlineadoEnd) TextAlign.End else TextAlign.Start,
+                maxLines = valorMaxLines,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 

@@ -12,11 +12,11 @@ android {
         applicationId = "com.movil.contrabajo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.12.2-Pre-Alpha"
-        buildConfigField("String", "USUARIOS_BASE_URL", "\"http://10.0.2.2:8081/\"")
-        buildConfigField("String", "SERVICIOS_BASE_URL", "\"http://10.0.2.2:8082/\"")
-        buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"http://10.0.2.2:8083/\"")
+        versionCode = 13
+        versionName = "0.13.1-Pre-Alpha"
+        buildConfigField("String", "USUARIOS_BASE_URL", "\"http://10.31.78.126:8081/\"")
+        buildConfigField("String", "SERVICIOS_BASE_URL", "\"http://10.31.78.126:8082/\"")
+        buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"http://10.31.78.126:8083/\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

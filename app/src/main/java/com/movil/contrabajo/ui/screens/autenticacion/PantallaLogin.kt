@@ -103,7 +103,7 @@ fun PantallaLogin(
         )
     }
 
-    PantallaBase(scrollable = false, mostrarFondo = false) {
+    PantallaBase(mostrarFondo = false) {
         LogoContrabajo(modifier = Modifier.align(Alignment.CenterHorizontally), compacto = true)
         TarjetaBase {
             Row(
@@ -184,7 +184,7 @@ fun PantallaLogin(
             BotonSecundario(texto = "Recuperar cuenta", onClick = onRecuperarCuenta)
         }
         Text(
-            text = "No tienes cuenta? Registrate",
+            text = "¿No tienes cuenta? Regístrate",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.primary
         )

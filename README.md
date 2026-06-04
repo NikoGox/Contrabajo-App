@@ -18,6 +18,29 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ### ❚❙❘ VERSIÓN 0.13.0-Pre-Alpha
 
 
+> <br>• Se corrigieron los bloques de información en Perfil y Ajustes para que el correo use una sola fila y no se superponga con sus etiquetas.
+> <br>• Se agregó un botón de cerrar sesión en la parte inferior del perfil y también en la pantalla de cuenta de Ajustes.
+> <br>• Se corrigió el texto de acceso para español: "¿No tienes cuenta? Regístrate".
+> <br>• Se restauró el scroll en el flujo de creación de cuenta para evitar que el contenido se corte en pantallas pequeñas.
+> <br>• Se reforzó el comportamiento de scroll en pantallas clave como inicio, login y registro para que los mensajes de error no tapen toda la vista.
+> <br>• Se revisaron los puntos más sensibles de superposición visual para mantener la lectura clara en textos largos y campos de perfil.
+
+---
+
+### ❚❙❘ VERSIÓN 0.13.1-Pre-Alpha
+
+
+> <br>• Se corrigieron los bloques de información en Perfil y Ajustes para que el correo use una sola fila y no se superponga con sus etiquetas.
+> <br>• Se agregó un botón de cerrar sesión en la parte inferior del perfil y también en la pantalla de cuenta de Ajustes.
+> <br>• Se corrigió el texto de acceso para español: "¿No tienes cuenta? Regístrate".
+> <br>• Se restauró el scroll en el flujo de creación de cuenta para evitar que el contenido se corte en pantallas pequeñas.
+> <br>• Se reforzó el comportamiento de scroll en pantallas clave como inicio, login y registro para que los mensajes de error no tapen toda la vista.
+> <br>• Se revisaron los puntos más sensibles de superposición visual para mantener la lectura clara en textos largos y campos de perfil.
+
+---
+
+### ❚❙❘ VERSIÓN 0.13.0-Pre-Alpha
+
 
 > <br>• La pantalla de información de cuenta fue rediseñada: datos agrupados con iconos, tarjetas de contacto lado a lado y sección de identificación con jerarquía visual clara.
 > <br>• El perfil muestra el prefijo +56 en gris antes del número de teléfono.

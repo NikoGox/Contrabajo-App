@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.BorderStroke
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -92,6 +94,7 @@ import com.movil.contrabajo.ui.components.CampoContrabajo
 import com.movil.contrabajo.ui.components.CampoSecretoContrabajo
 import com.movil.contrabajo.ui.components.EncabezadoPantalla
 import com.movil.contrabajo.ui.components.EtiquetaEstado
+import com.movil.contrabajo.ui.components.FilaEtiquetaValor
 import com.movil.contrabajo.ui.components.OverlayPantallaCarga
 import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.ResumenPerfilLinea
@@ -103,6 +106,7 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
+import androidx.compose.ui.unit.Dp
 
 @Composable
 fun PantallaAjustes(
@@ -453,6 +457,7 @@ fun PantallaPreguntasSeguridad(
 fun PantallaCuenta(
     viewModel: PerfilViewModel,
     onVolver: () -> Unit,
+    onCerrarSesion: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LaunchedEffect(Unit) { viewModel.recargar() }
@@ -471,14 +476,13 @@ fun PantallaCuenta(
             }
         } else {
             TarjetaBase {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
-                        modifier = Modifier.size(52.dp),
+                        modifier = Modifier.size(48.dp),
                         shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                     ) {
@@ -487,20 +491,27 @@ fun PantallaCuenta(
                                 imageVector = Icons.Filled.AccountCircle,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(38.dp)
+                                modifier = Modifier.size(34.dp)
                             )
                         }
                     }
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Text(
                             text = "${usuario.nombre} ${usuario.apellidoPaterno}",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "@${usuario.username}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Surface(
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
@@ -517,7 +528,6 @@ fun PantallaCuenta(
                     }
                 }
 
-                // 2 tarjetas: correo ocupa el espacio sobrante, telefono es cuadrado perfecto
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -528,7 +538,9 @@ fun PantallaCuenta(
                         icono = Icons.Filled.Email,
                         etiqueta = "Correo",
                         valor = usuario.correo,
-                        modifier = Modifier.weight(1f).fillMaxHeight()
+                        modifier = Modifier.fillMaxWidth(0.58f).fillMaxHeight(),
+                        etiquetaAncho = 72.dp,
+                        maxLineasValor = 1
                     )
                     TarjetaCuadradoCuenta(
                         icono = Icons.Filled.Phone,
@@ -539,7 +551,6 @@ fun PantallaCuenta(
                     )
                 }
 
-                // Tarjeta horizontal de identificacion
                 TarjetaHorizontalCuenta(
                     icono = Icons.Filled.Badge,
                     titulo = "Identificación",
@@ -549,6 +560,21 @@ fun PantallaCuenta(
                         "Nacimiento" to usuario.fechaNacimiento
                     )
                 )
+
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedButton(
+                    onClick = onCerrarSesion,
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.dp, Color(0xFFD32F2F)),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White)
+                ) {
+                    Text(
+                        text = "Cerrar sesión",
+                        color = Color(0xFFD32F2F),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }
@@ -961,7 +987,9 @@ private fun TarjetaCuadradoCuenta(
     etiqueta: String,
     valor: String,
     modifier: Modifier = Modifier,
-    prefijo: String? = null
+    prefijo: String? = null,
+    maxLineasValor: Int = 1,
+    etiquetaAncho: Dp = 0.dp
 ) {
     Surface(
         modifier = modifier,
@@ -992,7 +1020,10 @@ private fun TarjetaCuadradoCuenta(
                 Text(
                     text = etiqueta,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = if (etiquetaAncho > 0.dp) Modifier.width(etiquetaAncho) else Modifier
                 )
                 if (prefijo != null && valor.isNotBlank()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1005,7 +1036,7 @@ private fun TarjetaCuadradoCuenta(
                             text = valor,
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
+                            maxLines = maxLineasValor,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
@@ -1014,7 +1045,7 @@ private fun TarjetaCuadradoCuenta(
                         text = valor.ifBlank { "-" },
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
+                        maxLines = maxLineasValor,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -1065,51 +1096,13 @@ private fun TarjetaHorizontalCuenta(
                 )
             }
             filas.forEach { (etiqueta, valor) ->
-                FilaInfoCuenta(etiqueta = etiqueta, valor = valor)
-            }
-        }
-    }
-}
-
-@Composable
-private fun FilaInfoCuenta(
-    etiqueta: String,
-    valor: String,
-    prefijo: String? = null
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = etiqueta,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (prefijo != null && valor.isNotBlank()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = prefijo,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = valor,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                FilaEtiquetaValor(
+                    etiqueta = etiqueta,
+                    valor = valor,
+                    etiquetaAncho = 76.dp,
+                    valorMaxLines = 1
                 )
             }
-        } else {
-            Text(
-                text = valor.ifBlank { "-" },
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }
