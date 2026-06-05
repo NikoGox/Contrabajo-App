@@ -230,16 +230,26 @@ class RepositorioAutenticacionRemoto(
     private fun validarRegistroRemoto(registro: RegistroPendiente): String? {
         return when {
             registro.nombre.trim().isBlank() -> "Ingresa tu nombre"
+            registro.nombre.trim().length > 60 -> "El nombre permite hasta 60 caracteres"
             registro.apellidoPaterno.trim().isBlank() -> "Ingresa tu apellido paterno"
+            registro.apellidoPaterno.trim().length > 60 -> "El apellido paterno permite hasta 60 caracteres"
+            registro.apellidoMaterno.trim().length > 60 -> "El apellido materno permite hasta 60 caracteres"
             registro.run.filter { it.isDigit() }.length !in 7..8 -> "El RUN debe tener 7 u 8 digitos"
             registro.dv.trim().isBlank() -> "Ingresa el DV"
             registro.username.trim().isBlank() -> "Ingresa un nombre de usuario"
             registro.username.trim().length > 20 -> "El nombre de usuario debe tener maximo 20 caracteres"
             registro.username.contains("@") -> "El nombre de usuario online no debe ser un correo"
             registro.correo.trim().isBlank() || !registro.correo.contains("@") -> "Ingresa un correo valido"
+            registro.correo.trim().length > 254 -> "El correo permite hasta 254 caracteres"
             registro.telefono.normalizarTelefonoBackend().length != 8 ->
                 "Ingresa los 8 digitos restantes del celular"
             registro.fechaNacimiento.trim().isBlank() -> "Ingresa tu fecha de nacimiento"
+            registro.calle.trim().length > 120 -> "La calle permite hasta 120 caracteres"
+            registro.numeroDireccion.trim().length > 20 -> "El numero de direccion permite hasta 20 caracteres"
+            registro.preguntaSeguridad1.trim().length > 200 -> "La pregunta de seguridad 1 permite hasta 200 caracteres"
+            registro.preguntaSeguridad2.trim().length > 200 -> "La pregunta de seguridad 2 permite hasta 200 caracteres"
+            registro.respuestaSeguridad1.trim().length > 200 -> "La respuesta de seguridad 1 permite hasta 200 caracteres"
+            registro.respuestaSeguridad2.trim().length > 200 -> "La respuesta de seguridad 2 permite hasta 200 caracteres"
             registro.contrasena.length < 8 -> "La contrasena debe tener al menos 8 caracteres"
             registro.contrasena.none { it.isUpperCase() } -> "La contrasena debe incluir al menos 1 mayuscula"
             registro.contrasena.none { it.isDigit() } -> "La contrasena debe incluir al menos 1 numero"
@@ -498,6 +508,9 @@ class RepositorioPerfilRemoto(
         if (correoNormalizado.isBlank() || !correoNormalizado.contains("@")) {
             return Result.failure(IllegalArgumentException("Ingresa un correo valido"))
         }
+        if (correoNormalizado.length > 254) {
+            return Result.failure(IllegalArgumentException("El correo permite hasta 254 caracteres"))
+        }
         if (telefonoNormalizado.length != 8) {
             return Result.failure(IllegalArgumentException("Ingresa los 8 digitos restantes del celular"))
         }
@@ -523,6 +536,16 @@ class RepositorioPerfilRemoto(
                     Result.failure(
                         IllegalStateException(
                             "Tu sesion ya no es valida para editar perfil. Inicia sesion de nuevo."
+                        )
+                    )
+                } else if (
+                    mensaje.contains("truncat", ignoreCase = true) ||
+                    mensaje.contains("String or binary data would be truncated", ignoreCase = true) ||
+                    mensaje.contains("SQL", ignoreCase = true)
+                ) {
+                    Result.failure(
+                        IllegalArgumentException(
+                            "Uno de los campos supera el limite permitido. Reduce el texto y vuelve a intentar."
                         )
                     )
                 } else {

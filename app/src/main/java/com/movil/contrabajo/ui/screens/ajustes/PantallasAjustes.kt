@@ -546,7 +546,7 @@ fun PantallaCuenta(
                         icono = Icons.Filled.Phone,
                         etiqueta = "Teléfono",
                         valor = usuario.telefono,
-                        prefijo = "+56 ",
+                        prefijo = "+56 9 ",
                         modifier = Modifier.fillMaxHeight().aspectRatio(1f)
                     )
                 }
@@ -932,7 +932,7 @@ private fun MapaUbicacionOpenStreetMap(
             setMultiTouchControls(false)
             controller.setZoom(zoom)
             controller.setCenter(GeoPoint(latitud, longitud))
-            setOnTouchListener { _, _ -> true }
+            setOnTouchListener { _, _ -> false }
         }
     }
 

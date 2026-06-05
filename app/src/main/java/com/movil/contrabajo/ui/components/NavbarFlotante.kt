@@ -53,7 +53,7 @@ private data class ItemNavbar(
     val icono: ImageVector
 )
 
-val PaddingNavbarFlotante = PaddingValues(bottom = 112.dp)
+val PaddingNavbarFlotante = PaddingValues(bottom = 70.dp)
 
 @Composable
 fun ContenedorConNavbarFlotante(
@@ -101,13 +101,13 @@ fun NavbarFlotante(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 16.dp)
-            .padding(bottom = 8.dp),
+            .padding(horizontal = 18.dp)
+            .padding(bottom = 4.dp),
         contentAlignment = Alignment.Center
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(0.86f),
-            shape = RoundedCornerShape(34.dp),
+            modifier = Modifier.fillMaxWidth(0.84f),
+            shape = RoundedCornerShape(30.dp),
             color = NavbarVerde.copy(alpha = 0.9f),
             border = BorderStroke(1.dp, Blanco.copy(alpha = 0.28f)),
             shadowElevation = 16.dp
@@ -125,10 +125,10 @@ fun NavbarFlotante(
                             )
                         )
                     )
-                    .padding(horizontal = 10.dp, vertical = 10.dp)
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
             ) {
                 val anchoSegmento = maxWidth / items.size
-                val anchoIndicador = 76.dp
+                val anchoIndicador = 68.dp
                 val density = LocalDensity.current
                 val desplazamientoIndicador by animateDpAsState(
                     targetValue = (anchoSegmento * indiceSeleccionado) + ((anchoSegmento - anchoIndicador) / 2),
@@ -142,8 +142,8 @@ fun NavbarFlotante(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
                         .offset(x = desplazamientoIndicador)
-                        .size(width = anchoIndicador, height = 56.dp)
-                        .clip(RoundedCornerShape(28.dp))
+                        .size(width = anchoIndicador, height = 50.dp)
+                        .clip(RoundedCornerShape(25.dp))
                         .background(
                             Brush.linearGradient(
                                 colors = listOf(
@@ -157,7 +157,7 @@ fun NavbarFlotante(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(50.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     items.forEachIndexed { indice, item ->
@@ -186,7 +186,7 @@ fun NavbarFlotante(
                                 contentDescription = item.descripcion,
                                 tint = colorIcono,
                                 modifier = Modifier
-                                    .size(34.dp)
+                                    .size(30.dp)
                                     .offset(y = elevacionIcono)
                                     .graphicsLayer {
                                         scaleX = escala

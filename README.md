@@ -15,15 +15,15 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.13.0-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.13.2-Pre-Alpha
 
 
-> <br>• Se corrigieron los bloques de información en Perfil y Ajustes para que el correo use una sola fila y no se superponga con sus etiquetas.
-> <br>• Se agregó un botón de cerrar sesión en la parte inferior del perfil y también en la pantalla de cuenta de Ajustes.
-> <br>• Se corrigió el texto de acceso para español: "¿No tienes cuenta? Regístrate".
-> <br>• Se restauró el scroll en el flujo de creación de cuenta para evitar que el contenido se corte en pantallas pequeñas.
-> <br>• Se reforzó el comportamiento de scroll en pantallas clave como inicio, login y registro para que los mensajes de error no tapen toda la vista.
-> <br>• Se revisaron los puntos más sensibles de superposición visual para mantener la lectura clara en textos largos y campos de perfil.
+> <br>• Se reforzaron los límites de longitud en registro y edición de perfil para evitar que errores técnicos del backend expongan detalles de base de datos.
+> <br>• Los errores de truncamiento o SQL al actualizar el perfil ahora se traducen a mensajes claros para el usuario.
+> <br>• Se corrigió el cierre inesperado al entrar a Perfil eliminando el scroll duplicado dentro de la pantalla.
+> <br>• Se ajustaron Perfil, Ajustes y Principal para que mapas y tarjetas no bloqueen el gesto de desplazamiento.
+> <br>• Se compactó la barra inferior flotante para reducir el alto reservado en pantallas pequeñas.
+> <br>• Se mejoró la lectura de textos largos en Perfil usando cortes controlados y puntos suspensivos.
 
 ---
 

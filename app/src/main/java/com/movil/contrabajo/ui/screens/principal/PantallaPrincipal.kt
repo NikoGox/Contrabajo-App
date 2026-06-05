@@ -881,7 +881,8 @@ private fun MiniMapaRangoBusqueda(
             setMultiTouchControls(false)
             controller.setZoom(zoom)
             controller.setCenter(GeoPoint(latitud, longitud))
-            setOnTouchListener { _, _ -> true }
+            // Vista previa: no debe bloquear el scroll ni el gesto de la pantalla.
+            setOnTouchListener { _, _ -> false }
         }
     }
 

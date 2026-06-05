@@ -1,3 +1,12 @@
+VERSION 0.13.2-Pre-Alpha
+───────
+├─• Se reforzaron los límites de longitud en registro y edición de perfil para evitar que errores técnicos del backend expongan detalles de base de datos.
+├─• Los errores de truncamiento o SQL al actualizar el perfil ahora se traducen a mensajes claros para el usuario.
+├─• Se corrigió el cierre inesperado al entrar a Perfil eliminando el scroll duplicado dentro de la pantalla.
+├─• Se ajustaron Perfil, Ajustes y Principal para que mapas y tarjetas no bloqueen el gesto de desplazamiento.
+├─• Se compactó la barra inferior flotante para reducir el alto reservado en pantallas pequeñas.
+└─• Se mejoró la lectura de textos largos en Perfil usando cortes controlados y puntos suspensivos.
+
 VERSION 0.13.1-Pre-Alpha
 ───────
 ├─• Se corrigieron los bloques de información en Perfil y Ajustes para que el correo use una sola fila y no se superponga con sus etiquetas.

@@ -97,6 +97,7 @@ class PrincipalViewModel(
 
     fun recargar() {
         viewModelScope.launch {
+            try {
             val snapshot = withContext(Dispatchers.IO) {
                 val ubicacionActual = repositorioPerfil.obtenerUbicacionAjustes()
                 val usuarioActual = repositorioAutenticacion.obtenerSesionActiva()
@@ -127,6 +128,8 @@ class PrincipalViewModel(
                 latitudUsuario = ubicacionActual.latitud,
                 longitudUsuario = ubicacionActual.longitud
             )
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -1493,7 +1496,7 @@ class PerfilViewModel(
 
     fun actualizarCorreoPerfil(valor: String) {
         uiState = uiState.copy(
-            correoPerfilInput = valor,
+            correoPerfilInput = valor.trim().take(254),
             errorPerfilEdicion = null,
             mensajePerfilEdicion = null
         )
@@ -1526,8 +1529,15 @@ class PerfilViewModel(
                 )
                 recargar()
             }.onFailure {
+                val mensaje = it.message.orEmpty()
                 uiState = uiState.copy(
-                    errorPerfilEdicion = it.message ?: "No se pudo actualizar el perfil",
+                    errorPerfilEdicion = when {
+                        mensaje.contains("truncat", ignoreCase = true) ||
+                            mensaje.contains("String or binary data would be truncated", ignoreCase = true) ||
+                            mensaje.contains("SQL", ignoreCase = true) ->
+                            "Uno de los campos supera el limite permitido. Reduce el texto y vuelve a intentar."
+                        else -> it.message ?: "No se pudo actualizar el perfil"
+                    },
                     mensajePerfilEdicion = null
                 )
             }

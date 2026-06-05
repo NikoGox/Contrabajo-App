@@ -408,11 +408,11 @@ class RegistroViewModel(
     }
 
     fun actualizarCalle(valor: String) {
-        actualizarRegistro(uiState.registro.copy(calle = valor))
+        actualizarRegistro(uiState.registro.copy(calle = valor.take(120)))
     }
 
     fun actualizarNumeroDireccion(valor: String) {
-        actualizarRegistro(uiState.registro.copy(numeroDireccion = valor))
+        actualizarRegistro(uiState.registro.copy(numeroDireccion = valor.take(20)))
     }
 
     fun actualizarCoordenadasRegistro(latitud: Double?, longitud: Double?) {
@@ -421,7 +421,7 @@ class RegistroViewModel(
 
     fun actualizarUsername(valor: String) {
         uiState = uiState.copy(
-            registro = uiState.registro.copy(username = valor),
+            registro = uiState.registro.copy(username = valor.trim().take(20)),
             error = null,
             errorUsernameDisponible = null
         )
@@ -429,7 +429,7 @@ class RegistroViewModel(
 
     fun actualizarCorreo(valor: String) {
         uiState = uiState.copy(
-            registro = uiState.registro.copy(correo = valor),
+            registro = uiState.registro.copy(correo = valor.trim().take(254)),
             error = null,
             errorCorreoDisponible = null
         )
@@ -448,19 +448,19 @@ class RegistroViewModel(
     }
 
     fun actualizarPreguntaSeguridad1(valor: String) {
-        actualizarRegistro(uiState.registro.copy(preguntaSeguridad1 = valor))
+        actualizarRegistro(uiState.registro.copy(preguntaSeguridad1 = valor.take(200)))
     }
 
     fun actualizarRespuestaSeguridad1(valor: String) {
-        actualizarRegistro(uiState.registro.copy(respuestaSeguridad1 = valor))
+        actualizarRegistro(uiState.registro.copy(respuestaSeguridad1 = valor.take(200)))
     }
 
     fun actualizarPreguntaSeguridad2(valor: String) {
-        actualizarRegistro(uiState.registro.copy(preguntaSeguridad2 = valor))
+        actualizarRegistro(uiState.registro.copy(preguntaSeguridad2 = valor.take(200)))
     }
 
     fun actualizarRespuestaSeguridad2(valor: String) {
-        actualizarRegistro(uiState.registro.copy(respuestaSeguridad2 = valor))
+        actualizarRegistro(uiState.registro.copy(respuestaSeguridad2 = valor.take(200)))
     }
 
     private fun ordenarComunasIntegracion(comunas: List<ComunaCatalogo>): List<ComunaCatalogo> {
