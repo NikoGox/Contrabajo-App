@@ -91,12 +91,11 @@ interface ServiciosApiService {
     ): Call<Map<String, String>>
 
     // ── Fotos de oferta ──────────────────────────────────────────────────────
-    @Multipart
     @POST("api/fotos/{idOferta}")
     fun subirFotoOferta(
         @Header("Authorization") authorization: String,
         @Path("idOferta") idOferta: Int,
-        @Part imagen: MultipartBody.Part
+        @Body request: FotoRequestDTO
     ): Call<FotoOfertaResponseDto>
 
     @GET("api/fotos/oferta/{idOferta}")
@@ -229,14 +228,13 @@ data class OfertaServicioRequestDto(
     val idTipoPrecio: Int?
 )
 
+data class FotoRequestDTO(
+    @SerializedName("url") val url: String
+)
+
 data class FotoOfertaResponseDto(
     @SerializedName("id_foto")           val idFoto: Int?,
     @SerializedName("enlace")            val enlace: String?,
-    @SerializedName("nombre_original")   val nombreOriginal: String?,
-    @SerializedName("tipo_mime")         val tipoMime: String?,
-    @SerializedName("tamano_bytes")      val tamanoBytes: Long?,
-    @SerializedName("ancho_px")          val anchoPx: Int?,
-    @SerializedName("alto_px")           val altoPx: Int?,
     @SerializedName("fecha_subida")      val fechaSubida: String?,
     @SerializedName("id_oferta_servicio") val idOfertaServicio: Int?,
     @SerializedName("id_usuario")        val idUsuario: Int?

@@ -102,11 +102,10 @@ interface UsuariosApiService {
     ): Call<PreguntasSeguridadDto>
 
     // ── Foto de perfil ───────────────────────────────────────────────────────
-    @Multipart
     @POST("api/usuarios/foto-perfil")
-    fun subirFotoPerfil(
+    fun guardarFotoPerfil(
         @Header("Authorization") authorization: String,
-        @Part imagen: MultipartBody.Part
+        @Body request: FotoPerfilRequestDto
     ): Call<FotoPerfilResponseDto>
 
     @GET("api/usuarios/foto-perfil/{idUsuario}")
@@ -253,14 +252,15 @@ data class PreguntaSeguridadUpdateRequestDto(
     val respuesta: String
 )
 
+// DTO que le enviamos a la API de Usuarios con la URL lista
+data class FotoPerfilRequestDto(
+    @SerializedName("url") val url: String
+)
+
+// DTO de respuesta limpio, calcado del nuevo Backend de Java
 data class FotoPerfilResponseDto(
     @SerializedName("id_foto_perfil") val idFotoPerfil: Int?,
     @SerializedName("enlace")         val enlace: String?,
-    @SerializedName("nombre_original") val nombreOriginal: String?,
-    @SerializedName("tipo_mime")      val tipoMime: String?,
-    @SerializedName("tamano_bytes")   val tamanoBytes: Long?,
-    @SerializedName("ancho_px")       val anchoPx: Int?,
-    @SerializedName("alto_px")        val altoPx: Int?,
     @SerializedName("fecha_subida")   val fechaSubida: String?,
     @SerializedName("id_usuario")     val idUsuario: Int?
 )

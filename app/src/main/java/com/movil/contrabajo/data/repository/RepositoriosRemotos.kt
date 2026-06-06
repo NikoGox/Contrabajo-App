@@ -1,5 +1,13 @@
 package com.movil.contrabajo.data.repository
 
+import androidx.exifinterface.media.ExifInterface
+import android.graphics.Matrix
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.ByteArrayOutputStream
+import com.movil.contrabajo.data.remote.FotosApiClient
+import com.movil.contrabajo.data.remote.CloudinaryApiClient
+import com.movil.contrabajo.data.remote.FotoPerfilRequestDto
 import android.content.Context
 import android.net.Uri
 import okhttp3.MediaType.Companion.toMediaType
@@ -111,8 +119,22 @@ class RepositorioAutenticacionRemoto(
                     ?: throw IllegalStateException("El backend no devolvio token de sesion")
                 val usuarioDto = response.usuario
                     ?: throw IllegalStateException("El backend no devolvio datos de usuario")
-                val usuario = RemoteSessionStore.usuarioDesdeDto(usuarioDto, passwordTemporal = password)
-                    .copy(baneoFechaFin = response.baneoActivo?.fechaFin)
+                val idUsuario = usuarioDto.id ?: throw IllegalStateException("El backend devolvio un ID nulo")
+
+                // 1. Mapeamos los datos del usuario que devolvió el login
+                val usuarioMapeado = RemoteSessionStore.usuarioDesdeDto(usuarioDto, passwordTemporal = password)
+
+                // 2. Jugada Maestra: Vamos a buscar de inmediato la foto usando el endpoint exclusivo
+                val linkFoto = ejecutarApi(api.obtenerFotoPerfil(idUsuario))
+                    .map { it.enlace?.takeIf { it.isNotBlank() }?.normalizarEnlaceEmulador().orEmpty() }
+                    .getOrDefault("") // Si no tiene foto o falla, dejamos un string vacío
+
+                // 3. Unimos los dos mundos en el objeto final
+                val usuario = usuarioMapeado.copy(
+                    baneoFechaFin = response.baneoActivo?.fechaFin,
+                    fotoPerfilUrl = linkFoto.ifBlank { usuarioMapeado.fotoPerfilUrl }
+                )
+
                 sessionStore.guardarSesion(token, usuario)
                 usuario
             }
@@ -485,17 +507,50 @@ class RepositorioPerfilRemoto(
             ?: return Result.failure(IllegalStateException("No hay token de sesion activo"))
         val usuario = sessionStore.obtenerUsuario()
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
-        val part = runCatching { uriToMultipartPart(context, uriLocal, "imagen") }
+        val part = runCatching { uriToMultipartPart(context, uriLocal, "file") }
             .getOrElse { return Result.failure(IllegalStateException("No se pudo leer la imagen seleccionada")) }
-        return ejecutarApi(api.subirFotoPerfil(bearer(token), part))
-            .mapCatching { dto ->
-                val enlace = dto.enlace?.takeIf { it.isNotBlank() }
-                    ?.normalizarEnlaceEmulador()
-                    ?: throw IllegalStateException("El servidor no devolvio un enlace de foto valido")
-                val actualizado = usuario.copy(fotoPerfilUrl = enlace)
-                sessionStore.actualizarUsuario(actualizado)
-                actualizado
-            }
+
+        return runCatching {
+            // ========================================================
+            // PASO 1: Pedir llaves a tu API de Fotos (Puerto 8084)
+            // ========================================================
+            val firma = ejecutarApi(FotosApiClient.api.obtenerFirmaCloudinary(bearer(token))).getOrThrow()
+
+            val apiKeyReq = firma.apiKey.toRequestBody("text/plain".toMediaType())
+            val timestampReq = firma.timestamp.toRequestBody("text/plain".toMediaType())
+            val signatureReq = firma.signature.toRequestBody("text/plain".toMediaType())
+
+            // ========================================================
+            // PASO 2: Disparo directo a Cloudinary
+            // ========================================================
+            val cloudinaryRes = ejecutarApi(
+                CloudinaryApiClient.api.subirImagen(
+                    file = part,
+                    apiKey = apiKeyReq,
+                    timestamp = timestampReq,
+                    signature = signatureReq
+                )
+            ).getOrThrow()
+
+            val secureUrl = cloudinaryRes.secureUrl
+
+            // ========================================================
+            // PASO 3: Guardar el enlace HTTPS en tu API de Usuarios
+            // ========================================================
+            val requestDto = FotoPerfilRequestDto(url = secureUrl)
+
+            // OJO AQUÍ: Llamamos a guardarFotoPerfil (que ahora solo recibe el JSON)
+            val dtoBackend = ejecutarApi(
+                api.guardarFotoPerfil(bearer(token), requestDto)
+            ).getOrThrow()
+
+            // Actualizamos la sesión local con el enlace devuelto
+            val enlaceFinal = dtoBackend.enlace?.takeIf { it.isNotBlank() }?.normalizarEnlaceEmulador() ?: secureUrl
+            val actualizado = usuario.copy(fotoPerfilUrl = enlaceFinal)
+            sessionStore.actualizarUsuario(actualizado)
+
+            actualizado
+        }
     }
 
     override fun actualizarContactoPerfil(correo: String, telefono: String): Result<Usuario> {
@@ -577,37 +632,56 @@ class RepositorioOfertasRemoto(
 
     override fun obtenerOfertasMarketplace(busqueda: String): List<OfertaServicio> {
         val token = sessionStore.obtenerToken() ?: return emptyList()
-        val ofertasBase = ejecutarApiServicios(api.listarOfertas(bearer(token)))
-            .getOrDefault(emptyList())
-            .map { it.toOfertaServicio() }
-            .filter { !it.eliminada && it.disponible }
-            .filter {
-                val filtro = busqueda.trim()
-                filtro.isBlank() ||
-                    it.titulo.contains(filtro, ignoreCase = true) ||
-                    it.descripcion.contains(filtro, ignoreCase = true) ||
-                    it.nombreCategoria.contains(filtro, ignoreCase = true)
-            }
+        val ofertasBaseDto = ejecutarApiServicios(api.listarOfertas(bearer(token))).getOrDefault(emptyList())
+
+        // 1. Primero limpiamos la lista usando el DTO para quedarnos solo con lo que se va a mostrar
+        val ofertasFiltradasDto = ofertasBaseDto.filter { dto ->
+            val eliminado = dto.borrado ?: false
+            val disponible = dto.disponible ?: false
+            val filtro = busqueda.trim()
+
+            (!eliminado && disponible) && (
+                    filtro.isBlank() ||
+                            (dto.titulo.orEmpty().contains(filtro, ignoreCase = true)) ||
+                            (dto.descripcion.orEmpty().contains(filtro, ignoreCase = true)) ||
+                            (dto.categoria.orEmpty().contains(filtro, ignoreCase = true))
+                    )
+        }
+
+        // 2. Ahora sí, hacemos las llamadas HTTP solo para los elementos que realmente se van a pintar
+        val ofertasBase = ofertasFiltradasDto.map { dto ->
+            val fotoUrl = ejecutarApiServicios(api.listarFotosOferta(bearer(token), dto.id ?: 0))
+                .getOrNull()?.firstOrNull()?.enlace.orEmpty()
+            dto.toOfertaServicio(fotoUrl)
+        }
+
         return enriquecerPuntuacionPromedioPorServicio(ofertasBase, token)
     }
 
     override fun obtenerOfertaPorId(idOfertaServicio: Long, incluirEliminadas: Boolean): OfertaServicio? {
         val token = sessionStore.obtenerToken() ?: return null
-        val oferta = ejecutarApiServicios(api.buscarOferta(bearer(token), idOfertaServicio.toInt()))
-            .getOrNull()
-            ?.toOfertaServicio()
-            ?.takeIf { incluirEliminadas || !it.eliminada }
-            ?: return null
+        val dto = ejecutarApiServicios(api.buscarOferta(bearer(token), idOfertaServicio.toInt())).getOrNull() ?: return null
+
+        // Buscamos su foto correspondiente
+        val fotoUrl = ejecutarApiServicios(api.listarFotosOferta(bearer(token), dto.id ?: 0))
+            .getOrNull()?.firstOrNull()?.enlace.orEmpty()
+
+        val oferta = dto.toOfertaServicio(fotoUrl).takeIf { incluirEliminadas || !it.eliminada } ?: return null
         return enriquecerPuntuacionPromedioPorServicio(listOf(oferta), token).firstOrNull()
     }
 
     override fun obtenerOfertasPropias(): List<OfertaServicio> {
         val token = sessionStore.obtenerToken() ?: return emptyList()
         val usuario = sessionStore.obtenerUsuario() ?: return emptyList()
-        val ofertasBase = ejecutarApiServicios(api.listarOfertasTrabajador(bearer(token), usuario.idUsuario.toInt()))
+        val ofertasBaseDto = ejecutarApiServicios(api.listarOfertasTrabajador(bearer(token), usuario.idUsuario.toInt()))
             .getOrDefault(emptyList())
-            .map { it.toOfertaServicio() }
-            .filter { !it.eliminada }
+
+        val ofertasBase = ofertasBaseDto.map { dto ->
+            // Buscamos su foto correspondiente para la pantalla de Perfil
+            val fotoUrl = ejecutarApiServicios(api.listarFotosOferta(bearer(token), dto.id ?: 0))
+                .getOrNull()?.firstOrNull()?.enlace.orEmpty()
+            dto.toOfertaServicio(fotoUrl)
+        }.filter { !it.eliminada }
         return enriquecerPuntuacionPromedioPorServicio(ofertasBase, token)
     }
 
@@ -639,7 +713,11 @@ class RepositorioOfertasRemoto(
         }
 
         return ofertas.map { oferta ->
-            oferta.copy(puntuacionPromedio = promedioPorOferta[oferta.idOfertaServicio] ?: 0.0)
+            // 🌟 CORRECCIÓN MAESTRA: Forzamos a que la copia final mantenga intacto el 'fotoUrlReferencia' que recuperamos antes
+            oferta.copy(
+                puntuacionPromedio = promedioPorOferta[oferta.idOfertaServicio] ?: 0.0,
+                fotoUrlReferencia = oferta.fotoUrlReferencia // 👈 ¡Garantizamos que la foto no se borre aquí!
+            )
         }
     }
 
@@ -749,7 +827,17 @@ class RepositorioOfertasRemoto(
         } else {
             ejecutarApiServicios(api.crearOferta(bearer(token), request))
         }
-        return resultado.map { it.toOfertaServicio() }
+
+        return resultado.mapCatching { ofertaDto ->
+            val fotoLocalUri = formulario.foto?.uriLocal ?: ""
+            if (fotoLocalUri.isNotBlank()) {
+                val subidaFotoResult = subirFotoOferta(fotoLocalUri, ofertaDto.id?.toLong() ?: 0L)
+                val linkFinal = subidaFotoResult.getOrNull()?.enlace.orEmpty()
+                ofertaDto.toOfertaServicio(linkFinal)
+            } else {
+                ofertaDto.toOfertaServicio()
+            }
+        }
     }
 
     override fun actualizarDisponibilidadOfertaPropia(idOfertaServicio: Long, disponible: Boolean): Result<OfertaServicio> {
@@ -775,10 +863,42 @@ class RepositorioOfertasRemoto(
     override fun subirFotoOferta(uriString: String, idOferta: Long): Result<FotoOferta> {
         val token = sessionStore.obtenerToken()
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
-        val part = runCatching { uriToMultipartPart(context, uriString, "imagen") }
+        val part = runCatching { uriToMultipartPart(context, uriString, "file") }
             .getOrElse { return Result.failure(IllegalStateException("No se pudo leer la imagen seleccionada")) }
-        return ejecutarApiServicios(api.subirFotoOferta(bearer(token), idOferta.toInt(), part))
-            .map { it.toFotoOferta() }
+
+        return runCatching {
+            // ========================================================
+            // PASO 1: Pedir llaves a tu API de Fotos (Puerto 8084)
+            // ========================================================
+            val firma = ejecutarApi(FotosApiClient.api.obtenerFirmaCloudinary(bearer(token))).getOrThrow()
+
+            val apiKeyReq = firma.apiKey.toRequestBody("text/plain".toMediaType())
+            val timestampReq = firma.timestamp.toRequestBody("text/plain".toMediaType())
+            val signatureReq = firma.signature.toRequestBody("text/plain".toMediaType())
+
+            // ========================================================
+            // PASO 2: Disparo directo a Cloudinary
+            // ========================================================
+            val cloudinaryRes = ejecutarApi(
+                CloudinaryApiClient.api.subirImagen(
+                    file = part,
+                    apiKey = apiKeyReq,
+                    timestamp = timestampReq,
+                    signature = signatureReq
+                )
+            ).getOrThrow()
+
+            // ========================================================
+            // PASO 3: Guardar el enlace HTTPS en tu API de Servicios
+            // ========================================================
+            val requestDto = com.movil.contrabajo.data.remote.FotoRequestDTO(url = cloudinaryRes.secureUrl)
+
+            val dtoBackend = ejecutarApiServicios(
+                api.subirFotoOferta(bearer(token), idOferta.toInt(), requestDto)
+            ).getOrThrow()
+
+            dtoBackend.toFotoOferta()
+        }
     }
 
     override fun listarFotosOferta(idOferta: Long): Result<List<FotoOferta>> {
@@ -1513,12 +1633,28 @@ private fun PreguntasSeguridadDto.toPreguntasConfig(): List<PreguntaSeguridadCon
     )
 }
 
-private fun OfertaServicioDto.toOfertaServicio(): OfertaServicio {
+// Cambiamos la firma para poder pasarle la URL de la foto recuperada
+// 🌟 1. Reemplazar el mapeador del DTO para que lea los IDs exactos de tu SQL Server
+private fun OfertaServicioDto.toOfertaServicio(fotoUrl: String = ""): OfertaServicio {
     val categoriaNombre = categoria.orEmpty()
     val tipoPrecioNombre = tipoPrecio.orEmpty()
-    val tipoPrecioLocal = tipoPrecioNombre.toTipoPrecioLocal()
+
+    // Primero intentamos resolver por el ID numérico que es infalible y viene directo de la BD
+    val tipoPrecioLocal = if (idTipoPrecio != null) {
+        when (idTipoPrecio) {
+            1 -> TipoPrecio.POR_HORA   // ID 1: Por hora
+            2 -> TipoPrecio.FIJO       // ID 2: Por trabajo (Fijo en el Front)
+            3 -> TipoPrecio.DESDE      // ID 3: Por día (Desde en el Front)
+            4 -> TipoPrecio.CONTACTAR  // ID 4: A convenir (Contactar en el Front)
+            else -> tipoPrecioNombre.toTipoPrecioLocal() // Fallback a texto si es un ID nuevo
+        }
+    } else {
+        tipoPrecioNombre.toTipoPrecioLocal()
+    }
+
     val monto = precio?.toInt() ?: 0
     val precioTexto = PrecioUtils.construirPrecioTexto(tipoPrecioLocal, monto)
+
     return OfertaServicio(
         idOfertaServicio = id?.toLong() ?: 0L,
         titulo = titulo.orEmpty(),
@@ -1537,24 +1673,28 @@ private fun OfertaServicioDto.toOfertaServicio(): OfertaServicio {
         ubicacionReferencia = ubicacionReferencia.orEmpty(),
         latitudReferencia = latitudReferencia,
         longitudReferencia = longitudReferencia,
-        eliminada = borrado ?: false
+        eliminada = borrado ?: false,
+        fotoUrlReferencia = fotoUrl.normalizarEnlaceEmulador()
     )
 }
 
 private fun String.toTipoPrecioLocal(): Int {
     return when (normalizarTexto(this)) {
-        "precio fijo" -> TipoPrecio.FIJO
         "por hora" -> TipoPrecio.POR_HORA
-        "a convenir" -> TipoPrecio.CONTACTAR
+        "por trabajo", "precio fijo" -> TipoPrecio.FIJO
+        "por dia", "desde" -> TipoPrecio.DESDE
+        "a convenir", "contactar", "contactar para saber precio" -> TipoPrecio.CONTACTAR
         else -> TipoPrecio.CONTACTAR
     }
 }
 
+// 🌟 3. Corregir el formateador inverso que viaja hacia el Backend (Línea ~590)
 private fun Int.nombreBackendTipoPrecio(): String {
     return when (this) {
-        TipoPrecio.FIJO -> "Precio Fijo"
-        TipoPrecio.POR_HORA -> "Por Hora"
-        TipoPrecio.DESDE, TipoPrecio.CONTACTAR -> "A convenir"
+        TipoPrecio.POR_HORA  -> "Por hora"
+        TipoPrecio.FIJO      -> "Por trabajo"
+        TipoPrecio.DESDE     -> "Por día"
+        TipoPrecio.CONTACTAR -> "A convenir"
         else -> "A convenir"
     }
 }
@@ -1591,15 +1731,63 @@ private fun validarFormularioServicioRemoto(formulario: FormularioServicio): Str
 
 private fun uriToMultipartPart(context: Context, uriString: String, partName: String): MultipartBody.Part {
     val uri = Uri.parse(uriString)
-    val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
-    val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-    val extension = when {
-        mimeType.contains("png", ignoreCase = true) -> "png"
-        mimeType.contains("webp", ignoreCase = true) -> "webp"
-        else -> "jpg"
+
+    // 1. Detectar si la foto viene rotada por los metadatos del celular (EXIF)
+    var rotacionGrados = 0
+    try {
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            val exifInterface = ExifInterface(input)
+            val orientacion = exifInterface.getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )
+            rotacionGrados = when (orientacion) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270
+                else -> 0
+            }
+        }
+    } catch (_: Exception) {}
+
+    // 2. Abrimos la imagen original
+    val inputStream = context.contentResolver.openInputStream(uri)
+    val bitmapOriginal = BitmapFactory.decodeStream(inputStream)
+    inputStream?.close()
+
+    if (bitmapOriginal == null) {
+        throw IllegalStateException("No se pudo leer la imagen seleccionada")
     }
-    val requestBody = bytes.toRequestBody(mimeType.toMediaType())
-    return MultipartBody.Part.createFormData(partName, "foto.$extension", requestBody)
+
+    // 3. Redimensionar manteniendo la proporción (Max 1080px)
+    val maxDimension = 1080f
+    val scale = minOf(maxDimension / bitmapOriginal.width, maxDimension / bitmapOriginal.height, 1f)
+
+    // 4. Aplicamos escala y la rotación necesaria para enderezarla
+    val matriz = Matrix()
+    if (scale < 1f) matriz.postScale(scale, scale)
+    if (rotacionGrados != 0) matriz.postRotate(rotacionGrados.toFloat())
+
+    val bitmapFinal = Bitmap.createBitmap(
+        bitmapOriginal,
+        0, 0,
+        bitmapOriginal.width,
+        bitmapOriginal.height,
+        matriz,
+        true
+    )
+
+    // 5. Comprimimos a JPEG al 80% (Pasa de 16MB a ~300KB)
+    val outputStream = ByteArrayOutputStream()
+    bitmapFinal.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+    val bytesComprimidos = outputStream.toByteArray()
+
+    // Limpieza estricta de memoria RAM
+    if (bitmapFinal != bitmapOriginal) bitmapFinal.recycle()
+    bitmapOriginal.recycle()
+
+    val requestBody = bytesComprimidos.toRequestBody("image/jpeg".toMediaType())
+    return MultipartBody.Part.createFormData(partName, "foto_comprimida.jpg", requestBody)
 }
 
 private fun String.normalizarEnlaceEmulador(): String =
@@ -1609,11 +1797,11 @@ private fun String.normalizarEnlaceEmulador(): String =
 private fun FotoOfertaResponseDto.toFotoOferta(): FotoOferta = FotoOferta(
     idFoto = idFoto?.toLong() ?: 0L,
     enlace = enlace.orEmpty().normalizarEnlaceEmulador(),
-    nombreOriginal = nombreOriginal.orEmpty(),
-    tipoMime = tipoMime.orEmpty(),
-    tamanoBytes = tamanoBytes ?: 0L,
-    anchoPx = anchoPx,
-    altoPx = altoPx,
+    nombreOriginal = "foto_cloudinary", // Ya no lo guardamos, dejamos un genérico
+    tipoMime = "image/jpeg",           // Genérico para la UI
+    tamanoBytes = 0L,                  // Genérico
+    anchoPx = null,
+    altoPx = null,
     fechaSubida = fechaSubida.orEmpty(),
     idOfertaServicio = idOfertaServicio?.toLong() ?: 0L,
     idUsuario = idUsuario?.toLong() ?: 0L

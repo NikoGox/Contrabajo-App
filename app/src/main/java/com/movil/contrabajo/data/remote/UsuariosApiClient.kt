@@ -44,6 +44,36 @@ object UsuariosApiClient {
         .create(UsuariosApiService::class.java)
 }
 
+object FotosApiClient {
+    // 1. Le agregamos el interceptor para que imprima en el Logcat todo lo que entra y sale
+    private val client = OkHttpClient.Builder()
+        .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
+        .build()
+
+    val api: FotosApiService = Retrofit.Builder()
+        .baseUrl(BuildConfig.FOTOS_BASE_URL)
+        .client(client) // 2. Se lo enchufamos aquí
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(FotosApiService::class.java)
+}
+
+object CloudinaryApiClient {
+    // 1. Igual aquí, le ponemos el interceptor a Cloudinary
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
+        .build()
+
+    val api: CloudinaryApiService = Retrofit.Builder()
+        .baseUrl("https://api.cloudinary.com/")
+        .client(client) // 2. Se lo enchufamos aquí
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(CloudinaryApiService::class.java)
+}
 internal fun bearer(token: String): String = "Bearer $token"
 
 internal fun <T> ejecutarApi(call: Call<T>): Result<T> {
