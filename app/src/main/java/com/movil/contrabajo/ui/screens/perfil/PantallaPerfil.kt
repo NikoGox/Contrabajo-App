@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.ui.components.BotonPrimario
+import com.movil.contrabajo.ui.components.EstrellaPremiumAnimada
 import com.movil.contrabajo.ui.components.EtiquetaEstado
 import com.movil.contrabajo.ui.components.FilaEtiquetaValor
 import com.movil.contrabajo.ui.components.LogoContrabajo
@@ -199,17 +200,26 @@ fun PantallaPerfil(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        Text(
-                            text = if (usuario == null) {
-                                "Mi perfil"
-                            } else {
-                                "${usuario.nombre} ${usuario.apellidoPaterno}"
-                            },
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = if (usuario == null) {
+                                    "Mi perfil"
+                                } else {
+                                    "${usuario.nombre} ${usuario.apellidoPaterno}"
+                                },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            if (usuario?.tipoPerfil == TipoPerfil.PREMIUM) {
+                                EstrellaPremiumAnimada(tamano = 18.dp)
+                            }
+                        }
                         if (usuario != null) {
                             Text(
                                 text = "@${usuario.username}",
@@ -225,7 +235,8 @@ fun PantallaPerfil(
                                 Text(
                                     text = when (usuario.tipoPerfil) {
                                         TipoPerfil.MODERADOR -> "Moderador"
-                                        TipoPerfil.TRABAJADOR, TipoPerfil.PREMIUM -> "Trabajador"
+                                        TipoPerfil.PREMIUM -> "Trabajador Premium"
+                                        TipoPerfil.TRABAJADOR -> "Trabajador"
                                         else -> "Cliente"
                                     },
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),

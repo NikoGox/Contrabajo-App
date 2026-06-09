@@ -15,42 +15,15 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 ## Últimos cambios
 
 
-### ❚❙❘ VERSIÓN 0.13.2-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.14.0-Pre-Alpha
 
 
-> <br>• Se reforzaron los límites de longitud en registro y edición de perfil para evitar que errores técnicos del backend expongan detalles de base de datos.
-> <br>• Los errores de truncamiento o SQL al actualizar el perfil ahora se traducen a mensajes claros para el usuario.
-> <br>• Se corrigió el cierre inesperado al entrar a Perfil eliminando el scroll duplicado dentro de la pantalla.
-> <br>• Se ajustaron Perfil, Ajustes y Principal para que mapas y tarjetas no bloqueen el gesto de desplazamiento.
-> <br>• Se compactó la barra inferior flotante para reducir el alto reservado en pantallas pequeñas.
-> <br>• Se mejoró la lectura de textos largos en Perfil usando cortes controlados y puntos suspensivos.
-
----
-
-### ❚❙❘ VERSIÓN 0.13.1-Pre-Alpha
-
-
-> <br>• Se corrigieron los bloques de información en Perfil y Ajustes para que el correo use una sola fila y no se superponga con sus etiquetas.
-> <br>• Se agregó un botón de cerrar sesión en la parte inferior del perfil y también en la pantalla de cuenta de Ajustes.
-> <br>• Se corrigió el texto de acceso para español: "¿No tienes cuenta? Regístrate".
-> <br>• Se restauró el scroll en el flujo de creación de cuenta para evitar que el contenido se corte en pantallas pequeñas.
-> <br>• Se reforzó el comportamiento de scroll en pantallas clave como inicio, login y registro para que los mensajes de error no tapen toda la vista.
-> <br>• Se revisaron los puntos más sensibles de superposición visual para mantener la lectura clara en textos largos y campos de perfil.
-
----
-
-### ❚❙❘ VERSIÓN 0.13.0-Pre-Alpha
-
-
-> <br>• La pantalla de información de cuenta fue rediseñada: datos agrupados con iconos, tarjetas de contacto lado a lado y sección de identificación con jerarquía visual clara.
-> <br>• El perfil muestra el prefijo +56 en gris antes del número de teléfono.
-> <br>• Se eliminaron RUN y Dirección del bloque visible en la pantalla de Perfil; solo se muestran Correo y Teléfono.
-> <br>• Se reemplazó el pull-to-refresh por la API estándar de Material3 en PantallaPrincipal y PantallaPerfil: comportamiento más fluido, indicador centrado con fondo blanco y flecha en color primario.
-> <br>• Al abrir el chat, si los datos aún no cargaron se muestra un skeleton animado con la forma de las burbujas en lugar del mensaje de error incorrecto.
-> <br>• Se corrigieron todas las tildes faltantes en los textos visibles de la app (más de 90 cadenas en 11 archivos de pantallas).
-> <br>• Si el servidor está caído al iniciar la app, se muestra una pantalla de error con botones Reintentar y Cerrar sesión en lugar de entrar al home con pantallas vacías.
-> <br>• Si la sesión fue invalidada desde otro dispositivo, la app detecta el código 401 automáticamente y cierra sesión de forma ordenada.
-> <br>• La pantalla de lista de chats fue completamente rediseñada con estética moderna tipo WhatsApp/Messenger: buscador integrado en el contenedor, selector de tipo animado con pill deslizante, filas con avatar en degradado, badge de no leídos y chip de rol. Los clientes no ven el selector de tipo.
+> <br>• Se incorporó el apartado Premium: un botón con la "P" (solo visible para trabajadores) abre la pantalla de bienvenida con las ventajas y la activación.
+> <br>• La bienvenida Premium tiene elementos animados y un botón "Quiero ser premium" con borde animado en cyan y verde; el estado Premium se guarda de verdad en la cuenta a través del backend.
+> <br>• El menú Premium muestra estadísticas reales del trabajador (servicios, valoraciones, historial de contactos) y dashboards: contactos por día, días más rentables, conversión de chats a citas, ingreso total y ticket promedio.
+> <br>• Se agregaron las pantallas "Historial de contactos" y "Lectura rápida", además de una pantalla de carga tipo skeleton mientras se cargan las estadísticas (ya no se queda colgado si una consulta falla).
+> <br>• El trabajador Premium luce una estrella animada junto a su nombre y aparece como "Trabajador Premium" en su perfil.
+> <br>• Premium permite publicar hasta 5 servicios en total y mantener hasta 3 activos a la vez (antes 3 y 1). Tras activar Premium se solicita iniciar sesión nuevamente para habilitar los beneficios al instante.
 
 ---
 

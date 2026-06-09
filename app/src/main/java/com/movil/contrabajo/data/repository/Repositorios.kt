@@ -63,6 +63,7 @@ interface RepositorioPerfil {
     fun limpiarFiltrosMarketplace(): Result<FiltroMarketplaceConfig>
     fun actualizarFotoPerfil(uriLocal: String): Result<Usuario>
     fun actualizarContactoPerfil(correo: String, telefono: String): Result<Usuario>
+    fun promoverAPremium(): Result<Usuario>
 }
 
 interface RepositorioReportes {
@@ -92,6 +93,7 @@ interface RepositorioOfertas {
     fun obtenerDisponibilidadOfertaPropia(idOfertaServicio: Long): Result<Boolean>
     fun obtenerIdsOfertasConTrabajoEnCursoPropias(): Set<Long>
     fun obtenerValoracionesPropiasPorServicio(): List<ValoracionesServicio>
+    fun obtenerMisCitas(): List<CitaServicio>
     fun obtenerCategoriasServicio(): List<CategoriaServicio>
     fun guardarOfertaPropia(formulario: FormularioServicio, idOfertaServicio: Long? = null): Result<OfertaServicio>
     fun actualizarDisponibilidadOfertaPropia(idOfertaServicio: Long, disponible: Boolean): Result<OfertaServicio>
@@ -524,6 +526,18 @@ class RepositorioPerfilLocal(
         return Result.success(db.obtenerUsuarioPorId(usuario.idUsuario) ?: usuario)
     }
 
+    override fun promoverAPremium(): Result<Usuario> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        if (usuario.tipoPerfil == TipoPerfil.PREMIUM) {
+            return Result.failure(IllegalStateException("El usuario ya es premium"))
+        }
+        if (usuario.tipoPerfil != TipoPerfil.TRABAJADOR) {
+            return Result.failure(IllegalStateException("Solo un trabajador puede volverse premium"))
+        }
+        return Result.success(usuario.copy(tipoPerfil = TipoPerfil.PREMIUM))
+    }
+
     private fun limpiarRun(run: String): String = run.filter { it.isDigit() }
 }
 
@@ -690,6 +704,8 @@ class RepositorioOfertasLocal(
             )
         }
     }
+
+    override fun obtenerMisCitas(): List<CitaServicio> = emptyList()
 
     override fun obtenerCategoriasServicio(): List<CategoriaServicio> = db.obtenerCategoriasServicio()
 

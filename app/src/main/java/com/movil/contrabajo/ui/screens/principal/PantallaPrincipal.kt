@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import com.movil.contrabajo.ui.components.BotonPremiumP
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.outlined.FilterAlt
@@ -127,6 +128,8 @@ fun PantallaPrincipal(
     onAbrirServicio: (Long) -> Unit,
     onAbrirAjustes: () -> Unit,
     onAbrirUbicacionRapida: () -> Unit,
+    onAbrirPremium: () -> Unit = {},
+    mostrarBotonPremium: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val uiState = viewModel.uiState
@@ -352,6 +355,20 @@ fun PantallaPrincipal(
                         innerTextField()
                     }
                 )
+
+                if (mostrarBotonPremium && progresoBuscador < 0.98f) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .graphicsLayer {
+                                alpha = (1f - progresoBuscador).coerceIn(0f, 1f)
+                            }
+                            .clickable(enabled = progresoBuscador < 0.12f) { onAbrirPremium() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        BotonPremiumP(tamano = 34.dp)
+                    }
+                }
 
                 IconButton(
                     onClick = { busquedaActiva = true }

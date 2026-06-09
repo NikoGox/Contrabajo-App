@@ -352,6 +352,20 @@ class RepositorioPerfilRemoto(
         }
     }
 
+    override fun promoverAPremium(): Result<Usuario> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay token de sesion activo"))
+        val usuario = sessionStore.obtenerUsuario()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+
+        return ejecutarApi(api.hacermePremium(bearer(token))).mapCatching {
+            val actualizado = RemoteSessionStore.usuarioDesdeDto(it, passwordTemporal = usuario.contrasenaHash)
+                .copy(fotoPerfilUrl = usuario.fotoPerfilUrl)
+            sessionStore.actualizarUsuario(actualizado)
+            actualizado
+        }
+    }
+
     override fun obtenerPreguntasSeguridad(): List<PreguntaSeguridadConfig> {
         val token = sessionStore.obtenerToken() ?: return emptyList()
         val usuario = sessionStore.obtenerUsuario() ?: return emptyList()
@@ -630,6 +644,13 @@ class RepositorioOfertasRemoto(
     override fun obtenerOfertaPrincipal(): OfertaServicio? =
         obtenerOfertasMarketplace().firstOrNull { it.disponible }
 
+    override fun obtenerMisCitas(): List<CitaServicio> {
+        val token = sessionStore.obtenerToken() ?: return emptyList()
+        return ejecutarApiServicios(api.misCitas(bearer(token)))
+            .getOrDefault(emptyList())
+            .map { it.toCitaServicio(0L) }
+    }
+
     override fun obtenerOfertasMarketplace(busqueda: String): List<OfertaServicio> {
         val token = sessionStore.obtenerToken() ?: return emptyList()
         val ofertasBaseDto = ejecutarApiServicios(api.listarOfertas(bearer(token))).getOrDefault(emptyList())
@@ -843,8 +864,23 @@ class RepositorioOfertasRemoto(
     override fun actualizarDisponibilidadOfertaPropia(idOfertaServicio: Long, disponible: Boolean): Result<OfertaServicio> {
         val token = sessionStore.obtenerToken()
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
-        if (disponible && obtenerOfertasPropias().any { it.disponible && it.idOfertaServicio != idOfertaServicio }) {
-            return Result.failure(IllegalStateException("Ya tienes un servicio activo. Desactivalo antes de activar otro."))
+        if (disponible) {
+            // El límite de servicios activos depende del rol: 3 para Premium, 1 para trabajador normal.
+            val esPremium = sessionStore.obtenerUsuario()?.tipoPerfil == TipoPerfil.PREMIUM
+            val limiteActivos = if (esPremium) 3 else 1
+            val activosActuales = obtenerOfertasPropias()
+                .count { it.disponible && it.idOfertaServicio != idOfertaServicio }
+            if (activosActuales >= limiteActivos) {
+                return Result.failure(
+                    IllegalStateException(
+                        if (limiteActivos == 1) {
+                            "Ya tienes un servicio activo. Desactívalo antes de activar otro."
+                        } else {
+                            "Alcanzaste el límite de $limiteActivos servicios activos. Desactiva uno antes de activar otro."
+                        }
+                    )
+                )
+            }
         }
         val call = if (disponible) {
             api.activarDisponibilidadOferta(bearer(token), idOfertaServicio.toInt())

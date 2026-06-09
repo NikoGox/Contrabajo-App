@@ -12,12 +12,38 @@ android {
         applicationId = "com.movil.contrabajo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.13.2-Pre-Alpha"
-        buildConfigField("String", "USUARIOS_BASE_URL", "\"http://20.114.137.86:8081/\"")
-        buildConfigField("String", "SERVICIOS_BASE_URL", "\"http://20.114.137.86:8082/\"")
-        buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"http://20.114.137.86:8083/\"")
-        buildConfigField("String", "FOTOS_BASE_URL", "\"http://20.114.137.86:8084/\"")
+        versionCode = 15
+        versionName = "0.14.0-Pre-Alpha"
+
+        // ─────────────────────────────────────────────────────────────────────
+        // CONFIGURACIÓN DE ENTORNO (URLs de los microservicios)
+        //
+        // Existen dos perfiles de conexión. Mantén descomentado UNO solo:
+        //
+        //   • DOCKER (local): para desarrollo con el backend corriendo en
+        //     docker-compose en esta misma PC. El emulador Android alcanza el
+        //     host mediante la IP especial 10.0.2.2 (loopback emulador → host).
+        //     Es el perfil por defecto durante el desarrollo.
+        //
+        //   • NUBE (producción): apunta al despliegue en la nube. La IP puede
+        //     CAMBIAR entre despliegues; actualízala aquí cuando rote. Se
+        //     mantiene COMENTADO y solo se activa al compilar para distribución.
+        //
+        // Para alternar: comenta el bloque activo y descomenta el otro.
+        // ─────────────────────────────────────────────────────────────────────
+
+        // ── DOCKER (local) — ACTIVO ──
+        buildConfigField("String", "USUARIOS_BASE_URL", "\"http://10.0.2.2:8081/\"")
+        buildConfigField("String", "SERVICIOS_BASE_URL", "\"http://10.0.2.2:8082/\"")
+        buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"http://10.0.2.2:8083/\"")
+        buildConfigField("String", "FOTOS_BASE_URL", "\"http://10.0.2.2:8084/\"")
+
+        // ── NUBE (producción) — INACTIVO (IP puede variar, actualizar al rotar) ──
+        // buildConfigField("String", "USUARIOS_BASE_URL", "\"http://20.114.137.86:8081/\"")
+        // buildConfigField("String", "SERVICIOS_BASE_URL", "\"http://20.114.137.86:8082/\"")
+        // buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"http://20.114.137.86:8083/\"")
+        // buildConfigField("String", "FOTOS_BASE_URL", "\"http://20.114.137.86:8084/\"")
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Play Console valida 16 KB page size en libs nativas para Android 15+.

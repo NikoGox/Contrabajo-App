@@ -37,6 +37,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.DayOfWeek
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import java.text.Normalizer
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -1010,6 +1014,8 @@ class PerfilViewModel(
                 ofertaPrincipal.toFormularioServicio()
             }
 
+            val esPremium = usuario?.tipoPerfil == TipoPerfil.PREMIUM
+
             uiState = uiState.copy(
                 usuario = usuario,
                 ofertasPropias = ofertasPropias,
@@ -1017,6 +1023,8 @@ class PerfilViewModel(
                 comunasDisponibles = comunasDisponiblesRemotas ?: uiState.comunasDisponibles,
                 idsOfertasEnCurso = idsOfertasEnCurso,
                 valoracionesPorServicio = valoracionesPorServicio,
+                limiteServiciosActivos = if (esPremium) 3 else 1,
+                limiteServiciosTotales = if (esPremium) 5 else 3,
                 formularioServicio = formularioServicio,
                 runVerificacion = usuario?.run.orEmpty(),
                 dvVerificacion = usuario?.dv.orEmpty(),
@@ -2068,5 +2076,247 @@ class BaneosViewModel(
 
     fun consumirMensaje() {
         uiState = uiState.copy(mensajeExito = null, error = null)
+    }
+}
+
+// ============================================================================
+// PREMIUM
+// ============================================================================
+
+enum class EstadoPagoPremium { INICIAL, PROCESANDO, LISTO, ERROR }
+
+data class PremiumSerieDia(
+    val etiqueta: String,
+    val cantidad: Int,
+    val destacado: Boolean = false
+)
+
+data class PremiumHistorialContacto(
+    val idChatCita: Long,
+    val nombreContacto: String,
+    val tituloServicio: String,
+    val fechaTermino: String,
+    val resultado: String,
+    val estrellas: Int? = null
+)
+
+data class PremiumStats(
+    val chatsTotales: Int = 0,
+    val chatsActivos: Int = 0,
+    val mensajesNoLeidos: Int = 0,
+    val serviciosActivos: Int = 0,
+    val serviciosTotales: Int = 0,
+    val citasFinalizadas: Int = 0,
+    val citasCanceladas: Int = 0,
+    val citasRechazadas: Int = 0,
+    val citasTotales: Int = 0,
+    val valoracionesTotales: Int = 0,
+    val promedioValoracion: Double = 0.0,
+    val contactosUltimos7Dias: Int = 0,
+    val tasaConversionCita: Int = 0,
+    val ingresoTotalCerrado: Int = 0,
+    val ticketPromedio: Int = 0,
+    val mejorDiaContactos: String = "—",
+    val mejorDiaIngresos: String = "—",
+    val contactosPorDia: List<PremiumSerieDia> = emptyList(),
+    val ingresosPorDia: List<PremiumSerieDia> = emptyList()
+)
+
+data class PremiumUiState(
+    val esPremium: Boolean = false,
+    val estadoPago: EstadoPagoPremium = EstadoPagoPremium.INICIAL,
+    val errorPago: String? = null,
+    val cargandoStats: Boolean = true,
+    val stats: PremiumStats = PremiumStats(),
+    val historialContactos: List<PremiumHistorialContacto> = emptyList()
+)
+
+class PremiumViewModel(
+    private val repositorioPerfil: RepositorioPerfil,
+    private val repositorioOfertas: RepositorioOfertas,
+    private val repositorioChats: RepositorioChats
+) : ViewModel() {
+    var uiState by mutableStateOf(PremiumUiState())
+        private set
+
+    init { refrescarEstadoPremium() }
+
+    fun refrescarEstadoPremium() {
+        viewModelScope.launch {
+            val usuario = withContext(Dispatchers.IO) { repositorioPerfil.obtenerPerfilActual() }
+            uiState = uiState.copy(esPremium = usuario?.tipoPerfil == TipoPerfil.PREMIUM)
+        }
+    }
+
+    fun procesarPagoPremium() {
+        if (uiState.estadoPago == EstadoPagoPremium.PROCESANDO) return
+        uiState = uiState.copy(estadoPago = EstadoPagoPremium.PROCESANDO, errorPago = null)
+        viewModelScope.launch {
+            delay(1_100)
+            val resultado = withContext(Dispatchers.IO) { repositorioPerfil.promoverAPremium() }
+            uiState = resultado.fold(
+                onSuccess = { uiState.copy(estadoPago = EstadoPagoPremium.LISTO, esPremium = true) },
+                onFailure = {
+                    uiState.copy(
+                        estadoPago = EstadoPagoPremium.ERROR,
+                        errorPago = it.message ?: "No se pudo activar Premium"
+                    )
+                }
+            )
+        }
+    }
+
+    fun reiniciarPago() {
+        uiState = uiState.copy(estadoPago = EstadoPagoPremium.INICIAL, errorPago = null)
+    }
+
+    fun cargarEstadisticas() {
+        uiState = uiState.copy(cargandoStats = true)
+        viewModelScope.launch {
+          try {
+            val stats = withContext(Dispatchers.IO) {
+                val usuario = repositorioPerfil.obtenerPerfilActual()
+                val chats = repositorioChats.obtenerChatsActuales()
+                val ofertas = repositorioOfertas.obtenerOfertasPropias()
+                val citas = repositorioOfertas.obtenerMisCitas()
+                val valoraciones = repositorioOfertas.obtenerValoracionesPropiasPorServicio()
+                val votos = valoraciones.flatMap { it.valoraciones }.map { it.voto }
+                val valoracionesPorChat = valoraciones
+                    .flatMap { it.valoraciones }
+                    .associateBy { it.idChatCita }
+                val citasPorChat = citas.associateBy { it.idChatCita }
+                val historial = chats
+                    .filter { usuario == null || it.idTrabajador == usuario.idUsuario }
+                    .map { chat ->
+                        val cita = citasPorChat[chat.idChatCita]
+                        val valoracion = valoracionesPorChat[chat.idChatCita]
+                        PremiumHistorialContacto(
+                            idChatCita = chat.idChatCita,
+                            nombreContacto = chat.nombreContacto.ifBlank { chat.usernameContacto.ifBlank { "Contacto" } },
+                            tituloServicio = chat.tituloServicio.ifBlank { "Servicio sin título" },
+                            fechaTermino = cita?.fechaFinTrabajo
+                                ?: cita?.fechaProgramada
+                                ?: chat.horaUltimoMensaje.ifBlank { chat.fechaCreacion },
+                            resultado = describirResultadoContacto(chat, cita),
+                            estrellas = if (chat.chatCerrado) valoracion?.voto else null
+                        )
+                    }
+                    .sortedByDescending { parseFechaPremium(it.fechaTermino) ?: LocalDateTime.MIN }
+                val contactosPorDia = construirSerieSemanal(
+                    chats.mapNotNull { parseFechaPremium(it.fechaCreacion)?.dayOfWeek }
+                )
+                val citasFinalizadas = citas.filter { it.estado == EstadoCita.FINALIZADO }
+                val ingresosPorDia = construirSerieSemanal(
+                    citasFinalizadas.mapNotNull { cita ->
+                        parseFechaPremium(cita.fechaFinTrabajo ?: cita.fechaProgramada)?.dayOfWeek
+                    }
+                )
+                val contactosUltimos7Dias = chats.count {
+                    val fecha = parseFechaPremium(it.fechaCreacion) ?: return@count false
+                    fecha.isAfter(LocalDateTime.now().minusDays(7))
+                }
+                val ingresoTotal = citasFinalizadas.sumOf { it.precioAcordado.coerceAtLeast(0) }
+                val ticketPromedio = if (citasFinalizadas.isEmpty()) 0 else ingresoTotal / citasFinalizadas.size
+                Pair(
+                    PremiumStats(
+                    chatsTotales = chats.size,
+                    chatsActivos = chats.count { !it.chatCerrado },
+                    mensajesNoLeidos = chats.sumOf { it.mensajesNoLeidos },
+                    serviciosActivos = ofertas.count { it.disponible && !it.eliminada },
+                    serviciosTotales = ofertas.count { !it.eliminada },
+                    citasFinalizadas = citas.count { it.estado == EstadoCita.FINALIZADO },
+                    citasCanceladas = citas.count { it.estado == EstadoCita.CANCELADO },
+                    citasRechazadas = citas.count { it.estado == EstadoCita.RECHAZADA },
+                    citasTotales = citas.size,
+                    valoracionesTotales = votos.size,
+                    promedioValoracion = if (votos.isEmpty()) 0.0 else votos.average(),
+                    contactosUltimos7Dias = contactosUltimos7Dias,
+                    tasaConversionCita = if (chats.isEmpty()) 0 else ((citas.size * 100.0) / chats.size).toInt(),
+                    ingresoTotalCerrado = ingresoTotal,
+                    ticketPromedio = ticketPromedio,
+                    mejorDiaContactos = mejorEtiqueta(contactosPorDia),
+                    mejorDiaIngresos = mejorEtiqueta(ingresosPorDia),
+                    contactosPorDia = contactosPorDia,
+                    ingresosPorDia = ingresosPorDia
+                    ),
+                    historial
+                )
+            }
+            uiState = uiState.copy(
+                stats = stats.first,
+                historialContactos = stats.second,
+                cargandoStats = false
+            )
+          } catch (e: Exception) {
+            // Ante cualquier fallo (red caída, parseo, etc.) no dejamos el menú colgado:
+            // se apaga el indicador de carga y se conservan las últimas estadísticas.
+            uiState = uiState.copy(cargandoStats = false)
+          }
+        }
+    }
+
+    private fun describirResultadoContacto(chat: ChatCita, cita: CitaServicio?): String {
+        return when (cita?.estado ?: chat.estadoCita) {
+            EstadoCita.FINALIZADO -> "Finalizado"
+            EstadoCita.CANCELADO -> "Cancelado"
+            EstadoCita.RECHAZADA -> "Rechazado"
+            EstadoCita.CERRADO -> "Cerrado"
+            EstadoCita.EN_PROCESO, EstadoCita.COMENZANDO, EstadoCita.FINALIZANDO -> "En proceso"
+            EstadoCita.HANDSHAKE -> "Coordinación"
+            EstadoCita.PENDIENTE -> "Pendiente"
+            else -> if (chat.chatCerrado) "Chat cerrado" else "Activo"
+        }
+    }
+
+    private fun construirSerieSemanal(dias: List<DayOfWeek>): List<PremiumSerieDia> {
+        val orden = listOf(
+            DayOfWeek.MONDAY,
+            DayOfWeek.TUESDAY,
+            DayOfWeek.WEDNESDAY,
+            DayOfWeek.THURSDAY,
+            DayOfWeek.FRIDAY,
+            DayOfWeek.SATURDAY,
+            DayOfWeek.SUNDAY
+        )
+        val conteos = dias.groupingBy { it }.eachCount()
+        val maximo = conteos.values.maxOrNull() ?: 0
+        return orden.map { dia ->
+            PremiumSerieDia(
+                etiqueta = nombreCortoDia(dia),
+                cantidad = conteos[dia] ?: 0,
+                destacado = maximo > 0 && (conteos[dia] ?: 0) == maximo
+            )
+        }
+    }
+
+    private fun mejorEtiqueta(serie: List<PremiumSerieDia>): String {
+        val mejor = serie.maxByOrNull { it.cantidad } ?: return "—"
+        return if (mejor.cantidad <= 0) "—" else mejor.etiqueta
+    }
+
+    private fun nombreCortoDia(dia: DayOfWeek): String = when (dia) {
+        DayOfWeek.MONDAY -> "Lun"
+        DayOfWeek.TUESDAY -> "Mar"
+        DayOfWeek.WEDNESDAY -> "Mié"
+        DayOfWeek.THURSDAY -> "Jue"
+        DayOfWeek.FRIDAY -> "Vie"
+        DayOfWeek.SATURDAY -> "Sáb"
+        DayOfWeek.SUNDAY -> "Dom"
+    }
+
+    private fun parseFechaPremium(valor: String?): LocalDateTime? {
+        if (valor.isNullOrBlank()) return null
+        val patrones = listOf(
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+            DateTimeFormatter.ISO_LOCAL_DATE_TIME
+        )
+        for (patron in patrones) {
+            try {
+                return LocalDateTime.parse(valor.trim(), patron)
+            } catch (_: DateTimeParseException) {
+            }
+        }
+        return null
     }
 }

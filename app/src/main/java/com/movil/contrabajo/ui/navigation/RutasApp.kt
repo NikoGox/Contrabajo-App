@@ -37,6 +37,11 @@ sealed class RutasApp(val ruta: String) {
     data object Servicio : RutasApp("servicio/{idOfertaServicio}") {
         fun crearRuta(idOfertaServicio: Long): String = "servicio/$idOfertaServicio"
     }
+    data object PremiumBienvenida : RutasApp("premium_bienvenida")
+    data object PremiumActivado : RutasApp("premium_activado")
+    data object MenuPremium : RutasApp("menu_premium")
+    data object PremiumHistorialContactos : RutasApp("premium_historial_contactos")
+    data object PremiumLecturaRapida : RutasApp("premium_lectura_rapida")
 
     companion object {
         private val rutasPrincipales = listOf(

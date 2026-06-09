@@ -1,3 +1,21 @@
+VERSION 0.14.0-Pre-Alpha
+───────
+├─• Se agregó el apartado Premium: un botón con la "P" a la izquierda de la lupa abre la pantalla de bienvenida Premium.
+├─• La bienvenida Premium muestra las ventajas con animaciones y un botón "Quiero ser premium" con borde animado en cyan y verde.
+├─• Al suscribirse se simula el pago ("Procesando el pago…" → "¡Listo!") y se puede volver atrás o ir al menú Premium. No hay cobro real.
+├─• El menú Premium muestra estadísticas reales del trabajador: chats, servicios, citas (finalizadas/canceladas/rechazadas) y valoraciones. Reportes queda como "Próximamente".
+├─• El usuario Premium luce una estrella animada junto a su nombre en el perfil y su rol aparece como "Premium".
+├─• Premium permite publicar hasta 5 servicios en total (antes 3) y mantener hasta 3 activos a la vez (antes 1).
+├─• El estado Premium es real: se guarda en la cuenta a través del backend (no es un modo de prueba local).
+├─• El botón Premium solo aparece para trabajadores; los clientes no lo ven. Si ya eres Premium, abre directamente el menú.
+├─• El menú Premium incluye dashboards con datos reales: contactos por día, días más rentables, conversión de chats a citas, ingreso total y ticket promedio.
+├─• Se agregaron las pantallas "Historial de contactos" (con resultado y estrellas por contacto) y "Lectura rápida" (estado operativo).
+├─• El menú Premium ahora muestra una pantalla de carga tipo skeleton mientras trae las estadísticas, y ya no se queda colgado si una consulta falla.
+├─• Se corrigió que un trabajador Premium ahora sí puede mantener hasta 3 servicios activos a la vez (antes la app lo bloqueaba al segundo).
+├─• Tras activar Premium, la app pide iniciar sesión nuevamente para habilitar los beneficios al instante (el servidor reconoce el nuevo estado con la sesión fresca).
+├─• En el perfil, el trabajador Premium se identifica como "Trabajador Premium" junto a su estrella animada.
+└─• Se pulió la estética del apartado (jerarquía, paleta y textos) para que sea coherente con el resto de la app; se muestra un precio referencial en la bienvenida.
+
 VERSION 0.13.2-Pre-Alpha
 ───────
 ├─• Se reforzaron los límites de longitud en registro y edición de perfil para evitar que errores técnicos del backend expongan detalles de base de datos.

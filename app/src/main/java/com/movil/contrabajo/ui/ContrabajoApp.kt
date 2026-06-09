@@ -62,6 +62,11 @@ import com.movil.contrabajo.ui.screens.chats.PantallaCitaServicio
 import com.movil.contrabajo.ui.screens.chats.PantallaChats
 import com.movil.contrabajo.ui.screens.inicio.PantallaInicial
 import com.movil.contrabajo.ui.screens.perfil.PantallaPerfil
+import com.movil.contrabajo.ui.screens.premium.PantallaBienvenidaPremium
+import com.movil.contrabajo.ui.screens.premium.PantallaHistorialContactosPremium
+import com.movil.contrabajo.ui.screens.premium.PantallaMenuPremium
+import com.movil.contrabajo.ui.screens.premium.PantallaPremiumActivado
+import com.movil.contrabajo.ui.screens.premium.PantallaLecturaRapidaPremium
 import com.movil.contrabajo.ui.screens.perfil.PantallaEditarPerfil
 import com.movil.contrabajo.ui.screens.perfil.PantallaValoracionesServicios
 import com.movil.contrabajo.ui.screens.principal.PantallaPrincipal
@@ -76,6 +81,7 @@ import com.movil.contrabajo.ui.viewmodel.DetalleServicioViewModel
 import com.movil.contrabajo.ui.viewmodel.InicioViewModel
 import com.movil.contrabajo.ui.viewmodel.LoginViewModel
 import com.movil.contrabajo.ui.viewmodel.PerfilViewModel
+import com.movil.contrabajo.ui.viewmodel.PremiumViewModel
 import com.movil.contrabajo.ui.viewmodel.PrincipalViewModel
 import com.movil.contrabajo.ui.viewmodel.RegistroViewModel
 import com.movil.contrabajo.ui.viewmodel.ReportesViewModel
@@ -379,7 +385,78 @@ fun ContrabajoApp(
                     },
                     onAbrirUbicacionRapida = {
                         navController.navigate(RutasApp.AjustesUbicacion.ruta)
+                    },
+                    onAbrirPremium = {
+                        val destinoPremium = if (perfilViewModel.uiState.usuario?.tipoPerfil == TipoPerfil.PREMIUM) {
+                            RutasApp.MenuPremium.ruta
+                        } else {
+                            RutasApp.PremiumBienvenida.ruta
+                        }
+                        navController.navigate(destinoPremium)
                     }
+                )
+            }
+            composable(RutasApp.PremiumBienvenida.ruta) {
+                val premiumViewModel: PremiumViewModel = viewModel(factory = factory)
+                PantallaBienvenidaPremium(
+                    viewModel = premiumViewModel,
+                    onPremiumActivado = {
+                        perfilViewModel.recargar()
+                        navController.navigate(RutasApp.PremiumActivado.ruta) {
+                            launchSingleTop = true
+                        }
+                    },
+                    onIrAMenu = {
+                        perfilViewModel.recargar()
+                        navController.navigate(RutasApp.MenuPremium.ruta) {
+                            popUpTo(RutasApp.PremiumBienvenida.ruta) { inclusive = true }
+                        }
+                    },
+                    onVolver = {
+                        perfilViewModel.recargar()
+                        navController.popBackStack()
+                    }
+                )
+            }
+            composable(RutasApp.PremiumActivado.ruta) {
+                val premiumViewModel: PremiumViewModel = viewModel(factory = factory)
+                PantallaPremiumActivado(
+                    viewModel = premiumViewModel,
+                    onIniciarSesion = {
+                        // El rol Premium viaja en el JWT; para que el backend lo reconozca
+                        // (p. ej. activar 3 servicios) se fuerza un re-login que emite un token nuevo.
+                        perfilViewModel.cerrarSesion()
+                    },
+                    onVolver = {
+                        perfilViewModel.recargar()
+                        navController.popBackStack()
+                    }
+                )
+            }
+            composable(RutasApp.MenuPremium.ruta) {
+                val premiumViewModel: PremiumViewModel = viewModel(factory = factory)
+                PantallaMenuPremium(
+                    viewModel = premiumViewModel,
+                    onAbrirHistorial = { navController.navigate(RutasApp.PremiumHistorialContactos.ruta) },
+                    onAbrirLecturaRapida = { navController.navigate(RutasApp.PremiumLecturaRapida.ruta) },
+                    onVolver = {
+                        perfilViewModel.recargar()
+                        navController.popBackStack()
+                    }
+                )
+            }
+            composable(RutasApp.PremiumHistorialContactos.ruta) {
+                val premiumViewModel: PremiumViewModel = viewModel(factory = factory)
+                PantallaHistorialContactosPremium(
+                    viewModel = premiumViewModel,
+                    onVolver = { navController.popBackStack() }
+                )
+            }
+            composable(RutasApp.PremiumLecturaRapida.ruta) {
+                val premiumViewModel: PremiumViewModel = viewModel(factory = factory)
+                PantallaLecturaRapidaPremium(
+                    viewModel = premiumViewModel,
+                    onVolver = { navController.popBackStack() }
                 )
             }
             composable(RutasApp.PerfilEditar.ruta) {
@@ -553,10 +630,13 @@ private fun ShellPrincipal(
     onAbrirEditarPerfil: () -> Unit,
     onAbrirDetalleReporte: (Long) -> Unit,
     onAbrirUbicacionRapida: () -> Unit,
+    onAbrirPremium: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val esModerador = perfilViewModel.uiState.usuario?.tipoPerfil == TipoPerfil.MODERADOR
+    val mostrarBotonPremium = perfilViewModel.uiState.usuario?.tipoPerfil in
+        listOf(TipoPerfil.TRABAJADOR, TipoPerfil.PREMIUM)
     var rutaContenido by rememberSaveable(esModerador) {
         mutableStateOf(if (esModerador) RutasApp.ReportesModerador.ruta else RutasApp.Principal.ruta)
     }
@@ -662,6 +742,8 @@ private fun ShellPrincipal(
                         onAbrirServicio = onAbrirServicio,
                         onAbrirAjustes = onAbrirAjustes,
                         onAbrirUbicacionRapida = onAbrirUbicacionRapida,
+                        onAbrirPremium = onAbrirPremium,
+                        mostrarBotonPremium = mostrarBotonPremium,
                         modifier = Modifier.padding(innerPadding)
                     )
 
@@ -699,6 +781,8 @@ private fun ShellPrincipal(
                         onAbrirServicio = onAbrirServicio,
                         onAbrirAjustes = onAbrirAjustes,
                         onAbrirUbicacionRapida = onAbrirUbicacionRapida,
+                        onAbrirPremium = onAbrirPremium,
+                        mostrarBotonPremium = mostrarBotonPremium,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }

@@ -48,6 +48,13 @@ class ContrabajoViewModelFactory(
         modelClass.isAssignableFrom(BaneosViewModel::class.java) ->
             BaneosViewModel(repositorioBaneos = repositorios.baneos) as T
 
+        modelClass.isAssignableFrom(PremiumViewModel::class.java) ->
+            PremiumViewModel(
+                repositorioPerfil = repositorios.perfil,
+                repositorioOfertas = repositorios.ofertas,
+                repositorioChats = repositorios.chats
+            ) as T
+
         else -> throw IllegalArgumentException("ViewModel no soportado: ${modelClass.name}")
     }
 }

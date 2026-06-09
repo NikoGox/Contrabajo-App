@@ -128,6 +128,12 @@ interface UsuariosApiService {
         @Header("Authorization") authorization: String,
         @Path("id") id: Int
     ): Call<UsuarioResponseDto>
+
+    // ── Premium ──────────────────────────────────────────────────────────────
+    @PATCH("api/usuarios/perfil/premium")
+    fun hacermePremium(
+        @Header("Authorization") authorization: String
+    ): Call<UsuarioResponseDto>
 }
 
 data class LoginRequestDto(
