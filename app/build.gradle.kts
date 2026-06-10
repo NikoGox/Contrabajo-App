@@ -33,10 +33,11 @@ android {
         // ─────────────────────────────────────────────────────────────────────
 
         // ── DOCKER (local) — ACTIVO ──
-        buildConfigField("String", "USUARIOS_BASE_URL", "\"http://10.0.2.2:8081/\"")
-        buildConfigField("String", "SERVICIOS_BASE_URL", "\"http://10.0.2.2:8082/\"")
-        buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"http://10.0.2.2:8083/\"")
-        buildConfigField("String", "FOTOS_BASE_URL", "\"http://10.0.2.2:8084/\"")
+        buildConfigField("String", "USUARIOS_BASE_URL", "\"http://10.71.169.126" +
+                ":8081/\"")
+        buildConfigField("String", "SERVICIOS_BASE_URL", "\"http://10.71.169.126:8082/\"")
+        buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"http://10.71.169.126:8083/\"")
+        buildConfigField("String", "FOTOS_BASE_URL", "\"http://10.71.169.126:8084/\"")
 
         // ── NUBE (producción) — INACTIVO (IP puede variar, actualizar al rotar) ──
         // buildConfigField("String", "USUARIOS_BASE_URL", "\"http://20.114.137.86:8081/\"")

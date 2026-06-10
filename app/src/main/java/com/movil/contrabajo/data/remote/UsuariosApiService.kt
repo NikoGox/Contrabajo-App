@@ -134,6 +134,16 @@ interface UsuariosApiService {
     fun hacermePremium(
         @Header("Authorization") authorization: String
     ): Call<UsuarioResponseDto>
+
+    @POST("api/usuarios/perfil/premium/preferencia")
+    fun crearPreferenciaPremium(
+        @Header("Authorization") authorization: String
+    ): Call<PremiumPreferenceResponseDto>
+
+    @GET("api/usuarios/perfil/premium/estado")
+    fun obtenerEstadoPremium(
+        @Header("Authorization") authorization: String
+    ): Call<PremiumStatusResponseDto>
 }
 
 data class LoginRequestDto(
@@ -172,6 +182,16 @@ data class UsuarioResponseDto(
     val verificado: Boolean?,
     val direccion: DireccionResponseDto? = null,
     val idEstado: Int? = null
+)
+
+data class PremiumPreferenceResponseDto(
+    val preferenceId: String?,
+    val initPoint: String?,
+    val sandboxInitPoint: String?
+)
+
+data class PremiumStatusResponseDto(
+    val premium: Boolean?
 )
 
 data class ComunaDto(

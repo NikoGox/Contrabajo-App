@@ -1,5 +1,7 @@
 package com.movil.contrabajo.ui.screens.premium
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -36,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -53,6 +56,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalContext
 import com.movil.contrabajo.ui.components.EstrellaPremiumAnimada
 import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaBase
@@ -79,11 +86,48 @@ fun PantallaBienvenidaPremium(
     val uiState = viewModel.uiState
     val yaEsPremium = uiState.esPremium && uiState.estadoPago != EstadoPagoPremium.LISTO
     var redireccionExito by rememberSaveable { mutableStateOf(false) }
+    var verificacionAutomaticaPendiente by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(uiState.estadoPago) {
         if (uiState.estadoPago == EstadoPagoPremium.LISTO && !redireccionExito) {
             redireccionExito = true
             onPremiumActivado()
+        }
+    }
+
+    LaunchedEffect(uiState.checkoutUrl) {
+        val url = uiState.checkoutUrl ?: return@LaunchedEffect
+        runCatching {
+            verificacionAutomaticaPendiente = true
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }.onFailure {
+            verificacionAutomaticaPendiente = false
+            viewModel.reiniciarPago()
+        }
+        viewModel.consumirCheckoutUrl()
+    }
+
+    LaunchedEffect(uiState.estadoPago) {
+        if (uiState.estadoPago != EstadoPagoPremium.ESPERANDO_CONFIRMACION) {
+            verificacionAutomaticaPendiente = false
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, uiState.estadoPago, verificacionAutomaticaPendiente) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME &&
+                uiState.estadoPago == EstadoPagoPremium.ESPERANDO_CONFIRMACION &&
+                verificacionAutomaticaPendiente
+            ) {
+                verificacionAutomaticaPendiente = false
+                viewModel.verificarEstadoPagoPremium()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -241,9 +285,10 @@ fun PantallaBienvenidaPremium(
                 BloquePremiumActivo(onIrAMenu = onIrAMenu)
             } else {
                 BloqueActivacionPremium(
-                    procesando = uiState.estadoPago == EstadoPagoPremium.PROCESANDO,
+                    estadoPago = uiState.estadoPago,
                     error = uiState.errorPago,
-                    onActivar = viewModel::procesarPagoPremium
+                    onActivar = viewModel::procesarPagoPremium,
+                    onVerificar = viewModel::verificarEstadoPagoPremium
                 )
             }
 
@@ -254,10 +299,17 @@ fun PantallaBienvenidaPremium(
 
 @Composable
 private fun BloqueActivacionPremium(
-    procesando: Boolean,
+    estadoPago: EstadoPagoPremium,
     error: String?,
-    onActivar: () -> Unit
+    onActivar: () -> Unit,
+    onVerificar: () -> Unit
 ) {
+    val procesando = estadoPago in listOf(
+        EstadoPagoPremium.CREANDO_PREFERENCIA,
+        EstadoPagoPremium.VERIFICANDO
+    )
+    val esperandoConfirmacion = estadoPago == EstadoPagoPremium.ESPERANDO_CONFIRMACION
+
     if (error != null) {
         Text(
             text = error,
@@ -271,7 +323,11 @@ private fun BloqueActivacionPremium(
     }
 
     Text(
-        text = "Disponible para trabajadores verificados que quieran potenciar su perfil.",
+        text = if (esperandoConfirmacion) {
+            "Cuando vuelvas desde Mercado Pago verificaremos el estado real del pago con el backend."
+        } else {
+            "Disponible para trabajadores verificados que quieran potenciar su perfil."
+        },
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
@@ -293,7 +349,9 @@ private fun BloqueActivacionPremium(
                 )
             )
             .bordeBrilloPremium(cornerRadius = 20.dp, anchoTrazo = 2.6.dp)
-            .clickable(enabled = !procesando) { onActivar() },
+            .clickable(enabled = !procesando) {
+                if (esperandoConfirmacion) onVerificar() else onActivar()
+            },
         contentAlignment = Alignment.Center
     ) {
         if (procesando) {
@@ -307,7 +365,11 @@ private fun BloqueActivacionPremium(
                     strokeWidth = 2.5.dp
                 )
                 Text(
-                    text = "Procesando el pago...",
+                    text = if (estadoPago == EstadoPagoPremium.VERIFICANDO) {
+                        "Verificando pago..."
+                    } else {
+                        "Abriendo checkout..."
+                    },
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleSmall
@@ -315,7 +377,7 @@ private fun BloqueActivacionPremium(
             }
         } else {
             Text(
-                text = "Quiero ser premium",
+                text = if (esperandoConfirmacion) "Ya pagué, verificar estado" else "Quiero ser premium",
                 color = Color.White,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 17.sp

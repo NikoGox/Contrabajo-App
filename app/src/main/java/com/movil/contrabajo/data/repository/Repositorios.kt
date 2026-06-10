@@ -63,8 +63,16 @@ interface RepositorioPerfil {
     fun limpiarFiltrosMarketplace(): Result<FiltroMarketplaceConfig>
     fun actualizarFotoPerfil(uriLocal: String): Result<Usuario>
     fun actualizarContactoPerfil(correo: String, telefono: String): Result<Usuario>
+    fun crearPreferenciaPremium(): Result<PremiumCheckout>
+    fun verificarEstadoPremium(): Result<Boolean>
     fun promoverAPremium(): Result<Usuario>
 }
+
+data class PremiumCheckout(
+    val preferenceId: String,
+    val initPoint: String,
+    val sandboxInitPoint: String?
+)
 
 interface RepositorioReportes {
     fun obtenerTiposReporte(): List<TipoReporte>
@@ -536,6 +544,16 @@ class RepositorioPerfilLocal(
             return Result.failure(IllegalStateException("Solo un trabajador puede volverse premium"))
         }
         return Result.success(usuario.copy(tipoPerfil = TipoPerfil.PREMIUM))
+    }
+
+    override fun crearPreferenciaPremium(): Result<PremiumCheckout> {
+        return Result.failure(UnsupportedOperationException("Mercado Pago no esta disponible en modo local"))
+    }
+
+    override fun verificarEstadoPremium(): Result<Boolean> {
+        val usuario = db.obtenerUsuarioSesionActiva()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+        return Result.success(usuario.tipoPerfil == TipoPerfil.PREMIUM)
     }
 
     private fun limpiarRun(run: String): String = run.filter { it.isDigit() }

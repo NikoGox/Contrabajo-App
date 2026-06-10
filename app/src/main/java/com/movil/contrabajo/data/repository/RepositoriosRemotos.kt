@@ -1,5 +1,6 @@
 package com.movil.contrabajo.data.repository
 
+import android.util.Log
 import androidx.exifinterface.media.ExifInterface
 import android.graphics.Matrix
 import android.graphics.Bitmap
@@ -363,6 +364,48 @@ class RepositorioPerfilRemoto(
                 .copy(fotoPerfilUrl = usuario.fotoPerfilUrl)
             sessionStore.actualizarUsuario(actualizado)
             actualizado
+        }
+    }
+
+    override fun crearPreferenciaPremium(): Result<PremiumCheckout> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay token de sesion activo"))
+
+        return ejecutarApi(api.crearPreferenciaPremium(bearer(token))).mapCatching {
+            val initPoint = it.initPoint?.trim().orEmpty()
+            if (initPoint.isBlank()) {
+                throw IllegalStateException("El backend no devolvio un init_point valido")
+            }
+            PremiumCheckout(
+                preferenceId = it.preferenceId.orEmpty(),
+                initPoint = initPoint,
+                sandboxInitPoint = it.sandboxInitPoint
+            )
+        }.onSuccess {
+            Log.i(
+                "PremiumFlow",
+                "Preferencia creada preferenceId=${it.preferenceId} initPoint=${it.initPoint.take(120)}"
+            )
+        }.onFailure {
+            Log.w("PremiumFlow", "Error creando preferencia Premium", it)
+        }
+    }
+
+    override fun verificarEstadoPremium(): Result<Boolean> {
+        val token = sessionStore.obtenerToken()
+            ?: return Result.failure(IllegalStateException("No hay token de sesion activo"))
+        val usuario = sessionStore.obtenerUsuario()
+            ?: return Result.failure(IllegalStateException("No hay sesion activa"))
+
+        return ejecutarApi(api.obtenerEstadoPremium(bearer(token))).mapCatching {
+            val premium = it.premium == true
+            Log.i("PremiumFlow", "Estado Premium consultado premium=$premium")
+            if (premium && usuario.tipoPerfil != TipoPerfil.PREMIUM) {
+                sessionStore.actualizarUsuario(usuario.copy(tipoPerfil = TipoPerfil.PREMIUM))
+            }
+            premium
+        }.onFailure {
+            Log.w("PremiumFlow", "Error verificando estado Premium", it)
         }
     }
 

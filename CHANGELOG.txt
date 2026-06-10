@@ -1,3 +1,12 @@
+VERSION 0.14.1-Pre-Alpha
+───────
+├─• Se reemplazo el flujo simulado de Premium por la integracion real con Mercado Pago Sandbox.
+├─• La app ahora solicita una preferencia al backend y abre el `init_point` en navegador externo para completar el checkout.
+├─• Tras volver del checkout, la app consulta `GET /api/usuarios/perfil/premium/estado` para verificar si el backend ya promovio al usuario a Premium.
+├─• Se agregaron trazas de diagnostico para seguir el flujo Premium (`Preferencia creada`, `Estado Premium consultado`, `Backend confirma usuario PREMIUM`).
+├─• Se corrigio el bucle de verificacion automatica para que la consulta de estado no se dispare en cada reanudacion de pantalla.
+└─• El cierre de sesion sigue siendo guiado por la app luego de confirmar el estado Premium, manteniendo el JWT sin mutaciones instantaneas.
+
 VERSION 0.14.0-Pre-Alpha
 ───────
 ├─• Se agregó el apartado Premium: un botón con la "P" a la izquierda de la lupa abre la pantalla de bienvenida Premium.

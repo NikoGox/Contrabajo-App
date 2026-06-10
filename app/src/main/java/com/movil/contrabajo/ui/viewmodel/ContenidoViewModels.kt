@@ -1,5 +1,6 @@
 package com.movil.contrabajo.ui.viewmodel
 
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -2083,7 +2084,7 @@ class BaneosViewModel(
 // PREMIUM
 // ============================================================================
 
-enum class EstadoPagoPremium { INICIAL, PROCESANDO, LISTO, ERROR }
+enum class EstadoPagoPremium { INICIAL, CREANDO_PREFERENCIA, ESPERANDO_CONFIRMACION, VERIFICANDO, LISTO, ERROR }
 
 data class PremiumSerieDia(
     val etiqueta: String,
@@ -2126,6 +2127,7 @@ data class PremiumUiState(
     val esPremium: Boolean = false,
     val estadoPago: EstadoPagoPremium = EstadoPagoPremium.INICIAL,
     val errorPago: String? = null,
+    val checkoutUrl: String? = null,
     val cargandoStats: Boolean = true,
     val stats: PremiumStats = PremiumStats(),
     val historialContactos: List<PremiumHistorialContacto> = emptyList()
@@ -2149,14 +2151,26 @@ class PremiumViewModel(
     }
 
     fun procesarPagoPremium() {
-        if (uiState.estadoPago == EstadoPagoPremium.PROCESANDO) return
-        uiState = uiState.copy(estadoPago = EstadoPagoPremium.PROCESANDO, errorPago = null)
+        if (uiState.estadoPago in listOf(EstadoPagoPremium.CREANDO_PREFERENCIA, EstadoPagoPremium.VERIFICANDO)) return
+        Log.i("PremiumFlow", "Iniciando creacion de preferencia Premium")
+        uiState = uiState.copy(
+            estadoPago = EstadoPagoPremium.CREANDO_PREFERENCIA,
+            errorPago = null,
+            checkoutUrl = null
+        )
         viewModelScope.launch {
-            delay(1_100)
-            val resultado = withContext(Dispatchers.IO) { repositorioPerfil.promoverAPremium() }
+            delay(350)
+            val resultado = withContext(Dispatchers.IO) { repositorioPerfil.crearPreferenciaPremium() }
             uiState = resultado.fold(
-                onSuccess = { uiState.copy(estadoPago = EstadoPagoPremium.LISTO, esPremium = true) },
+                onSuccess = {
+                    Log.i("PremiumFlow", "Checkout Premium listo, esperando confirmacion")
+                    uiState.copy(
+                        estadoPago = EstadoPagoPremium.ESPERANDO_CONFIRMACION,
+                        checkoutUrl = it.initPoint
+                    )
+                },
                 onFailure = {
+                    Log.w("PremiumFlow", "Fallo al crear preferencia Premium", it)
                     uiState.copy(
                         estadoPago = EstadoPagoPremium.ERROR,
                         errorPago = it.message ?: "No se pudo activar Premium"
@@ -2166,8 +2180,43 @@ class PremiumViewModel(
         }
     }
 
+    fun consumirCheckoutUrl() {
+        if (uiState.checkoutUrl == null) return
+        uiState = uiState.copy(checkoutUrl = null)
+    }
+
+    fun verificarEstadoPagoPremium() {
+        if (uiState.estadoPago != EstadoPagoPremium.ESPERANDO_CONFIRMACION) return
+        Log.i("PremiumFlow", "Verificando estado Premium contra backend")
+        uiState = uiState.copy(estadoPago = EstadoPagoPremium.VERIFICANDO, errorPago = null)
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) { repositorioPerfil.verificarEstadoPremium() }
+            uiState = resultado.fold(
+                onSuccess = { premium ->
+                    if (premium) {
+                        Log.i("PremiumFlow", "Backend confirma usuario PREMIUM")
+                        uiState.copy(estadoPago = EstadoPagoPremium.LISTO, esPremium = true)
+                    } else {
+                        Log.i("PremiumFlow", "Backend aun responde premium=false")
+                        uiState.copy(
+                            estadoPago = EstadoPagoPremium.ESPERANDO_CONFIRMACION,
+                            errorPago = "Tu pago aun no figura aprobado. Si ya pagaste, vuelve a intentarlo en unos segundos."
+                        )
+                    }
+                },
+                onFailure = {
+                    Log.w("PremiumFlow", "Fallo verificando estado Premium", it)
+                    uiState.copy(
+                        estadoPago = EstadoPagoPremium.ERROR,
+                        errorPago = it.message ?: "No se pudo verificar el estado del pago"
+                    )
+                }
+            )
+        }
+    }
+
     fun reiniciarPago() {
-        uiState = uiState.copy(estadoPago = EstadoPagoPremium.INICIAL, errorPago = null)
+        uiState = uiState.copy(estadoPago = EstadoPagoPremium.INICIAL, errorPago = null, checkoutUrl = null)
     }
 
     fun cargarEstadisticas() {
