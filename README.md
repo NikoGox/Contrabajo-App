@@ -14,31 +14,30 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 
 ## Últimos cambios
 
+### ❚❙❘ VERSIÓN 0.14.1.a-Pre-Alpha
 
-### ❚❙❘ VERSIÓN 0.14.0-Pre-Alpha
-
-
-> <br>• Se incorporó el apartado Premium: un botón con la "P" (solo visible para trabajadores) abre la pantalla de bienvenida con las ventajas y la activación.
-> <br>• La bienvenida Premium tiene elementos animados y un botón "Quiero ser premium" con borde animado en cyan y verde; el estado Premium se guarda de verdad en la cuenta a través del backend.
-> <br>• El menú Premium muestra estadísticas reales del trabajador (servicios, valoraciones, historial de contactos) y dashboards: contactos por día, días más rentables, conversión de chats a citas, ingreso total y ticket promedio.
-> <br>• Se agregaron las pantallas "Historial de contactos" y "Lectura rápida", además de una pantalla de carga tipo skeleton mientras se cargan las estadísticas (ya no se queda colgado si una consulta falla).
-> <br>• El trabajador Premium luce una estrella animada junto a su nombre y aparece como "Trabajador Premium" en su perfil.
-> <br>• Premium permite publicar hasta 5 servicios en total y mantener hasta 3 activos a la vez (antes 3 y 1). Tras activar Premium se solicita iniciar sesión nuevamente para habilitar los beneficios al instante.
+> `<br>`• Se ajustó la integración de Premium con Mercado Pago Sandbox para que el backend valide el pago real antes de promover al usuario.
+> `<br>`• La app abre el checkout externo con el `init_point` y luego consulta el estado Premium en backend para reflejar la aprobación real.
+> `<br>`• Se agregó soporte de diagnóstico y se dejó preparado el uso de un túnel público para el webhook (`notification-url`), evitando depender de `localhost`.
 
 ---
 
 ## Características principales
 
 ### Búsqueda de servicios
+
 Explora servicios por categoría y disponibilidad, permitiendo encontrar rápidamente lo que necesitas.
 
 ### Comunicación directa
+
 Sistema de chat integrado entre cliente y trabajador para coordinar servicios sin intermediarios.
 
 ### Gestión de perfil
+
 Los usuarios pueden registrarse, gestionar su información y administrar sus servicios dentro de la plataforma.
 
 ### Experiencia moderna
+
 Interfaz desarrollada en Jetpack Compose, optimizada para una navegación fluida y visualmente clara.
 
 ---
@@ -50,7 +49,6 @@ Interfaz desarrollada en Jetpack Compose, optimizada para una navegación fluida
 - **SQLite**
 - **Navigation Compose**
 - **Backend basado en microservicios Java**
-
 
 <p align="center">
   <b>Contrabajo — Tu instrumento para trabajar</b>
