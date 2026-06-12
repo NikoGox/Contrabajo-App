@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -38,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +60,93 @@ import com.movil.contrabajo.ui.components.TarjetaBase
 import com.movil.contrabajo.ui.theme.AzulPetroleo
 import com.movil.contrabajo.ui.theme.TurquesaBrillante
 import com.movil.contrabajo.ui.viewmodel.ChatsViewModel
+
+@Composable
+fun AvatarUsuarioAsync(
+    idUsuario: Int,
+    nombreParaFallback: String,
+    modifier: Modifier = Modifier
+) {
+    var urlFoto by remember(idUsuario) { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    var cargado by remember(idUsuario) { androidx.compose.runtime.mutableStateOf(false) }
+
+    androidx.compose.runtime.LaunchedEffect(idUsuario) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                // Hacemos el GET público a tu API de usuarios
+                val response = com.movil.contrabajo.data.remote.UsuariosApiClient.api.obtenerFotoPerfil(idUsuario).execute()
+                if (response.isSuccessful) {
+                    urlFoto = response.body()?.enlace
+                }
+            } catch (e: Exception) {
+                // Falla silenciosa de red: se mantendrá urlFoto en null
+            } finally {
+                cargado = true
+            }
+        }
+    }
+
+    if (!cargado) {
+        // Estado 1: Skeleton cargando el JSON
+        Box(
+            modifier = modifier.background(
+                androidx.compose.ui.graphics.Brush.linearGradient(
+                    listOf(com.movil.contrabajo.ui.theme.TurquesaBrillante, com.movil.contrabajo.ui.theme.AzulPetroleo)
+                )
+            ),
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.material3.CircularProgressIndicator(
+                color = Color.White,
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp
+            )
+        }
+    } else if (urlFoto.isNullOrBlank()) {
+        // Estado 2: Fallback (No tiene foto o dio 404), mostramos inicial
+        Box(
+            modifier = modifier.background(
+                androidx.compose.ui.graphics.Brush.linearGradient(
+                    listOf(com.movil.contrabajo.ui.theme.TurquesaBrillante, com.movil.contrabajo.ui.theme.AzulPetroleo)
+                )
+            ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = nombreParaFallback.take(1).uppercase().ifBlank { "?" },
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 19.sp
+            )
+        }
+    } else {
+        // Estado 3: Carga exitosa, le pasamos la URL de Cloudinary a Coil
+        coil.compose.SubcomposeAsyncImage(
+            model = urlFoto,
+            contentDescription = "Avatar de $nombreParaFallback",
+            modifier = modifier,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            error = {
+                // Si la URL falla (ej: fue borrada en Cloudinary), volvemos al Fallback
+                Box(
+                    modifier = Modifier.fillMaxSize().background(
+                        androidx.compose.ui.graphics.Brush.linearGradient(
+                            listOf(com.movil.contrabajo.ui.theme.TurquesaBrillante, com.movil.contrabajo.ui.theme.AzulPetroleo)
+                        )
+                    ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = nombreParaFallback.take(1).uppercase().ifBlank { "?" },
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 19.sp
+                    )
+                }
+            }
+        )
+    }
+}
 
 @Composable
 fun PantallaChats(
@@ -376,32 +465,24 @@ private fun FilaChatModerna(
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // ── Avatar ────────────────────────────────────────────────
-        Box(
+        val idContacto = if (esComoTrabajador) chat.idCliente else chat.idTrabajador
+
+        AvatarUsuarioAsync(
+            idUsuario = idContacto.toInt(),
+            nombreParaFallback = chat.nombreContacto,
             modifier = Modifier
                 .size(50.dp)
-                .background(
-                    Brush.linearGradient(listOf(TurquesaBrillante, AzulPetroleo)),
-                    CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = chat.nombreContacto.take(1).uppercase().ifBlank { "?" },
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 19.sp
-            )
-        }
+                .clip(CircleShape)
+        )
 
-        // ── Contenido ─────────────────────────────────────────────
+        // ── Contenido
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Línea 1: nombre del contacto + hora
+            // Línea 1: nombre del contacto + hora (¡Este es el Row que faltaba!)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(

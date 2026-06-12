@@ -92,6 +92,7 @@ import coil.imageLoader
 import com.movil.contrabajo.R
 import com.movil.contrabajo.domain.model.EscalaRango
 import com.movil.contrabajo.domain.model.OfertaServicio
+import com.movil.contrabajo.ui.screens.chats.AvatarUsuarioAsync
 import com.movil.contrabajo.ui.viewmodel.DetalleServicioViewModel
 import com.movil.contrabajo.ui.viewmodel.ReportesViewModel
 import org.osmdroid.config.Configuration
@@ -977,7 +978,7 @@ private fun TarjetaDetalleOferta(
                 ResumenTrabajadorDetalle(
                     nombreTrabajador = oferta.nombreTrabajador,
                     usernameTrabajador = oferta.usernameTrabajador,
-                    fotoPerfilTrabajador = oferta.fotoPerfilTrabajador
+                    idTrabajador = oferta.idTrabajador
                 )
             }
         }
@@ -1130,7 +1131,7 @@ private fun TarjetaDetallePrevisualizacion(
             ResumenTrabajadorDetalle(
                 nombreTrabajador = oferta.nombreTrabajador,
                 usernameTrabajador = oferta.usernameTrabajador,
-                fotoPerfilTrabajador = oferta.fotoPerfilTrabajador
+                idTrabajador = oferta.idTrabajador // <--- Modificado
             )
         }
     }
@@ -1362,7 +1363,7 @@ private fun calcularZoomPorRangoM(rangoM: Int): Int = when {
 private fun ResumenTrabajadorDetalle(
     nombreTrabajador: String,
     usernameTrabajador: String,
-    fotoPerfilTrabajador: String
+    idTrabajador: Long // <--- Recibe el ID
 ) {
     val usernameVisible = usernameTrabajador.trim().ifBlank {
         nombreTrabajador
@@ -1386,23 +1387,12 @@ private fun ResumenTrabajadorDetalle(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surface
             ) {
-                if (fotoPerfilTrabajador.isBlank()) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.ChatBubble,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.65f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                } else {
-                    AsyncImage(
-                        model = fotoPerfilTrabajador,
-                        contentDescription = "Foto trabajador",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
+                // 🌟 Cargamos la foto dinámicamente con nuestro componente
+                AvatarUsuarioAsync(
+                    idUsuario = idTrabajador.toInt(),
+                    nombreParaFallback = nombreTrabajador,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
             Column(
                 modifier = Modifier.weight(1f),
