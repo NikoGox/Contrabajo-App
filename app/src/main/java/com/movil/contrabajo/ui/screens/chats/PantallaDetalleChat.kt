@@ -149,15 +149,6 @@ fun PantallaDetalleChat(
         }
     }
 
-    // Refresca los mensajes cada 5 s para que el emisor vea los ticks actualizados
-    // (el WS ya actualiza en tiempo real, esto es un respaldo por si se pierde algun evento)
-    LaunchedEffect(idChatCita) {
-        while (true) {
-            delay(5_000L)
-            viewModel.refrescarMensajes(idChatCita)
-        }
-    }
-
     PantallaBase(
         modifier = modifier,
         scrollable = false,
@@ -263,11 +254,19 @@ fun PantallaDetalleChat(
                             etiqueta = "Escribe un mensaje",
                             modifier = Modifier.weight(1f)
                         )
-                        IconButton(onClick = viewModel::enviarMensaje) {
+
+                        // 🌟 REGLA DE SEGURIDAD: Solo está activo si hay texto real
+                        val puedeEnviar = uiState.borradorMensaje.isNotBlank()
+
+                        IconButton(
+                            onClick = viewModel::enviarMensaje,
+                            enabled = puedeEnviar // Bloquea el spam de toques vacíos
+                        ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
                                 contentDescription = "Enviar mensaje",
-                                tint = MaterialTheme.colorScheme.primary
+                                // Feedback visual: gris si está deshabilitado, azul/primario si está listo
+                                tint = if (puedeEnviar) MaterialTheme.colorScheme.primary else Color.Gray
                             )
                         }
                     }

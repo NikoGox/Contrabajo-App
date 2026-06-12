@@ -396,27 +396,33 @@ class ChatsViewModel(
             com.movil.contrabajo.data.remote.WsManager.mensajesEntrantes.collect { mensaje ->
                 val chatActivo = uiState.chatActivo
                 if (chatActivo != null && mensaje.idChatCita == chatActivo.idChatCita) {
-                    // Agrega el mensaje de inmediato para que aparezca sin esperar al servidor
-                    uiState = uiState.copy(mensajesActivos = uiState.mensajesActivos + mensaje)
-                    // Recarga desde el servidor: aplica marks y devuelve ticks actualizados
-                    val (mensajesActualizados, citaActualizada) = withContext(Dispatchers.IO) {
-                        repositorioChats.obtenerMensajes(chatActivo.idChatCita) to
-                            repositorioChats.obtenerCitaPorChat(chatActivo.idChatCita)
+
+                    // 1. Hacemos una copia inmutable de la lista actual
+                    val listaActual = uiState.mensajesActivos.toMutableList()
+
+                    // 2. Buscamos si el mensaje ya existe (para actualización de estado)
+                    val indice = listaActual.indexOfFirst { it.idMensajeChat == mensaje.idMensajeChat }
+
+                    if (indice != -1) {
+                        // Si ya existe, lo reemplazamos
+                        listaActual[indice] = mensaje
+                    } else {
+                        // Si no existe, es nuevo y lo agregamos
+                        listaActual.add(mensaje)
                     }
-                    uiState = uiState.copy(
-                        mensajesActivos = mensajesActualizados,
-                        citaActiva = citaActualizada ?: uiState.citaActiva
-                    )
+
+                    // 3. Pasamos la lista nueva a Compose limpiamente sin hacer recargas HTTP
+                    uiState = uiState.copy(mensajesActivos = listaActual)
+
                 } else {
                     // El chat no esta abierto: registrar entrega
                     withContext(Dispatchers.IO) {
                         repositorioChats.marcarRecibidos(mensaje.idChatCita)
                     }
-                    // Buscar el username del contacto en la lista de chats ya cargada.
-                    // Si no existe todavia (nuevo chat por mensaje de sistema), recargar primero.
+                    // Buscar el username del contacto en la lista de chats ya cargada
                     var chatEnLista = uiState.chats.firstOrNull { it.idChatCita == mensaje.idChatCita }
                     if (chatEnLista == null) {
-                        // Chat nuevo (trabajador recibe notificacion de nuevo contacto): recargar
+                        // Chat nuevo: recargar lista completa
                         val nuevosChatsList = withContext(Dispatchers.IO) {
                             repositorioChats.obtenerChatsActuales()
                         }
@@ -429,16 +435,13 @@ class ChatsViewModel(
                     val usernameContacto = chatEnLista?.usernameContacto
                     val tituloNotif = when {
                         !usernameContacto.isNullOrBlank() -> usernameContacto
-                        mensaje.tipo == 1                 -> "Nuevo chat"
+                        mensaje.tipo == 1      -> "Nuevo chat"
                         else                              -> "Nuevo mensaje"
                     }
                     val contenidoNotif = when {
                         mensaje.tipo == 1 -> mensaje.contenido.take(80).ifBlank { "Tienes un nuevo chat." }
-                        else              -> mensaje.contenido.take(80).ifBlank { "Tienes un nuevo mensaje." }
+                        else                       -> mensaje.contenido.take(80).ifBlank { "Tienes un nuevo mensaje." }
                     }
-                    // Alimenta el mecanismo de notificaciones existente en ShellPrincipal.
-                    // El LaunchedEffect(notificacionesPendientes) de ShellPrincipal lo captura
-                    // y muestra el banner del sistema antes de que recargar() lo limpie.
                     val notif = NotificacionMensajePendiente(
                         idMensajeChat = mensaje.idMensajeChat,
                         idChatCita    = mensaje.idChatCita,
@@ -447,8 +450,7 @@ class ChatsViewModel(
                     )
                     uiState = uiState.copy(notificacionesPendientes = listOf(notif))
                 }
-                // Refrescar lista de chats (sobreescribe notificacionesPendientes con emptyList,
-                // pero el LaunchedEffect de ShellPrincipal ya habra disparado para entonces)
+                // Refrescar lista de chats (sobreescribe notificacionesPendientes pero ShellPrincipal ya lo captura)
                 recargar()
             }
         }
@@ -696,20 +698,32 @@ class ChatsViewModel(
 
     fun enviarMensaje() {
         val chat = uiState.chatActivo ?: return
+
+        // 1. Capturamos el contenido y validamos
+        val contenido = uiState.borradorMensaje.trim()
+        if (contenido.isEmpty()) return
+
+        // 2. Limpiamos el texto DE INMEDIATO para bloquear el botón en la UI
+        uiState = uiState.copy(borradorMensaje = "", error = null)
+
         viewModelScope.launch {
             val resultado = withContext(Dispatchers.IO) {
-                repositorioChats.enviarMensaje(chat.idChatCita, uiState.borradorMensaje)
+                // Usamos el 'contenido' capturado antes de limpiar el estado
+                repositorioChats.enviarMensaje(chat.idChatCita, contenido)
             }
             resultado.onSuccess {
                 val mensajes = withContext(Dispatchers.IO) { repositorioChats.obtenerMensajes(chat.idChatCita) }
                 uiState = uiState.copy(
-                    borradorMensaje = "",
                     mensajesActivos = mensajes,
                     error = null
                 )
                 recargar()
             }.onFailure {
-                uiState = uiState.copy(error = it.message ?: "No se pudo enviar el mensaje")
+                // Opcional: Si falla, le devolvemos el texto al usuario para que no lo pierda
+                uiState = uiState.copy(
+                    borradorMensaje = contenido,
+                    error = it.message ?: "No se pudo enviar el mensaje"
+                )
             }
         }
     }
