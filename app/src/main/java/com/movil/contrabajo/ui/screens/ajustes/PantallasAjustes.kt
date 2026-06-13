@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.movil.contrabajo.ui.screens.ajustes
 
 import android.Manifest
@@ -36,6 +38,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +56,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -229,56 +233,44 @@ fun PantallaAjustesSeguridad(
     }
 
     if (mostrarModalContrasena) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { mostrarModalContrasena = false },
-            title = { Text("Validar con contraseña") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)) }
+        ) {
+            ModalAjustesContenedor(
+                titulo = "Validar con contraseña",
+                subtitulo = "No fue posible usar biometría. Ingresa la contraseña de tu cuenta para continuar.",
+                onCancelar = { mostrarModalContrasena = false },
+                onConfirmar = {
+                    viewModel.validarContrasenaCuenta(contrasenaInput)
+                        .onSuccess {
+                            mostrarModalContrasena = false
+                            onAbrirPreguntas()
+                        }
+                        .onFailure {
+                            errorContrasena = it.message ?: "No se pudo validar la contraseña"
+                        }
+                }
+            ) {
+                CampoSecretoContrabajo(
+                    valor = contrasenaInput,
+                    onValueChange = {
+                        contrasenaInput = it
+                        errorContrasena = null
+                    },
+                    etiqueta = "Contraseña de cuenta"
+                )
+                if (errorContrasena != null) {
                     Text(
-                        text = "No fue posible usar biometría. Ingresa la contraseña de tu cuenta para continuar.",
+                        text = errorContrasena.orEmpty(),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Medium
                     )
-                    CampoSecretoContrabajo(
-                        valor = contrasenaInput,
-                        onValueChange = {
-                            contrasenaInput = it
-                            errorContrasena = null
-                        },
-                        etiqueta = "Contraseña de cuenta"
-                    )
-                    if (errorContrasena != null) {
-                        Text(
-                            text = errorContrasena.orEmpty(),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.validarContrasenaCuenta(contrasenaInput)
-                            .onSuccess {
-                                mostrarModalContrasena = false
-                                onAbrirPreguntas()
-                            }
-                            .onFailure {
-                                errorContrasena = it.message ?: "No se pudo validar la contraseña"
-                            }
-                    }
-                ) {
-                    Text("Continuar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { mostrarModalContrasena = false }) {
-                    Text("Cancelar")
                 }
             }
-        )
+        }
     }
 }
 
@@ -390,66 +382,60 @@ fun PantallaPreguntasSeguridad(
     }
 
     if (mostrarModal) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { mostrarModal = false },
-            title = { Text("Configurar pregunta $indiceEnEdicion") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ExposedDropdownMenuBox(
-                        expanded = desplegarPreguntas,
-                        onExpandedChange = { desplegarPreguntas = !desplegarPreguntas }
-                    ) {
-                        OutlinedTextField(
-                            value = preguntaInput.ifBlank { "Seleccionar pregunta" },
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Pregunta") },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegarPreguntas) },
-                            singleLine = true
-                        )
-                        DropdownMenu(
-                            expanded = desplegarPreguntas,
-                            onDismissRequest = { desplegarPreguntas = false }
-                        ) {
-                            opcionesDisponibles.forEach { opcion ->
-                                DropdownMenuItem(
-                                    text = { Text(opcion) },
-                                    onClick = {
-                                        preguntaInput = opcion
-                                        desplegarPreguntas = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    CampoSecretoContrabajo(
-                        valor = respuestaInput,
-                        onValueChange = { respuestaInput = it },
-                        etiqueta = "Respuesta"
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)) }
+        ) {
+            ModalAjustesContenedor(
+                titulo = "Configurar pregunta $indiceEnEdicion",
+                onCancelar = { mostrarModal = false },
+                onConfirmar = {
                     viewModel.guardarPreguntaSeguridad(
                         indice = indiceEnEdicion,
                         pregunta = preguntaInput,
                         respuesta = respuestaInput
                     )
                     mostrarModal = false
-                }) {
-                    Text("Guardar")
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { mostrarModal = false }) {
-                    Text("Cancelar")
+            ) {
+                ExposedDropdownMenuBox(
+                    expanded = desplegarPreguntas,
+                    onExpandedChange = { desplegarPreguntas = !desplegarPreguntas }
+                ) {
+                    OutlinedTextField(
+                        value = preguntaInput.ifBlank { "Seleccionar pregunta" },
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Pregunta") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegarPreguntas) },
+                        singleLine = true
+                    )
+                    DropdownMenu(
+                        expanded = desplegarPreguntas,
+                        onDismissRequest = { desplegarPreguntas = false }
+                    ) {
+                        opcionesDisponibles.forEach { opcion ->
+                            DropdownMenuItem(
+                                text = { Text(opcion) },
+                                onClick = {
+                                    preguntaInput = opcion
+                                    desplegarPreguntas = false
+                                }
+                            )
+                        }
+                    }
                 }
+                CampoSecretoContrabajo(
+                    valor = respuestaInput,
+                    onValueChange = { respuestaInput = it },
+                    etiqueta = "Respuesta"
+                )
             }
-        )
+        }
     }
 }
 
@@ -768,22 +754,32 @@ fun PantallaUbicacion(
                             )
                         }
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp)
                 ) { Text("Obtener ubicación") }
-                BotonPrimario(
-                    texto = "Guardar",
+                OutlinedButton(
                     onClick = viewModel::guardarUbicacionAjustes,
-                    modifier = Modifier.weight(1f)
-                )
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) { Text("Guardar") }
             }
             Text(
                 text = if (ubicacion.latitud == null || ubicacion.longitud == null) {
-                    "Coordenadas: sin definir"
+                    "Coordenadas sin definir"
                 } else {
                     "Coordenadas: ${"%.5f".format(ubicacion.latitud)}, ${"%.5f".format(ubicacion.longitud)}"
                 },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
             )
         }
 
@@ -798,51 +794,45 @@ fun PantallaUbicacion(
     }
 
     if (mostrarModalDireccion) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { mostrarModalDireccion = false },
-            title = { Text("Editar ubicación") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = "Región Metropolitana",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Región") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Text(
-                        text = "Pronto podrás elegir otras regiones.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    ComboComunaRM(
-                        comunaSeleccionada = comunaInput.ifBlank { "Sin comuna" },
-                        comunas = uiState.comunasDisponibles,
-                        onSeleccionar = { comunaInput = it }
-                    )
-                    CampoContrabajo(valor = calleInput, onValueChange = { calleInput = it }, etiqueta = "Calle")
-                    CampoContrabajo(valor = numeroInput, onValueChange = { numeroInput = it }, etiqueta = "Número")
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)) }
+        ) {
+            ModalAjustesContenedor(
+                titulo = "Editar ubicación",
+                onCancelar = { mostrarModalDireccion = false },
+                onConfirmar = {
                     viewModel.actualizarRegionUbicacion("Región Metropolitana")
                     viewModel.actualizarComunaUbicacion(comunaInput)
                     viewModel.actualizarCalleUbicacion(calleInput)
                     viewModel.actualizarNumeroUbicacion(numeroInput)
                     viewModel.guardarUbicacionAjustes()
                     mostrarModalDireccion = false
-                }) {
-                    Text("Guardar")
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { mostrarModalDireccion = false }) {
-                    Text("Cancelar")
-                }
+            ) {
+                OutlinedTextField(
+                    value = "Región Metropolitana",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Región") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                Text(
+                    text = "Pronto podrás elegir otras regiones.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                ComboComunaRM(
+                    comunaSeleccionada = comunaInput.ifBlank { "Sin comuna" },
+                    comunas = uiState.comunasDisponibles,
+                    onSeleccionar = { comunaInput = it }
+                )
+                CampoContrabajo(valor = calleInput, onValueChange = { calleInput = it }, etiqueta = "Calle")
+                CampoContrabajo(valor = numeroInput, onValueChange = { numeroInput = it }, etiqueta = "Número")
             }
-        )
+        }
     }
 
     OverlayPantallaCarga(
@@ -979,6 +969,66 @@ private fun calcularZoomPorRangoM(rangoM: Int): Int = when {
     rangoM <= 20_000 -> 10
     rangoM <= 35_000 -> 9
     else -> 9
+}
+
+@Composable
+private fun ModalAjustesContenedor(
+    titulo: String,
+    subtitulo: String? = null,
+    onCancelar: () -> Unit,
+    onConfirmar: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                text = titulo,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            if (!subtitulo.isNullOrBlank()) {
+                Text(
+                    text = subtitulo,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 2.dp,
+            shadowElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                content()
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(onClick = onCancelar) {
+                Text("Cancelar")
+            }
+            TextButton(onClick = onConfirmar) {
+                Text("Guardar")
+            }
+        }
+    }
 }
 
 @Composable

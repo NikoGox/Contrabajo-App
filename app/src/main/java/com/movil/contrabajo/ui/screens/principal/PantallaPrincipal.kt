@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,13 +28,14 @@ import com.movil.contrabajo.ui.components.BotonPremiumP
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.outlined.FilterAlt
+import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -47,11 +47,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -78,7 +78,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -494,11 +493,30 @@ fun PantallaPrincipal(
                             .verticalScroll(rememberScrollState()),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Spacer(modifier = Modifier.height(86.dp))
+                        Spacer(modifier = Modifier.height(64.dp))
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.SearchOff,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(18.dp).size(42.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
                         Text(
                             text = textoEstado,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Prueba ajustando el rango, la comuna o los filtros para encontrar más publicaciones.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 } else {
@@ -532,60 +550,44 @@ fun PantallaPrincipal(
     }
 
     if (mostrarModalRango) {
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { mostrarModalRango = false },
-            title = { Text("Rango de búsqueda") },
-            text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = "Selecciona hasta dónde quieres buscar servicios cercanos.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)) }
+        ) {
+            ModalAjustesContenedor(
+                titulo = "Rango de búsqueda",
+                subtitulo = "Selecciona hasta dónde quieres buscar servicios cercanos.",
+                onCancelar = { mostrarModalRango = false },
+                onConfirmar = {
+                    viewModel.guardarRangoBusqueda(
+                        EscalaRango.valorPorPosicionSlider(posicionSliderRangoBusqueda)
                     )
-                    Text(
-                        text = "Actual: ${EscalaRango.formatear(EscalaRango.valorPorPosicionSlider(posicionSliderRangoBusqueda))}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    MiniMapaRangoBusqueda(
-                        latitud = uiState.latitudUsuario ?: -33.4489,
-                        longitud = uiState.longitudUsuario ?: -70.6693,
-                        rangoM = EscalaRango.valorPorPosicionSlider(posicionSliderRangoBusqueda),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                    )
-                    Slider(
-                        value = posicionSliderRangoBusqueda,
-                        onValueChange = { posicionSliderRangoBusqueda = it },
-                        valueRange = 0f..EscalaRango.valoresMetros.lastIndex.toFloat(),
-                        steps = EscalaRango.valoresMetros.size - 2
-                    )
+                    mostrarModalRango = false
                 }
-            },
-            confirmButton = {
-                OutlinedButton(
-                    enabled = !uiState.cargandoOperacion,
-                    onClick = {
-                        viewModel.guardarRangoBusqueda(
-                            EscalaRango.valorPorPosicionSlider(posicionSliderRangoBusqueda)
-                        )
-                        mostrarModalRango = false
-                    },
-                    colors = ButtonDefaults.outlinedButtonColors()
-                ) {
-                    Text("Guardar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { mostrarModalRango = false }) {
-                    Text("Cancelar")
-                }
+            ) {
+                Text(
+                    text = "Actual: ${EscalaRango.formatear(EscalaRango.valorPorPosicionSlider(posicionSliderRangoBusqueda))}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                MiniMapaRangoBusqueda(
+                    latitud = uiState.latitudUsuario ?: -33.4489,
+                    longitud = uiState.longitudUsuario ?: -70.6693,
+                    rangoM = EscalaRango.valorPorPosicionSlider(posicionSliderRangoBusqueda),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(168.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                )
+                Slider(
+                    value = posicionSliderRangoBusqueda,
+                    onValueChange = { posicionSliderRangoBusqueda = it },
+                    valueRange = 0f..EscalaRango.valoresMetros.lastIndex.toFloat(),
+                    steps = EscalaRango.valoresMetros.size - 2
+                )
             }
-        )
+        }
     }
 
     OverlayPantallaCarga(
@@ -652,199 +654,263 @@ private fun FiltroMarketplaceDialog(
 ) {
     var desplegarCategorias by rememberSaveable { mutableStateOf(false) }
     var desplegarComunas by rememberSaveable { mutableStateOf(false) }
-    val alturaMaxModal = LocalConfiguration.current.screenHeightDp.dp * 0.72f
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text("Filtrar y ordenar") },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = alturaMaxModal),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)) }
+    ) {
+        ModalAjustesContenedor(
+            titulo = "Filtrar y ordenar",
+            onCancelar = onDismiss,
+            onConfirmar = onAplicar
+        ) {
+            ExposedDropdownMenuBox(
+                expanded = desplegarCategorias,
+                onExpandedChange = { desplegarCategorias = !desplegarCategorias }
             ) {
-                ExposedDropdownMenuBox(
+                OutlinedTextField(
+                    value = categorias.firstOrNull { it.first == categoriaSeleccionada }?.second ?: "Todas",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Categoría") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegarCategorias) },
+                    singleLine = true
+                )
+                ExposedDropdownMenu(
                     expanded = desplegarCategorias,
-                    onExpandedChange = { desplegarCategorias = !desplegarCategorias }
+                    onDismissRequest = { desplegarCategorias = false }
                 ) {
-                    OutlinedTextField(
-                        value = categorias.firstOrNull { it.first == categoriaSeleccionada }?.second ?: "Todas",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Categoría") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegarCategorias) },
-                        singleLine = true
+                    DropdownMenuItem(
+                        text = { Text("Todas") },
+                        onClick = {
+                            onCategoriaSeleccionada(null)
+                            desplegarCategorias = false
+                        }
                     )
-                    ExposedDropdownMenu(
-                        expanded = desplegarCategorias,
-                        onDismissRequest = { desplegarCategorias = false }
-                    ) {
+                    categorias.forEach { categoria ->
                         DropdownMenuItem(
-                            text = { Text("Todas") },
+                            text = { Text(categoria.second) },
                             onClick = {
-                                onCategoriaSeleccionada(null)
+                                onCategoriaSeleccionada(categoria.first)
                                 desplegarCategorias = false
                             }
                         )
-                        categorias.forEach { categoria ->
-                            DropdownMenuItem(
-                                text = { Text(categoria.second) },
-                                onClick = {
-                                    onCategoriaSeleccionada(categoria.first)
-                                    desplegarCategorias = false
-                                }
-                            )
-                        }
                     }
                 }
+            }
 
+            Text(
+                text = "Tipo de precio",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            val opcionesTipoPrecio = listOf(
+                "Todos" to null,
+                "Fijo" to TipoPrecio.FIJO,
+                "Por hora" to TipoPrecio.POR_HORA,
+                "Desde" to TipoPrecio.DESDE,
+                "Contactar" to TipoPrecio.CONTACTAR
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                opcionesTipoPrecio.forEach { (texto, valor) ->
+                    BotonOrdenCompacto(
+                        texto = texto,
+                        seleccionado = tipoPrecioSeleccionado == valor,
+                        onClick = { onTipoPrecioSeleccionado(valor) }
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "Tipo de precio",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
+                    text = "Solo trabajadores verificados",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                val opcionesTipoPrecio = listOf(
-                    "Todos" to null,
-                    "Fijo" to TipoPrecio.FIJO,
-                    "Por hora" to TipoPrecio.POR_HORA,
-                    "Desde" to TipoPrecio.DESDE,
-                    "Contactar" to TipoPrecio.CONTACTAR
+                Switch(
+                    checked = soloVerificados,
+                    onCheckedChange = { onSoloVerificadosCambiado(it) }
                 )
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(opcionesTipoPrecio) { (texto, valor) ->
-                        BotonOrdenCompacto(
-                            texto = texto,
-                            seleccionado = tipoPrecioSeleccionado == valor,
-                            onClick = { onTipoPrecioSeleccionado(valor) }
-                        )
-                    }
-                }
-
-                OpcionFiltro(
-                    texto = if (soloVerificados) "Solo trabajador verificado: SI" else "Solo trabajador verificado: NO",
-                    seleccionada = soloVerificados,
-                    onClick = { onSoloVerificadosCambiado(!soloVerificados) }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Filtrar por comuna",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-
-                Row(
+                Switch(
+                    checked = filtroZonaComunaActivo,
+                    onCheckedChange = { onFiltroZonaComunaCambiado(it) }
+                )
+            }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { if (filtroZonaComunaActivo) desplegarComunas = true },
+                    enabled = filtroZonaComunaActivo,
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    shape = RoundedCornerShape(999.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (filtroZonaComunaActivo) {
+                            MaterialTheme.colorScheme.surface
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                        },
+                        contentColor = if (filtroZonaComunaActivo) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                    )
                 ) {
                     Text(
-                        text = "Filtrar por comuna",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Switch(
-                        checked = filtroZonaComunaActivo,
-                        onCheckedChange = { onFiltroZonaComunaCambiado(it) }
+                        text = comunaSeleccionada.ifBlank { "Seleccionar comuna" },
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedButton(
-                        onClick = { if (filtroZonaComunaActivo) desplegarComunas = true },
-                        enabled = filtroZonaComunaActivo,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = comunaSeleccionada.ifBlank { "Seleccionar comuna" },
-                            modifier = Modifier.fillMaxWidth(),
-                            style = MaterialTheme.typography.bodyMedium
+                DropdownMenu(
+                    expanded = desplegarComunas && filtroZonaComunaActivo,
+                    onDismissRequest = { desplegarComunas = false }
+                ) {
+                    comunas.forEach { comuna ->
+                        DropdownMenuItem(
+                            text = { Text(comuna) },
+                            onClick = {
+                                onComunaSeleccionada(comuna)
+                                desplegarComunas = false
+                            }
                         )
                     }
-                    DropdownMenu(
-                        expanded = desplegarComunas && filtroZonaComunaActivo,
-                        onDismissRequest = { desplegarComunas = false }
-                    ) {
-                        comunas.forEach { comuna ->
-                            DropdownMenuItem(
-                                text = { Text(comuna) },
-                                onClick = {
-                                    onComunaSeleccionada(comuna)
-                                    desplegarComunas = false
-                                }
-                            )
-                        }
-                    }
                 }
+            }
 
-                Text(
-                    text = "Orden",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    BotonOrdenCompacto(
-                        texto = "A -> Z",
-                        seleccionado = ordenActual == OrdenMarketplace.ALFABETICO_A_Z,
-                        onClick = { onOrdenSeleccionado(OrdenMarketplace.ALFABETICO_A_Z) }
-                    )
-                    BotonOrdenCompacto(
-                        texto = "Recientes",
-                        seleccionado = ordenActual == OrdenMarketplace.FECHA_RECIENTES,
-                        onClick = { onOrdenSeleccionado(OrdenMarketplace.FECHA_RECIENTES) }
-                    )
-                    BotonOrdenCompacto(
-                        texto = "Antiguas",
-                        seleccionado = ordenActual == OrdenMarketplace.FECHA_ANTIGUAS,
-                        onClick = { onOrdenSeleccionado(OrdenMarketplace.FECHA_ANTIGUAS) }
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            OutlinedButton(
-                onClick = onAplicar,
-                colors = ButtonDefaults.outlinedButtonColors()
+            Text(
+                text = "Orden",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Aplicar")
-            }
-        },
-        dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onLimpiar) {
-                    Text("Limpiar")
-                }
-                TextButton(onClick = onDismiss) {
-                    Text("Cancelar")
-                }
+                BotonOrdenCompacto(
+                    texto = "A -> Z",
+                    seleccionado = ordenActual == OrdenMarketplace.ALFABETICO_A_Z,
+                    onClick = { onOrdenSeleccionado(OrdenMarketplace.ALFABETICO_A_Z) }
+                )
+                BotonOrdenCompacto(
+                    texto = "Recientes",
+                    seleccionado = ordenActual == OrdenMarketplace.FECHA_RECIENTES,
+                    onClick = { onOrdenSeleccionado(OrdenMarketplace.FECHA_RECIENTES) }
+                )
+                BotonOrdenCompacto(
+                    texto = "Antiguas",
+                    seleccionado = ordenActual == OrdenMarketplace.FECHA_ANTIGUAS,
+                    onClick = { onOrdenSeleccionado(OrdenMarketplace.FECHA_ANTIGUAS) }
+                )
             }
         }
-    )
+    }
 }
 
 @Composable
-private fun OpcionFiltro(
-    texto: String,
-    seleccionada: Boolean,
-    onClick: () -> Unit
+private fun ModalAjustesContenedor(
+    titulo: String,
+    subtitulo: String? = null,
+    onCancelar: () -> Unit,
+    onConfirmar: () -> Unit,
+    content: @Composable () -> Unit
 ) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (seleccionada) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
-        )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = texto,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (seleccionada) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = titulo,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            if (!subtitulo.isNullOrBlank()) {
+                Text(
+                    text = subtitulo,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Surface(
+            shape = RoundedCornerShape(22.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 2.dp,
+            shadowElevation = 0.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                content()
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = onCancelar,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(999.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                )
+            ) {
+                Text("Cancelar")
+            }
+            OutlinedButton(
+                onClick = onConfirmar,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(999.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text("Aplicar")
+            }
+        }
     }
 }
 
@@ -857,6 +923,7 @@ private fun BotonOrdenCompacto(
     OutlinedButton(
         onClick = onClick,
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(999.dp),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = if (seleccionado) {
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)

@@ -105,6 +105,7 @@ import com.movil.contrabajo.ui.theme.SombraPetroleo
 import com.movil.contrabajo.ui.theme.TurquesaBrillante
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.text.TextStyle
 import kotlinx.coroutines.delay
 
 @Composable
@@ -934,6 +935,7 @@ fun FilaEtiquetaValor(
     valorAlineadoEnd: Boolean = true,
     valorMaxLines: Int = 1,
     valorFontWeight: FontWeight = FontWeight.SemiBold,
+    valorTextStyle: TextStyle = MaterialTheme.typography.bodyMedium,
     prefijo: String? = null
 ) {
     Row(
@@ -962,7 +964,7 @@ fun FilaEtiquetaValor(
                 )
                 Text(
                     text = valor,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = valorTextStyle,
                     fontWeight = valorFontWeight,
                     textAlign = if (valorAlineadoEnd) TextAlign.End else TextAlign.Start,
                     maxLines = valorMaxLines,
@@ -973,7 +975,7 @@ fun FilaEtiquetaValor(
             Text(
                 text = valor.ifBlank { "-" },
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodyMedium,
+                style = valorTextStyle,
                 fontWeight = valorFontWeight,
                 textAlign = if (valorAlineadoEnd) TextAlign.End else TextAlign.Start,
                 maxLines = valorMaxLines,

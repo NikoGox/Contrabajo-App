@@ -26,13 +26,16 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -48,11 +51,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.movil.contrabajo.domain.model.TipoPerfil
-import com.movil.contrabajo.ui.components.BotonPrimario
 import com.movil.contrabajo.ui.components.EstrellaPremiumAnimada
 import com.movil.contrabajo.ui.components.EtiquetaEstado
 import com.movil.contrabajo.ui.components.FilaEtiquetaValor
-import com.movil.contrabajo.ui.components.LogoContrabajo
 import com.movil.contrabajo.ui.components.OverlayPantallaCarga
 import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaBase
@@ -100,449 +101,484 @@ fun PantallaPerfil(
     val pullToRefreshState = rememberPullToRefreshState()
 
     Box(modifier = modifier.fillMaxSize()) {
-    PullToRefreshBox(
-        isRefreshing = uiState.refrescando,
-        onRefresh = viewModel::refrescarDesdeGesto,
-        state = pullToRefreshState,
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopCenter,
-        indicator = {
-            PullToRefreshDefaults.Indicator(
-                state = pullToRefreshState,
-                isRefreshing = uiState.refrescando,
-                containerColor = Color.White,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    ) {
-    PantallaBase(
-        modifier = Modifier,
-        mostrarFondo = false,
-        scrollable = false
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(scrollPerfil),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
-        ) {
-            TarjetaBase {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box {
-                        Surface(
-                            modifier = Modifier.size(84.dp),
-                            shape = androidx.compose.foundation.shape.CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                        ) {
-                            val fotoPerfil = usuario?.fotoPerfilUrl.orEmpty()
-                            when {
-                                uiState.subiendoFotoPerfil -> {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(32.dp),
-                                            strokeWidth = 3.dp
-                                        )
-                                    }
-                                }
-                                fotoPerfil.isBlank() -> {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.AccountCircle,
-                                            contentDescription = "Sin foto de perfil",
-                                            modifier = Modifier.fillMaxSize(),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                        )
-                                    }
-                                }
-                                else -> {
-                                    AsyncImage(
-                                        model = fotoPerfil,
-                                        contentDescription = "Foto de perfil",
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                }
-                            }
-                        }
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(26.dp)
-                                .clickable { selectorFotoPerfilLauncher.launch(arrayOf("image/*")) },
-                            shape = androidx.compose.foundation.shape.CircleShape,
-                            color = MaterialTheme.colorScheme.primary
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Filled.PhotoCamera,
-                                    contentDescription = "Cambiar foto de perfil",
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        }
-                    }
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = if (usuario == null) {
-                                    "Mi perfil"
-                                } else {
-                                    "${usuario.nombre} ${usuario.apellidoPaterno}"
-                                },
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                            if (usuario?.tipoPerfil == TipoPerfil.PREMIUM) {
-                                EstrellaPremiumAnimada(tamano = 18.dp)
-                            }
-                        }
-                        if (usuario != null) {
-                            Text(
-                                text = "@${usuario.username}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Surface(
-                                shape = RoundedCornerShape(999.dp),
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                            ) {
-                                Text(
-                                    text = when (usuario.tipoPerfil) {
-                                        TipoPerfil.MODERADOR -> "Moderador"
-                                        TipoPerfil.PREMIUM -> "Trabajador Premium"
-                                        TipoPerfil.TRABAJADOR -> "Trabajador"
-                                        else -> "Cliente"
-                                    },
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilaEtiquetaValor(
-                            etiqueta = "Correo",
-                            valor = usuario?.correo.orEmpty(),
-                            etiquetaAncho = 76.dp,
-                            valorMaxLines = 1
-                        )
-                        FilaEtiquetaValor(
-                            etiqueta = "Teléfono",
-                            valor = usuario?.telefono.orEmpty(),
-                            prefijo = "+56 9 "
-                        )
-                    }
-                }
-
-                if (esTrabajador) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onAbrirValoraciones() },
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Valoraciones",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            ValoracionPerfil(valor = promedioPerfil, onClick = onAbrirValoraciones)
-                        }
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = onEditarPerfil,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Editar perfil")
-                }
-
-                OutlinedButton(
-                    onClick = onCerrarSesion,
-                    modifier = Modifier.fillMaxWidth(),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        Color(0xFFD32F2F)
-                    )
-                ) {
-                    Text(
-                        text = "Cerrar sesión",
-                        color = Color(0xFFD32F2F),
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-                }
+        PullToRefreshBox(
+            isRefreshing = uiState.refrescando,
+            onRefresh = viewModel::refrescarDesdeGesto,
+            state = pullToRefreshState,
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopCenter,
+            indicator = {
+                PullToRefreshDefaults.Indicator(
+                    state = pullToRefreshState,
+                    isRefreshing = uiState.refrescando,
+                    containerColor = Color.White,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
-
-            if (!esModerador) {
-                TarjetaBase {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                    Text(
-                        text = "Mis servicios",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ResumenCupo(
-                            titulo = "Servicios disponibles",
-                            valor = "$serviciosActivos/${uiState.limiteServiciosActivos}",
-                            modifier = Modifier.weight(1f)
-                        )
-                        ResumenCupo(
-                            titulo = "Total de servicios",
-                            valor = "$totalServicios/${uiState.limiteServiciosTotales}",
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    if (uiState.ofertasPropias.isEmpty()) {
-                        Text(
-                            text = if (uiState.usuario?.tipoPerfil == TipoPerfil.USUARIO_BASE) {
-                                "Tu perfil actual no puede publicar servicios aún."
-                            } else {
-                                "Aún no has creado tu primer servicio."
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (uiState.usuario?.tipoPerfil != TipoPerfil.USUARIO_BASE) {
-                            BotonPrimario(
-                                texto = "Crear servicio",
-                                onClick = onAbrirCrearServicio
-                            )
-                        }
-                    } else {
-                        if (totalServicios < uiState.limiteServiciosTotales) {
-                            OutlinedButton(
-                                onClick = onAbrirCrearServicio,
-                                modifier = Modifier.fillMaxWidth()
+        ) {
+            PantallaBase(
+                modifier = Modifier,
+                mostrarFondo = false,
+                scrollable = false
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(scrollPerfil)
+                        .padding(bottom = 72.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    TarjetaBase {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Crear servicio")
-                            }
-                        }
+                                Box {
+                                    Surface(
+                                        modifier = Modifier.size(84.dp),
+                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                                    ) {
+                                        val fotoPerfil = usuario?.fotoPerfilUrl.orEmpty()
+                                        when {
+                                            uiState.subiendoFotoPerfil -> {
+                                                Box(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    CircularProgressIndicator(
+                                                        modifier = Modifier.size(32.dp),
+                                                        strokeWidth = 3.dp
+                                                    )
+                                                }
+                                            }
+                                            fotoPerfil.isBlank() -> {
+                                                Box(
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.AccountCircle,
+                                                        contentDescription = "Sin foto de perfil",
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                                    )
+                                                }
+                                            }
+                                            else -> {
+                                                AsyncImage(
+                                                    model = fotoPerfil,
+                                                    contentDescription = "Foto de perfil",
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Surface(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .size(26.dp)
+                                            .clickable { selectorFotoPerfilLauncher.launch(arrayOf("image/*")) },
+                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                        color = MaterialTheme.colorScheme.primary
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Filled.PhotoCamera,
+                                                contentDescription = "Cambiar foto de perfil",
+                                                tint = MaterialTheme.colorScheme.onPrimary,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    }
+                                }
 
-                        uiState.ofertasPropias.forEach { oferta ->
-                            val enCurso = uiState.idsOfertasEnCurso.contains(oferta.idOfertaServicio)
-                            val bloqueadoPorCupo = !oferta.disponible && serviciosActivos >= uiState.limiteServiciosActivos
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = if (usuario == null) {
+                                                "Mi perfil"
+                                            } else {
+                                                "${usuario.nombre} ${usuario.apellidoPaterno}"
+                                            },
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        if (usuario?.tipoPerfil == TipoPerfil.PREMIUM) {
+                                            EstrellaPremiumAnimada(tamano = 18.dp)
+                                        }
+                                    }
+                                    if (usuario != null) {
+                                        Text(
+                                            text = "@${usuario.username}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(999.dp),
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                        ) {
+                                            Text(
+                                                text = when (usuario.tipoPerfil) {
+                                                    TipoPerfil.MODERADOR -> "Moderador"
+                                                    TipoPerfil.PREMIUM -> "Trabajador Premium"
+                                                    TipoPerfil.TRABAJADOR -> "Trabajador"
+                                                    else -> "Cliente"
+                                                },
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             Surface(
-                                shape = RoundedCornerShape(18.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.32f)
                             ) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(14.dp),
-                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    FilaEtiquetaValor(
+                                        etiqueta = "Correo",
+                                        valor = usuario?.correo.orEmpty(),
+                                        etiquetaAncho = 76.dp,
+                                        valorMaxLines = 1,
+                                        valorTextStyle = MaterialTheme.typography.bodySmall
+                                    )
+                                    FilaEtiquetaValor(
+                                        etiqueta = "Teléfono",
+                                        valor = usuario?.telefono.orEmpty(),
+                                        prefijo = "+56 9 "
+                                    )
+                                }
+                            }
+
+                            if (esTrabajador) {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onAbrirValoraciones() },
+                                    shape = RoundedCornerShape(14.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                                    )
                                 ) {
                                     Row(
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                        Text(
+                                            text = "Valoraciones",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        ValoracionPerfil(valor = promedioPerfil, onClick = onAbrirValoraciones)
+                                    }
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = onEditarPerfil,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(999.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Edit,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Editar perfil")
+                            }
+                        }
+                    }
+
+                    if (!esModerador) {
+                        TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "Mis servicios",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    ResumenCupo(
+                                        titulo = "Servicios disponibles",
+                                        valor = "$serviciosActivos/${uiState.limiteServiciosActivos}",
+                                        colorTitulo = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    ResumenCupo(
+                                        titulo = "Total de servicios",
+                                        valor = "$totalServicios/${uiState.limiteServiciosTotales}",
+                                        colorTitulo = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                if (uiState.ofertasPropias.isEmpty()) {
+                                    Text(
+                                        text = if (uiState.usuario?.tipoPerfil == TipoPerfil.USUARIO_BASE) {
+                                            "Tu perfil actual no puede publicar servicios aún."
+                                        } else {
+                                            "Aún no has creado tu primer servicio."
+                                        },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (uiState.usuario?.tipoPerfil != TipoPerfil.USUARIO_BASE) {
+                                        OutlinedButton(
+                                            onClick = onAbrirCrearServicio,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(999.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                            )
                                         ) {
-                                            Surface(
+                                            Icon(
+                                                imageVector = Icons.Filled.Add,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Crear servicio")
+                                        }
+                                    }
+                                } else {
+                                    if (totalServicios < uiState.limiteServiciosTotales) {
+                                        OutlinedButton(
+                                            onClick = onAbrirCrearServicio,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(999.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                            )
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Add,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Crear servicio")
+                                        }
+                                    }
+
+                                    uiState.ofertasPropias.forEach { oferta ->
+                                        val enCurso = uiState.idsOfertasEnCurso.contains(oferta.idOfertaServicio)
+                                        val bloqueadoPorCupo = !oferta.disponible && serviciosActivos >= uiState.limiteServiciosActivos
+                                        Surface(
+                                            shape = RoundedCornerShape(18.dp),
+                                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                                        ) {
+                                            Column(
                                                 modifier = Modifier
-                                                    .size(72.dp)
-                                                    .height(72.dp),
-                                                shape = RoundedCornerShape(12.dp),
-                                                color = MaterialTheme.colorScheme.surface
+                                                    .fillMaxWidth()
+                                                    .padding(14.dp),
+                                                verticalArrangement = Arrangement.spacedBy(10.dp)
                                             ) {
-                                                if (oferta.fotoUrlReferencia.isBlank()) {
-                                                    Box(contentAlignment = Alignment.Center) {
-                                                        Icon(
-                                                            imageVector = Icons.Filled.Build,
-                                                            contentDescription = null,
-                                                            tint = MaterialTheme.colorScheme.primary,
-                                                            modifier = Modifier.size(34.dp)
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Row(
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Surface(
+                                                            modifier = Modifier
+                                                                .size(72.dp)
+                                                                .height(72.dp),
+                                                            shape = RoundedCornerShape(12.dp),
+                                                            color = MaterialTheme.colorScheme.surface
+                                                        ) {
+                                                            if (oferta.fotoUrlReferencia.isBlank()) {
+                                                                Box(contentAlignment = Alignment.Center) {
+                                                                    Icon(
+                                                                        imageVector = Icons.Filled.Build,
+                                                                        contentDescription = null,
+                                                                        tint = MaterialTheme.colorScheme.primary,
+                                                                        modifier = Modifier.size(34.dp)
+                                                                    )
+                                                                }
+                                                            } else {
+                                                                AsyncImage(
+                                                                    model = oferta.fotoUrlReferencia,
+                                                                    contentDescription = oferta.titulo,
+                                                                    modifier = Modifier.fillMaxWidth(),
+                                                                    contentScale = ContentScale.Crop
+                                                                )
+                                                            }
+                                                        }
+                                                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                            Text(
+                                                                text = oferta.titulo,
+                                                                style = MaterialTheme.typography.titleMedium,
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis
+                                                            )
+                                                            Text(
+                                                                text = oferta.precioTexto,
+                                                                style = MaterialTheme.typography.bodyMedium,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis
+                                                            )
+                                                        }
+                                                    }
+                                                    if (enCurso) {
+                                                        EstadoServicioEnCurso()
+                                                    } else {
+                                                        Switch(
+                                                            checked = oferta.disponible,
+                                                            onCheckedChange = { valor ->
+                                                                viewModel.cambiarDisponibilidadServicioRapido(
+                                                                    idOfertaServicio = oferta.idOfertaServicio,
+                                                                    valor = valor
+                                                                )
+                                                            },
+                                                            enabled = !bloqueadoPorCupo,
+                                                            modifier = Modifier.alpha(if (bloqueadoPorCupo) 0.35f else 1f)
                                                         )
                                                     }
-                                                } else {
-                                                    AsyncImage(
-                                                        model = oferta.fotoUrlReferencia,
-                                                        contentDescription = oferta.titulo,
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        contentScale = ContentScale.Crop
-                                                    )
                                                 }
-                                            }
-                                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+
                                                 Text(
-                                                    text = oferta.titulo,
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    maxLines = 1,
+                                                    text = oferta.descripcion,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    maxLines = 3,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Text(
-                                                    text = oferta.precioTexto,
-                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    text = oferta.ubicacionReferencia.ifBlank { "Región Metropolitana" },
+                                                    style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
-                                            }
-                                        }
-                                        if (enCurso) {
-                                            EstadoServicioEnCurso()
-                                        } else {
-                                            Switch(
-                                                checked = oferta.disponible,
-                                                onCheckedChange = { valor ->
-                                                    viewModel.cambiarDisponibilidadServicioRapido(
-                                                        idOfertaServicio = oferta.idOfertaServicio,
-                                                        valor = valor
+                                                OutlinedButton(
+                                                    onClick = { onAbrirEditarServicio(oferta.idOfertaServicio) },
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.Edit,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(18.dp)
                                                     )
-                                                },
-                                                enabled = !bloqueadoPorCupo,
-                                                modifier = Modifier.alpha(if (bloqueadoPorCupo) 0.35f else 1f)
-                                            )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text("Editar servicio")
+                                                }
+                                            }
                                         }
                                     }
 
-                                    Text(
-                                        text = oferta.descripcion,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 3,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = oferta.ubicacionReferencia.ifBlank { "Región Metropolitana" },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    OutlinedButton(
-                                        onClick = { onAbrirEditarServicio(oferta.idOfertaServicio) },
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Edit,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(18.dp)
+                                    if (serviciosActivos >= uiState.limiteServiciosActivos) {
+                                        Text(
+                                            text = "Es necesario tener cupo disponible para activar un servicio.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Editar servicio")
                                     }
                                 }
                             }
                         }
 
-                        if (serviciosActivos >= uiState.limiteServiciosActivos) {
+                        if (uiState.errorServicio != null) {
                             Text(
-                                text = "Es necesario tener cupo disponible para activar un servicio.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = uiState.errorServicio,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
                             )
                         }
-                    }
-                }
 
-                if (uiState.errorServicio != null) {
-                    Text(
-                        text = uiState.errorServicio,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                    if (uiState.usuario?.tipoPerfil == TipoPerfil.USUARIO_BASE) {
-                        EtiquetaEstado("Para verificarte ve a Ajustes > Seguridad y verificación")
+                        if (uiState.usuario?.tipoPerfil == TipoPerfil.USUARIO_BASE) {
+                            EtiquetaEstado("Para verificarte ve a Ajustes > Seguridad y verificación")
+                        }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+
+                    TextButton(
+                        onClick = onCerrarSesion,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = Color(0xFFD32F2F)
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Logout,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color(0xFFD32F2F)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Cerrar sesión",
+                            color = Color(0xFFD32F2F),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
         }
-        }
-    }
-    }
 
         OverlayPantallaCarga(
             visible = uiState.cargandoPantalla,
             mensaje = "Actualizando perfil..."
         )
     }
+}
 
 
 @Composable
 private fun ResumenCupo(
     titulo: String,
     valor: String,
+    colorTitulo: Color = MaterialTheme.colorScheme.primary,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -559,7 +595,8 @@ private fun ResumenCupo(
             Text(
                 text = titulo,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = colorTitulo,
+                fontWeight = FontWeight.SemiBold
             )
             Text(
                 text = valor,

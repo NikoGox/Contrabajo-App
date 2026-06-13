@@ -1,3 +1,23 @@
+VERSION 0.15.2-Pre-Alpha
+───────
+├─• Se rediseñaron los menús emergentes de Ajustes para compartir un contenedor visual único con `ModalAjustesContenedor`, alineado al sistema actual de tarjetas.
+├─• Se migraron a `ModalBottomSheet` los flujos de seguridad, validación por contraseña, edición de ubicación y filtros del marketplace, eliminando diálogos nativos anticuados.
+├─• Se ajustaron los botones y chips del marketplace para mejorar jerarquía visual, contraste, radio y consistencia entre acciones primarias y secundarias.
+├─• El estado vacío del marketplace ahora muestra un ícono `SearchOff` con cápsula de color y texto de soporte para evitar una pantalla desolada.
+├─• La pantalla de Perfil recibió mejoras de lectura y jerarquía: correo con mejor ajuste, contadores con contraste reforzado, creación de servicio con ícono y cierre de sesión reubicado debajo de Mis servicios.
+├─• Se corrigió la estructura del composable de Perfil para evitar referencias fuera de alcance y mantener separados los bloques de tarjeta.
+└─• Se simplificó la configuración de endpoints en `build.gradle.kts` para editar la IP del host con menos fricción durante el desarrollo local.
+
+VERSION 0.15.1-Pre-Alpha
+───────
+├─• Se incluyó la foto de perfil en `PantallaChats.kt`.
+└─• Se agregó la foto de perfil del trabajador en el detalle del servicio.
+
+VERSION 0.15.0-Pre-Alpha
+───────
+├─• Se arregló el bug del chat que crasheaba la app al enviar mensajes cuando ambos usuarios estaban en la conversación.
+└─• Se limpió el campo de escritura del chat al enviar un mensaje para evitar spam constante de texto repetido.
+
 VERSION 0.14.1-Pre-Alpha
 ───────
 ├─• Se reemplazo el flujo simulado de Premium por la integracion real con Mercado Pago Sandbox.

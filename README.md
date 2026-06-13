@@ -14,11 +14,11 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 
 ## Últimos cambios
 
-### ❚❙❘ VERSIÓN 0.14.1.a-Pre-Alpha
+### ❚❙❘ VERSIÓN 0.15.2-Pre-Alpha
 
-> `<br>`• Se ajustó la integración de Premium con Mercado Pago Sandbox para que el backend valide el pago real antes de promover al usuario.
-> `<br>`• La app abre el checkout externo con el `init_point` y luego consulta el estado Premium en backend para reflejar la aprobación real.
-> `<br>`• Se agregó soporte de diagnóstico y se dejó preparado el uso de un túnel público para el webhook (`notification-url`), evitando depender de `localhost`.
+> `<br>`• Se unificó el diseño de los `ModalBottomSheet` de Ajustes y Marketplace con un contenedor visual coherente con el sistema de tarjetas.
+> `<br>`• Se rediseñaron el filtro del marketplace y el estado vacío con mejor jerarquía, chips redondeados y una ilustración vectorial amigable.
+> `<br>`• Se mejoró la pantalla de Perfil para ordenar mejor las tarjetas, dar más aire a `Cerrar sesión` y reforzar lectura/contraste de correo y contadores.
 
 ---
 
