@@ -1,5 +1,8 @@
 package com.movil.contrabajo.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
@@ -12,10 +15,22 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -26,8 +41,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -39,6 +58,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.movil.contrabajo.data.repository.ProveedorRepositorios
+import com.movil.contrabajo.ui.components.BotonPrimario
 import com.movil.contrabajo.ui.components.ContenedorConNavbarFlotante
 import com.movil.contrabajo.ui.components.FondoContrabajo
 import com.movil.contrabajo.ui.components.OverlayPantallaCarga
@@ -52,6 +72,7 @@ import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoSegurid
 import com.movil.contrabajo.ui.screens.autenticacion.PantallaRegistroPasoUno
 import com.movil.contrabajo.ui.screens.ajustes.PantallaAjustes
 import com.movil.contrabajo.ui.screens.ajustes.PantallaAjustesSeguridad
+import com.movil.contrabajo.ui.screens.ajustes.PantallaPreferencias
 import com.movil.contrabajo.ui.screens.ajustes.PantallaBaneos
 import com.movil.contrabajo.ui.screens.ajustes.PantallaCuenta
 import com.movil.contrabajo.ui.screens.ajustes.PantallaPreguntasSeguridad
@@ -66,7 +87,7 @@ import com.movil.contrabajo.ui.screens.premium.PantallaBienvenidaPremium
 import com.movil.contrabajo.ui.screens.premium.PantallaHistorialContactosPremium
 import com.movil.contrabajo.ui.screens.premium.PantallaMenuPremium
 import com.movil.contrabajo.ui.screens.premium.PantallaPremiumActivado
-import com.movil.contrabajo.ui.screens.premium.PantallaLecturaRapidaPremium
+import com.movil.contrabajo.ui.screens.premium.PantallaEstadisticasPremium
 import com.movil.contrabajo.ui.screens.perfil.PantallaEditarPerfil
 import com.movil.contrabajo.ui.screens.perfil.PantallaValoracionesServicios
 import com.movil.contrabajo.ui.screens.principal.PantallaPrincipal
@@ -90,8 +111,11 @@ import com.movil.contrabajo.data.remote.SesionEventos
 import com.movil.contrabajo.data.remote.WsManager
 import com.movil.contrabajo.data.workers.MensajesPollWorker
 import com.movil.contrabajo.domain.model.TipoPerfil
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 @Composable
@@ -288,7 +312,85 @@ fun ContrabajoApp(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    // Monitor de conexión: detecta caídas del backend y muestra modal de intermitencias
+    var mostrarModalIntermitencias by rememberSaveable { mutableStateOf(false) }
+    var segundosSinConexion by rememberSaveable { mutableStateOf(0) }
+    var monitoreoActivo by rememberSaveable { mutableStateOf(false) }
+
+    val rutaActual = navController.currentBackStackEntry?.destination?.route
+    val enPantallaPrincipal = rutaActual in listOf(
+        "principal",
+        "perfil",
+        "chats"
+    )
+
+    LaunchedEffect(enPantallaPrincipal) {
+        if (enPantallaPrincipal) {
+            monitoreoActivo = true
+            segundosSinConexion = 0
+            mostrarModalIntermitencias = false
+        } else {
+            monitoreoActivo = false
+            segundosSinConexion = 0
+            mostrarModalIntermitencias = false
+        }
+    }
+
+    LaunchedEffect(monitoreoActivo) {
+        if (!monitoreoActivo) return@LaunchedEffect
+
+        while (isActive) {
+            delay(5000) // Verificar cada 5 segundos
+
+            val token = RemoteSessionStore.obtenerTokenEstatico(context)
+            if (token == null) {
+                segundosSinConexion = 0
+                continue
+            }
+
+            val conexionOk = try {
+                withContext(Dispatchers.IO) {
+                    val call = com.movil.contrabajo.data.remote.UsuariosApiClient.api.validarSesion(token)
+                    val response = call.execute()
+                    response.isSuccessful
+                }
+            } catch (_: Exception) {
+                false
+            }
+
+            if (conexionOk) {
+                segundosSinConexion = 0
+                mostrarModalIntermitencias = false
+            } else {
+                segundosSinConexion += 5
+
+                // A los 20 segundos, mostrar modal de advertencia
+                if (segundosSinConexion >= 20 && !mostrarModalIntermitencias) {
+                    mostrarModalIntermitencias = true
+                }
+
+                // A los 40 segundos, cerrar la app
+                if (segundosSinConexion >= 40) {
+                    val activity = context.findActivity()
+                    activity?.finishAffinity()
+                    break
+                }
+            }
+        }
+    }
+
+    // Resetear contador al volver a tener conexión
+    LaunchedEffect(mostrarModalIntermitencias) {
+        if (!mostrarModalIntermitencias && segundosSinConexion == 0) {
+            // La conexión se recuperó, todo bien
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         NavHost(
             navController = navController,
             startDestination = RutasApp.Inicio.ruta,
@@ -438,7 +540,7 @@ fun ContrabajoApp(
                 PantallaMenuPremium(
                     viewModel = premiumViewModel,
                     onAbrirHistorial = { navController.navigate(RutasApp.PremiumHistorialContactos.ruta) },
-                    onAbrirLecturaRapida = { navController.navigate(RutasApp.PremiumLecturaRapida.ruta) },
+                    onAbrirEstadisticas = { navController.navigate(RutasApp.PremiumEstadisticas.ruta) },
                     onVolver = {
                         perfilViewModel.recargar()
                         navController.popBackStack()
@@ -452,9 +554,9 @@ fun ContrabajoApp(
                     onVolver = { navController.popBackStack() }
                 )
             }
-            composable(RutasApp.PremiumLecturaRapida.ruta) {
+            composable(RutasApp.PremiumEstadisticas.ruta) {
                 val premiumViewModel: PremiumViewModel = viewModel(factory = factory)
-                PantallaLecturaRapidaPremium(
+                PantallaEstadisticasPremium(
                     viewModel = premiumViewModel,
                     onVolver = { navController.popBackStack() }
                 )
@@ -488,6 +590,7 @@ fun ContrabajoApp(
                     onAbrirSeguridad = { navController.navigate(RutasApp.AjustesSeguridad.ruta) },
                     onAbrirCuenta = { navController.navigate(RutasApp.AjustesCuenta.ruta) },
                     onAbrirUbicacion = { navController.navigate(RutasApp.AjustesUbicacion.ruta) },
+                    onAbrirPreferencias = { navController.navigate(RutasApp.AjustesPreferencias.ruta) },
                     onCerrarSesion = {
                         perfilViewModel.cerrarSesion()
                         navController.navigate(RutasApp.Inicio.ruta) {
@@ -499,6 +602,11 @@ fun ContrabajoApp(
                         baneosViewModel.cargar()
                         navController.navigate(RutasApp.AjustesModerarBaneos.ruta)
                     }
+                )
+            }
+            composable(RutasApp.AjustesPreferencias.ruta) {
+                PantallaPreferencias(
+                    onVolver = { navController.popBackStack() }
                 )
             }
             composable(RutasApp.AjustesModerarBaneos.ruta) {
@@ -605,6 +713,57 @@ fun ContrabajoApp(
             }
         }
 
+        // Modal de intermitencias de conexión
+        if (mostrarModalIntermitencias && enPantallaPrincipal) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .padding(32.dp)
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 8.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            modifier = Modifier.size(56.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            text = "Conexión intermitente",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "Se están presentando intermitencias con los servicios de Contrabajo.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        BotonPrimario(
+                            texto = "Aceptar",
+                            onClick = {
+                                mostrarModalIntermitencias = false
+                                segundosSinConexion = 0
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
         OverlayPantallaCarga(
             visible = mostrarCargaGlobal,
             mensaje = mensajeCargaGlobal,
@@ -613,6 +772,15 @@ fun ContrabajoApp(
             modoSuave = modoSuaveCargaGlobal
         )
     }
+}
+
+private fun Context.findActivity(): Activity? {
+    var ctx = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
 }
 
 @Composable
@@ -689,6 +857,7 @@ private fun ShellPrincipal(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .pointerInput(rutaContenido) {
                     detectHorizontalDragGestures(
                         onDragStart = { desplazamientoHorizontal = 0f },
@@ -793,6 +962,11 @@ private fun ShellPrincipal(
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionEntrada(): EnterTransition {
     return when {
+        routeEsLogin(targetState.destination.route) ->
+            slideInVertically(
+                animationSpec = tween(durationMillis = 300),
+                initialOffsetY = { it }
+            ) + fadeIn(animationSpec = tween(durationMillis = 250))
         routeEsRegistro(targetState.destination.route) ->
             slideInVertically(
                 animationSpec = tween(durationMillis = 250),
@@ -811,6 +985,11 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionEnt
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionSalida(): ExitTransition {
     return when {
+        routeEsLogin(initialState.destination.route) ->
+            slideOutVertically(
+                animationSpec = tween(durationMillis = 280),
+                targetOffsetY = { it }
+            ) + fadeOut(animationSpec = tween(durationMillis = 200))
         routeEsRegistro(targetState.destination.route) && routeEsInicio(initialState.destination.route) ->
             slideOutVertically(
                 animationSpec = tween(durationMillis = 200),
@@ -838,6 +1017,11 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionPop
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.crearTransicionPopSalida(): ExitTransition {
     return when {
+        routeEsLogin(targetState.destination.route) ->
+            slideOutVertically(
+                animationSpec = tween(durationMillis = 280),
+                targetOffsetY = { it }
+            ) + fadeOut(animationSpec = tween(durationMillis = 200))
         routeEsRegistro(initialState.destination.route) ->
             slideOutVertically(
                 animationSpec = tween(durationMillis = 200),
@@ -875,4 +1059,8 @@ private fun routeEsRegistro(route: String?): Boolean {
 private fun routeEsServicio(route: String?): Boolean {
     val base = route?.substringBefore("/")
     return base == RutasApp.Servicio.ruta.substringBefore("/")
+}
+
+private fun routeEsLogin(route: String?): Boolean {
+    return route == RutasApp.Login.ruta || route == RutasApp.RecuperarCuenta.ruta
 }

@@ -1,3 +1,63 @@
+VERSION 0.16.0-Alpha
+───────
+├─• Primera versión Alpha del producto.
+├─• Se verificó la conexión al backend al iniciar la app: si el backend no responde, se muestra un modal con el mensaje "Los servicios de Contrabajo no se encuentran disponibles actualmente, por favor intente mas tarde."
+├─• Se agregó monitor de conexión en tiempo real: mientras el usuario está en las pantallas principales (Principal, Perfil, Mensajes), la app verifica la conectividad cada 5 segundos.
+├─• Se agregó modal de intermitencias: si la conexión falla durante 20 segundos, aparece un modal con ícono de alerta que indica "Se están presentando intermitencias con los servicios de Contrabajo." con botón "Aceptar".
+├─• Se agregó cierre automático por pérdida de conexión: si la conexión no se recupera después de 40 segundos totales (20s de modal + 20s más), la app se cierra automáticamente forzando al usuario a reabrirla.
+├─• Se agregó Modo Oscuro: un switch en Ajustes › Accesibilidad y apariencia permite activarlo/desactivarlo o seguir la configuración del sistema, y la preferencia queda guardada.
+├─• Se agregó un menú de Accesibilidad con paletas de color pensadas para distintos tipos de daltonismo (Estándar, Rojo-Verde, Azul-Amarillo y Alto contraste), basadas en la paleta Okabe-Ito.
+├─• Se agregó el ajuste de tamaño de letra (Pequeño / Normal / Grande / Muy grande) con vista previa, que escala el texto de toda la app.
+├─• Se habilitó el menú de Preferencias (antes deshabilitado) que da acceso a estas opciones de accesibilidad.
+├─• Se unificó el navbar flotante para usar colores semánticos de `LocalColoresContrabajo` en lugar de valores hardcodeados, habilitando soporte completo para todas las paletas de daltonismo en modo claro y oscuro.
+├─• Se migró el botón de cerrar sesión en Perfil, Ajustes y Cuenta: en modo oscuro se muestra como `Button` sólido rojo (`error`/`onError`), y en modo claro se muestra como `OutlinedButton` con borde rojo y fondo transparente.
+├─• Auditoría de colores en toda la app: se reemplazaron `Color.White` hardcodeados por colores de tema en `CampoSecretoContrabajo`, `IndicadorPasos`, `ChipAccion`, `TarjetaBase`, `TarjetaOfertaServicio`, `TarjetaMarketplaceCompacta` e indicador Pull-to-Refresh. Títulos de Editar Perfil, Editar/Crear Servicio y `EncabezadoPantalla` ajustados para legibilidad en modo oscuro. `PantallaBase` ahora aplica siempre el `background` del tema.
+├─• Se cambió el color `navbarIconoInactivo` de la paleta oscura de verde oscuro a cyan claro para que los iconos no seleccionados sean visibles sobre el fondo azul oscuro del navbar.
+├─• Se agregó `respetarNavegacionInferior = false` al `PantallaBase` dentro de `PantallaPerfil` para eliminar el doble padding inferior.
+├─• Se configuró la barra de navegación de Android para que sea oscura en modo oscuro mediante `SystemBarStyle.dark()` en `MainActivity` y `SplashActivity`, respetando la preferencia del usuario.
+├─• En modo oscuro la barra de estado de Android ahora usa íconos claros para que resalten sobre el fondo oscuro. El cambio de tema actualiza la barra en tiempo real.
+├─• En "Mis servicios" (Perfil) se rellenó el fondo de la pantalla con el color de fondo del tema y se agregó espacio superior dentro del scroll.
+├─• En cada tarjeta de "Mis servicios" el switch de disponibilidad se movió a la fila inferior: el botón "Editar" queda a la izquierda y la etiqueta "Disponibilidad" con su switch a la derecha.
+├─• Se agregó skeleton de carga (shimmer animado) a la pantalla de Detalle de Servicio.
+├─• Se agregó borde sutil (`BorderStroke`) y elevación mejorada a las tarjetas del marketplace.
+├─• Se cambió el color de fondo claro de cyan-blancuzco a gris claro neutro para mayor contraste entre superficies.
+├─• Se eliminó el efecto de fade superior de PantallaPerfil que cortaba las sombras de las tarjetas.
+├─• Menú Premium: se eliminaron las tarjetas de "Servicios" y "Valoración" (solo lectura), dejando solo "Historial" y "Estadísticas". Botones rediseñados (apilados verticalmente). Topbar con degradado estático. Banner "Premium" simplificado a color sólido. Funciones próximas (IA, Campañas, Puntos) en estado gris/deshabilitado. Se eliminó "Ingreso total cerrado" y "Ticket promedio" de las métricas.
+├─• Gráficos Premium: se reemplazó "Valoraciones" por gráfico de dona (radial) rotatorio con conteo de calificaciones por estrella, y "Embudo de conversión" por funnel vertical con anchos proporcionales animados.
+├─• Se restauraron los colores premium a la paleta turquesa de la app y se ajustaron los colores del modo oscuro para que sean más brillantes. Se restauraron bordes redondeados en topbar y encabezados secundarios.
+├─• Historial de contactos Premium: skeleton de carga, tarjeta rediseñada con badge de resultado, estrellas doradas, texto de valoración en cursiva y campo `comentarioValoracion` mapeado desde el backend.
+├─• Lista de chats: nombre real del contacto (resuelto desde API), avatar con imagen del servicio cargada desde la API, título del servicio como segunda línea, layout con cabecera fija y lista scrollable con fade de 20dp superior.
+├─• Se corrigieron los iconos de volver y opciones en el chat para usar `MaterialTheme.colorScheme.primary`.
+├─• Cita de servicio: topbar con color de fondo `primary` y texto `onPrimary`, skeleton de carga con shimmer. Estado de la cita se actualiza inmediatamente dentro del chat después de una transición o por mensaje de sistema por WebSocket.
+├─• Topbar de PantallaDetalleChat: durante skeleton, siempre se renderizan los `Text` reales con texto `" "` y `Color.Transparent` para preservar altura idéntica al estado cargado.
+├─• Se corrigió la lista de chats para mostrar el nombre real del contacto (nombre + apellido) en lugar del nombre de usuario. Se eliminaron los checks de visto (Done/DoneAll), mostrando solo el texto del último mensaje.
+├─• Se corrigió el modal de valoración para que aparezca centrado en pantalla. Se ocultó el título "Conversación" en el topbar del chat detalle mientras se carga el skeleton.
+├─• Ubicación en Ajustes: coordenadas movidas como overlay dentro del mapa, modal de editar ubicación completamente expandido.
+├─• Se actualizó la versión de la app a `0.16.0-Alpha` (versionCode 18).
+├─• Navbar flotante: `ContenedorConNavbarFlotante` pasa `PaddingValues.Zero` y cada pantalla calcula padding inferior dinámico con `WindowInsets.navigationBars`. Box sólido opaco en las 3 pantallas principales.
+├─• Fades verticales en PantallaPrincipal (28dp) y PantallaPerfil (56dp) para suavizar el scroll.
+├─• En `PantallaChats` se separó el layout en cabecera fija y lista de chats con scroll independiente y fade de 20dp en el borde superior.
+├─• Se agregó parámetro `espaciadoVertical` a `PantallaBase` y se redujo el espaciado vertical en PantallaPrincipal de 18dp a 12dp (~30% menos).
+├─• Se reemplazó el botón "Iniciar sesión" + "Crear cuenta" en la pantalla de bienvenida por un único botón "Comenzar". En login: inputs vacíos por defecto, "Recuperar cuenta" como texto subrayado. En recuperar cuenta: "Volver al inicio de sesión".
+├─• Se corrigieron los iconos de la barra de notificaciones de Android y el cambio de tema actualiza la barra en tiempo real.
+├─• Se agregó `ComboContrabajo`, un ComboBox reutilizable en `ComponentesBase.kt` para selects de comuna. Se reemplazó en registro, ajustes y reportar servicio.
+├─• Se agregó validación de correo con `@` y `.` en 6 puntos: registro UI, registro repo local, registro repo remoto, edición perfil VM, edición perfil repo local, edición perfil repo remoto.
+├─• Perfil editar: al guardar, se muestra toast "Perfil actualizado correctamente" y se navega atrás automáticamente. Se eliminó el texto inline de `mensajePerfilEdicion` de la UI.
+├─• Chats: se corrigió el flash de datos previos al cambiar de chat. `abrirChat()` ahora limpia `chatActivo`, `mensajesActivos` y `citaActiva` de forma síncrona antes de lanzar la carga async.
+├─• Ajustes: se eliminó el botón "Obtener ubicación" del mapa, dejando solo el ícono de Refresh en `Alignment.TopStart` y el botón "Guardar" centrado.
+├─• Marketplace: el texto del subtitle en empty state ("Prueba ajustando el rango...") ahora se muestra centrado horizontalmente.
+├─• Login: se eliminó el texto "¿No tienes cuenta? Regístrate" de la pantalla de login.
+├─• Login rediseñado: fondo degradado full-screen, logo real, campos de usuario/contraseña con estilo propio, botón "Iniciar Sesión" centrado, "¿Olvidaste tu contraseña?" a la izquierda, ortografía corregida (ñ, tildes, signos de interrogación).
+├─• Pantalla Recuperar Cuenta rediseñada al mismo estilo que Login con fondo degradado.
+├─• Animación slide-up/down para Login y Recuperar Cuenta al entrar/salir.
+├─• Empty state del marketplace: título centrado con `titleLarge` bold, subtítulo reducido a `bodySmall`.
+├─• Dirección en Ubicación rediseñada: ícono de ubicación, dirección en tarjeta con calle/número, comuna y región separados, botón "Editar dirección" con ícono de lápiz.
+├─• Pantalla de Bienvenida rediseñada: fondo degradado, logo real, texto "Bienvenido a" + "Contrabajo", tarjeta de descripción semitransparente, botón "Comenzar" estilo login.
+├─• Menú de cuentas de prueba (3 puntos) con `zIndex(10f)` para evitar superposición.
+├─• Animación de Login al volver: login se oculta hacia abajo (sin animación de slide en pantalla de inicio).
+├─• Rango de disponibilidad rediseñado: etiqueta y valor separados en fila, valor en badge `primary.copy(alpha=0.1f)`.
+└─• Recuperar cuenta: el botón ahora dice "Volver al inicio de sesión" en lugar de "Volver al login".
+
 VERSION 0.15.2-Pre-Alpha
 ───────
 ├─• Se rediseñaron los menús emergentes de Ajustes para compartir un contenedor visual único con `ModalAjustesContenedor`, alineado al sistema actual de tarjetas.

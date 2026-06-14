@@ -26,6 +26,7 @@ class ProveedorRepositorios(context: Context) {
     val chats: RepositorioChats = RepositorioChatRemoto(
         comunicacionesApi = ComunicacionesApiClient.api,
         serviciosApi = ServiciosApiClient.api,
+        usuariosApi = UsuariosApiClient.api,
         sessionStore = sessionStore
     )
     val reportes: RepositorioReportes = RepositorioReportesRemoto(

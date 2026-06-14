@@ -1,6 +1,7 @@
 package com.movil.contrabajo.ui.screens.principal
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -10,6 +11,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,6 +52,7 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -64,9 +69,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
@@ -86,6 +91,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -96,6 +102,7 @@ import com.movil.contrabajo.domain.model.TipoPrecio
 import com.movil.contrabajo.ui.components.OverlayPantallaCarga
 import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaMarketplaceCompacta
+import com.movil.contrabajo.ui.theme.LocalColoresContrabajo
 import com.movil.contrabajo.ui.viewmodel.OrdenMarketplace
 import com.movil.contrabajo.ui.viewmodel.PrincipalViewModel
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -116,6 +123,7 @@ import com.movil.contrabajo.R
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
@@ -192,6 +200,7 @@ fun PantallaPrincipal(
     )
 
     val pullToRefreshState = rememberPullToRefreshState()
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     LaunchedEffect(uiState.rangoBusquedaM, mostrarModalRango) {
         if (!mostrarModalRango) {
@@ -240,7 +249,7 @@ fun PantallaPrincipal(
             PullToRefreshDefaults.Indicator(
                 state = pullToRefreshState,
                 isRefreshing = uiState.refrescando,
-                containerColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.surface,
                 color = MaterialTheme.colorScheme.primary
             )
         }
@@ -249,8 +258,13 @@ fun PantallaPrincipal(
         modifier = Modifier,
         scrollable = false,
         mostrarFondo = false,
-        respetarNavegacionInferior = false
+        respetarNavegacionInferior = false,
+        espaciadoVertical = 12.dp
     ) {
+        val glowAzul = LocalColoresContrabajo.current.info
+        val glowCyan = MaterialTheme.colorScheme.secondary
+        val glowVerde = LocalColoresContrabajo.current.exito
+        val colorCampoActivo = MaterialTheme.colorScheme.surface
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -264,10 +278,10 @@ fun PantallaPrincipal(
                     drawRoundRect(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0xFF1E88E5).copy(alpha = alphaBase),
-                                Color(0xFF00BCD4).copy(alpha = (alphaBase * 1.05f).coerceAtMost(0.17f)),
-                                Color(0xFF17A673).copy(alpha = alphaBase),
-                                Color(0xFF1E88E5).copy(alpha = alphaBase)
+                                glowAzul.copy(alpha = alphaBase),
+                                glowCyan.copy(alpha = (alphaBase * 1.05f).coerceAtMost(0.17f)),
+                                glowVerde.copy(alpha = alphaBase),
+                                glowAzul.copy(alpha = alphaBase)
                             ),
                             start = Offset(fase - (size.width * 2f), 0f),
                             end = Offset(fase, size.height)
@@ -281,10 +295,10 @@ fun PantallaPrincipal(
                     drawRoundRect(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0xFF1E88E5).copy(alpha = 0.8f),
-                                Color(0xFF00BCD4).copy(alpha = 0.88f),
-                                Color(0xFF17A673).copy(alpha = 0.8f),
-                                Color(0xFF1E88E5).copy(alpha = 0.8f)
+                                glowAzul.copy(alpha = 0.8f),
+                                glowCyan.copy(alpha = 0.88f),
+                                glowVerde.copy(alpha = 0.8f),
+                                glowAzul.copy(alpha = 0.8f)
                             ),
                             start = Offset(size.width - fase, 0f),
                             end = Offset(-fase, size.height)
@@ -293,7 +307,7 @@ fun PantallaPrincipal(
                         style = Stroke(width = 2.4.dp.toPx())
                     )
                 },
-            color = lerp(MaterialTheme.colorScheme.primary, Color.White, progresoBuscador),
+            color = lerp(MaterialTheme.colorScheme.primary, colorCampoActivo, progresoBuscador),
             shape = RoundedCornerShape(18.dp),
             shadowElevation = (8f + (8f * progresoBuscador)).dp
         ) {
@@ -339,16 +353,16 @@ fun PantallaPrincipal(
                         },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color(0xFF0F2124),
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold
                     ),
-                    cursorBrush = SolidColor(Color(0xFF0F2124)),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
                     decorationBox = { innerTextField ->
                         if (uiState.busqueda.isBlank()) {
                             Text(
                                 text = "Buscar servicios",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = Color(0xFF60737A)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         innerTextField()
@@ -376,7 +390,7 @@ fun PantallaPrincipal(
                         imageVector = Icons.Outlined.Search,
                         contentDescription = "Buscar",
                         tint = if (progresoBuscador > 0.02f) {
-                            Color(0xFF0F2124)
+                            MaterialTheme.colorScheme.onSurface
                         } else {
                             MaterialTheme.colorScheme.onPrimary
                         }
@@ -480,12 +494,12 @@ fun PantallaPrincipal(
                         if (hayBusquedaOFiltrosActivos) {
                             "No hay coincidencias. Ajusta tu búsqueda, filtros o rango."
                         } else {
-                            "No hay publicaciones dentro de tu rango actual."
+                            "No hay servicios disponibles dentro de tu rango actual"
                         }
                     } else if (hayBusquedaOFiltrosActivos) {
                         "No hay coincidencias. Ajusta tu búsqueda o filtros."
                     } else {
-                        "No hay publicaciones disponibles por ahora."
+                        "No hay servicios disponibles por ahora."
                     }
                     Column(
                         modifier = Modifier
@@ -508,27 +522,32 @@ fun PantallaPrincipal(
                         Spacer(modifier = Modifier.height(14.dp))
                         Text(
                             text = textoEstado,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 32.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Prueba ajustando el rango, la comuna o los filtros para encontrar más publicaciones.",
+                            text = "Prueba ajustando el rango de busqueda, la comuna o los filtros para encontrar más publicaciones.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 40.dp)
                         )
                     }
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clipToBounds(),
+                            .fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         userScrollEnabled = !bloquearScrollVertical,
-                        contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 0.dp)
+                        contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 8.dp, bottom = navBarBottom + 160.dp)
                     ) {
                         items(uiState.ofertas, key = { it.idOfertaServicio }) { oferta ->
                             TarjetaMarketplaceCompacta(
@@ -545,6 +564,24 @@ fun PantallaPrincipal(
                         }
                     }
                 }
+
+            // Fade en el borde superior del área scrollable, justo debajo del selector de filtros
+            val fadeColor = MaterialTheme.colorScheme.background
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(28.dp)
+                    .drawBehind {
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(fadeColor, Color.Transparent),
+                                startY = 0f,
+                                endY = size.height
+                            )
+                        )
+                    }
+            )
         }
     }
     }
@@ -552,6 +589,7 @@ fun PantallaPrincipal(
     if (mostrarModalRango) {
         ModalBottomSheet(
             onDismissRequest = { mostrarModalRango = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = MaterialTheme.colorScheme.surface,
             dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)) }
         ) {
@@ -963,10 +1001,12 @@ private fun MiniMapaRangoBusqueda(
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(false)
+            // Vista previa estatica: ocultar botones +/- y bloquear zoom/desplazamiento.
+            zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             controller.setZoom(zoom)
             controller.setCenter(GeoPoint(latitud, longitud))
-            // Vista previa: no debe bloquear el scroll ni el gesto de la pantalla.
-            setOnTouchListener { _, _ -> false }
+            // Consumir el touch para que el usuario no pueda mover ni hacer zoom al mapa.
+            setOnTouchListener { _, _ -> true }
         }
     }
 

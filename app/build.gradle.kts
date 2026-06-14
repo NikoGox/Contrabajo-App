@@ -12,8 +12,8 @@ android {
         applicationId = "com.movil.contrabajo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 17
-        versionName = "0.15.2-Pre-Alpha"
+        versionCode = 18
+        versionName = "0.16.0-Alpha"
 
         // ─────────────────────────────────────────────────────────────────────
         // CONFIGURACIÓN DE ENTORNO (URLs de los microservicios)
@@ -38,16 +38,16 @@ android {
         val dockerHost = "http://10.0.2.2" // Cambia aquí la IP del host si compilas fuera del emulador
 
         // 2. Usando las comillas escapadas y la interpolación de Kotlin
-        buildConfigField("String", "USUARIOS_BASE_URL", "\"$dockerHost:8081/\"")
-        buildConfigField("String", "SERVICIOS_BASE_URL", "\"$dockerHost:8082/\"")
-        buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"$dockerHost:8083/\"")
-        buildConfigField("String", "FOTOS_BASE_URL", "\"$dockerHost:8084/\"")
+        //buildConfigField("String", "USUARIOS_BASE_URL", "\"$dockerHost:8081/\"")
+        //buildConfigField("String", "SERVICIOS_BASE_URL", "\"$dockerHost:8082/\"")
+        //buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"$dockerHost:8083/\"")
+        //buildConfigField("String", "FOTOS_BASE_URL", "\"$dockerHost:8084/\"")
 
         // ── NUBE (producción) — INACTIVO (IP puede variar, actualizar al rotar) ──
-        // buildConfigField("String", "USUARIOS_BASE_URL", "\"http://20.114.137.86:8081/\"")
-        // buildConfigField("String", "SERVICIOS_BASE_URL", "\"http://20.114.137.86:8082/\"")
-        // buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"http://20.114.137.86:8083/\"")
-        // buildConfigField("String", "FOTOS_BASE_URL", "\"http://20.114.137.86:8084/\"")
+        buildConfigField("String", "USUARIOS_BASE_URL", "\"http://20.114.137.86:8081/\"")
+        buildConfigField("String", "SERVICIOS_BASE_URL", "\"http://20.114.137.86:8082/\"")
+        buildConfigField("String", "COMUNICACIONES_BASE_URL", "\"http://20.114.137.86:8083/\"")
+        buildConfigField("String", "FOTOS_BASE_URL", "\"http://20.114.137.86:8084/\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

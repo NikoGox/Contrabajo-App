@@ -4,6 +4,7 @@ import android.net.Uri
 import android.widget.ImageView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -21,12 +22,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,6 +60,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -101,6 +110,7 @@ import com.movil.contrabajo.ui.theme.AzulPetroleoOscuro
 import com.movil.contrabajo.ui.theme.Blanco
 import com.movil.contrabajo.ui.theme.CoralSuave
 import com.movil.contrabajo.ui.theme.GrisLinea
+import com.movil.contrabajo.ui.theme.LocalColoresContrabajo
 import com.movil.contrabajo.ui.theme.SombraPetroleo
 import com.movil.contrabajo.ui.theme.TurquesaBrillante
 import androidx.compose.ui.layout.ContentScale
@@ -110,16 +120,17 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun FondoContrabajo(modifier: Modifier = Modifier) {
+    val cs = MaterialTheme.colorScheme
+    val extra = LocalColoresContrabajo.current
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        Color(0xFFEAF7FA),
-                        Color(0xFFDFEFF4),
-                        Color(0xFFD2E6EE),
-                        Color(0xFFC8DEE8)
+                        cs.background,
+                        cs.surfaceVariant.copy(alpha = 0.7f),
+                        cs.surfaceVariant
                     )
                 )
             )
@@ -131,8 +142,8 @@ fun FondoContrabajo(modifier: Modifier = Modifier) {
                 .background(
                     Brush.radialGradient(
                         listOf(
-                            Color(0xFF78C6D6).copy(alpha = 0.22f),
-                            Color(0xFF4BAFC5).copy(alpha = 0.12f),
+                            cs.secondary.copy(alpha = 0.22f),
+                            cs.secondary.copy(alpha = 0.10f),
                             Color.Transparent
                         )
                     ),
@@ -146,7 +157,7 @@ fun FondoContrabajo(modifier: Modifier = Modifier) {
                 .background(
                     Brush.radialGradient(
                         listOf(
-                            Color(0xFF7FBFD4).copy(alpha = 0.20f),
+                            extra.premiumBrillo.copy(alpha = 0.20f),
                             Color.Transparent
                         )
                     ),
@@ -162,6 +173,7 @@ fun PantallaBase(
     scrollable: Boolean = true,
     mostrarFondo: Boolean = true,
     respetarNavegacionInferior: Boolean = true,
+    espaciadoVertical: Dp = 18.dp,
     content: @Composable ColumnScope.() -> Unit
 ) {
     if (mostrarFondo) {
@@ -171,11 +183,12 @@ fun PantallaBase(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .statusBarsPadding()
             .then(if (respetarNavegacionInferior) Modifier.navigationBarsPadding() else Modifier)
             .then(scrollModifier)
             .padding(horizontal = 18.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         content = content
     )
 }
@@ -226,7 +239,7 @@ fun TarjetaBase(
         Column(
             modifier = Modifier
                 .then(if (llenarAlto) Modifier.fillMaxHeight() else Modifier)
-                .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(22.dp))
+                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f), RoundedCornerShape(22.dp))
                 .padding(contentPadding),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             content = content
@@ -248,7 +261,8 @@ fun EncabezadoPantalla(
         Text(
             text = titulo,
             style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
         )
         if (!subtitulo.isNullOrBlank()) {
             Text(
@@ -317,9 +331,9 @@ fun CampoContrabajo(
         visualTransformation = visualTransformation,
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            unfocusedContainerColor = Color.White.copy(alpha = 0.92f),
-            focusedContainerColor = Color.White,
-            disabledContainerColor = Color(0xFFF1F3F5),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+            focusedContainerColor = MaterialTheme.colorScheme.surface,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
             focusedBorderColor = MaterialTheme.colorScheme.primary,
             disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.28f),
@@ -357,8 +371,8 @@ fun CampoSecretoContrabajo(
         },
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            unfocusedContainerColor = Color.White.copy(alpha = 0.92f),
-            focusedContainerColor = Color.White,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+            focusedContainerColor = MaterialTheme.colorScheme.surface,
             unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
             focusedBorderColor = MaterialTheme.colorScheme.primary
         ),
@@ -374,7 +388,7 @@ fun IndicadorPasos(pasoActual: Int, totalPasos: Int) {
                 val activo = index + 1 <= pasoActual
                 Surface(
                     shape = CircleShape,
-                    color = if (activo) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.85f)
+                    color = if (activo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
                 ) {
                     Text(
                         text = "${index + 1}",
@@ -437,7 +451,7 @@ fun TarjetaOfertaServicio(
                         Brush.linearGradient(
                             listOf(
                                 MaterialTheme.colorScheme.secondaryContainer,
-                                Color.White
+                                MaterialTheme.colorScheme.surface
                             )
                         ),
                         RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
@@ -448,7 +462,7 @@ fun TarjetaOfertaServicio(
                     modifier = Modifier
                         .size(128.dp)
                         .align(Alignment.Center)
-                        .background(Color.White.copy(alpha = 0.96f), RoundedCornerShape(18.dp))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f), RoundedCornerShape(18.dp))
                         .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), RoundedCornerShape(18.dp)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -588,7 +602,8 @@ fun TarjetaMarketplaceCompacta(
             ),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp, pressedElevation = 12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f))
     ) {
         Column {
             Box(
@@ -614,7 +629,7 @@ fun TarjetaMarketplaceCompacta(
                 Surface(
                     modifier = Modifier.padding(10.dp),
                     shape = CircleShape,
-                    color = Color.White.copy(alpha = 0.92f)
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f)
                 ) {
                     Text(
                         text = oferta.nombreCategoria.ifBlank { "Servicio" },
@@ -626,7 +641,9 @@ fun TarjetaMarketplaceCompacta(
             }
 
             Column(
-                modifier = Modifier.padding(14.dp),
+                modifier = Modifier
+                    .padding(14.dp)
+                    .height(110.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
@@ -758,7 +775,7 @@ private fun EstrellaFraccion(
         Icon(
             imageVector = Icons.Rounded.Star,
             contentDescription = null,
-            tint = Color(0xFFB0B7BF),
+            tint = MaterialTheme.colorScheme.outline,
             modifier = Modifier.matchParentSize()
         )
         if (fraccion > 0f) {
@@ -771,7 +788,7 @@ private fun EstrellaFraccion(
                 Icon(
                     imageVector = Icons.Rounded.Star,
                     contentDescription = null,
-                    tint = Color(0xFFFFC93C),
+                    tint = LocalColoresContrabajo.current.premiumEstrella,
                     modifier = Modifier.matchParentSize()
                 )
             }
@@ -786,7 +803,7 @@ fun TarjetaChat(
     onClick: (() -> Unit)? = null
 ) {
     val fondoTarjeta = if (esChatComoTrabajador) {
-        Color(0xFFDCEBFF)
+        LocalColoresContrabajo.current.infoContenedor
     } else {
         MaterialTheme.colorScheme.surface
     }
@@ -1102,7 +1119,7 @@ fun OverlayPantallaCarga(
 fun ChipAccion(texto: String) {
     Surface(
         shape = RoundedCornerShape(999.dp),
-        color = Color.White.copy(alpha = 0.92f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
         shadowElevation = 3.dp
     ) {
         Text(
@@ -1123,4 +1140,90 @@ private fun formatearFechaPublicacionCompacta(fecha: String): String {
         return "$dia/$mes $hora"
     }
     return fecha.take(16)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ComboContrabajo(
+    valorSeleccionado: String,
+    opciones: List<String>,
+    onSeleccionar: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    etiqueta: String = "Seleccionar"
+) {
+    var desplegado by rememberSaveable { mutableStateOf(false) }
+    val shapeEntrada = RoundedCornerShape(14.dp)
+    val shapeMenu = RoundedCornerShape(18.dp)
+
+    ExposedDropdownMenuBox(
+        expanded = desplegado,
+        onExpandedChange = { desplegado = !desplegado },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = valorSeleccionado,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(etiqueta) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegado) },
+            singleLine = true,
+            shape = shapeEntrada,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+            )
+        )
+        DropdownMenu(
+            expanded = desplegado,
+            onDismissRequest = { desplegado = false },
+            modifier = Modifier
+                .exposedDropdownSize(matchTextFieldWidth = true)
+                .widthIn(min = 280.dp)
+                .heightIn(max = 280.dp),
+            shape = shapeMenu,
+            containerColor = MaterialTheme.colorScheme.surface,
+            shadowElevation = 6.dp
+        ) {
+            opciones.forEach { opcion ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = opcion,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    onClick = {
+                        onSeleccionar(opcion)
+                        desplegado = false
+                    },
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ComboComunaContrabajo(
+    comunaSeleccionada: String,
+    comunas: List<String>,
+    onSeleccionar: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    etiqueta: String = "Comuna"
+) {
+    ComboContrabajo(
+        valorSeleccionado = comunaSeleccionada,
+        opciones = comunas,
+        onSeleccionar = onSeleccionar,
+        modifier = modifier,
+        etiqueta = etiqueta
+    )
 }

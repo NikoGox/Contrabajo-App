@@ -58,6 +58,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.movil.contrabajo.ui.theme.LocalColoresContrabajo
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -262,7 +263,7 @@ private fun IlustracionCedula(modifier: Modifier = Modifier) {
             .height(175.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(
-                Brush.linearGradient(listOf(AzulPetroleo, Color(0xFF1B7A8A)))
+                Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary))
             )
             .padding(16.dp)
     ) {
@@ -696,14 +697,14 @@ private fun PantallaResultadoVerificacion(
                             .size(110.dp)
                             .clip(CircleShape)
                             .background(
-                                if (exitoso) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+                                if (exitoso) LocalColoresContrabajo.current.exitoContenedor else MaterialTheme.colorScheme.errorContainer
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = if (exitoso) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
                             contentDescription = null,
-                            tint = if (exitoso) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
+                            tint = if (exitoso) LocalColoresContrabajo.current.exito else MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(68.dp)
                         )
                     }

@@ -19,7 +19,8 @@ import kotlinx.coroutines.withContext
 data class InicioUiState(
     val revisandoSesion: Boolean = true,
     val sesionActivaDetectada: Boolean = false,
-    val errorConexion: Boolean = false
+    val errorConexion: Boolean = false,
+    val backendDisponible: Boolean = true
 )
 
 class InicioViewModel(
@@ -67,12 +68,34 @@ class InicioViewModel(
             uiState = InicioUiState(revisandoSesion = false, sesionActivaDetectada = false, errorConexion = false)
         }
     }
+
+    /** Verifica si el backend está disponible antes de navegar al login. */
+    fun verificarBackend(onBackendDisponible: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                val disponible = withContext(Dispatchers.IO) {
+                    repositorioAutenticacion.verificarBackend()
+                }
+                uiState = uiState.copy(backendDisponible = disponible)
+                if (disponible) {
+                    onBackendDisponible()
+                }
+            } catch (_: Exception) {
+                uiState = uiState.copy(backendDisponible = false)
+            }
+        }
+    }
+
+    /** Reinicia el estado del backend para mostrar la pantalla de bienvenida. */
+    fun reiniciarEstadoBackend() {
+        uiState = uiState.copy(backendDisponible = true)
+    }
 }
 
 data class LoginUiState(
-    val identificador: String = "cliente_prueba",
-    val contrasena: String = "Contrabajo123!",
-    val recordarme: Boolean = true,
+    val identificador: String = "",
+    val contrasena: String = "",
+    val recordarme: Boolean = false,
     val error: String? = null,
     val loginExitoso: Boolean = false,
     // Bloqueo de cuenta: se setea cuando idEstado es 102 (suspendido) o 103 (baneado)

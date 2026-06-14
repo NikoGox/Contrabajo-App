@@ -51,6 +51,7 @@ import com.movil.contrabajo.ui.components.BotonPrimario
 import com.movil.contrabajo.ui.components.BotonSecundario
 import com.movil.contrabajo.ui.components.CampoContrabajo
 import com.movil.contrabajo.ui.components.CampoSecretoContrabajo
+import com.movil.contrabajo.ui.components.ComboComunaContrabajo
 import com.movil.contrabajo.ui.components.EncabezadoPantalla
 import com.movil.contrabajo.ui.components.IndicadorPasos
 import com.movil.contrabajo.ui.components.LogoContrabajo
@@ -308,63 +309,11 @@ fun PantallaRegistroPasoDireccion(
     val comunas = viewModel.uiState.comunas
     val context = LocalContext.current
     val scrollPasoDireccion = rememberScrollState()
-    var desplegarComunas by rememberSaveable { mutableStateOf(false) }
-    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     LaunchedEffect(Unit) {
         viewModel.cargarComunas()
         if (registro.region.isBlank()) {
             viewModel.actualizarRegion("Región Metropolitana")
-        }
-    }
-
-    val reportarErrorUbicacion: () -> Unit = {
-        Toast.makeText(
-            context,
-            "No se pudo obtener ubicación actual. Puedes continuar igual.",
-            Toast.LENGTH_SHORT
-        ).show()
-    }
-    val actualizarUbicacionReal: () -> Unit = {
-        val tieneFine = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val prioridad = if (tieneFine) {
-            Priority.PRIORITY_HIGH_ACCURACY
-        } else {
-            Priority.PRIORITY_BALANCED_POWER_ACCURACY
-        }
-        val token = CancellationTokenSource()
-        fusedLocationClient.getCurrentLocation(prioridad, token.token)
-            .addOnSuccessListener { location ->
-                if (location != null) {
-                    viewModel.actualizarCoordenadasRegistro(location.latitude, location.longitude)
-                    Toast.makeText(context, "Ubicación actual capturada.", Toast.LENGTH_SHORT).show()
-                } else {
-                    fusedLocationClient.lastLocation
-                        .addOnSuccessListener { ultima ->
-                            if (ultima != null) {
-                                viewModel.actualizarCoordenadasRegistro(ultima.latitude, ultima.longitude)
-                                Toast.makeText(context, "Ubicación actual capturada.", Toast.LENGTH_SHORT).show()
-                            } else {
-                                reportarErrorUbicacion()
-                            }
-                        }
-                        .addOnFailureListener { reportarErrorUbicacion() }
-                }
-            }
-            .addOnFailureListener { reportarErrorUbicacion() }
-    }
-    val solicitudPermisosLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permisos ->
-        val concedido = permisos[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            permisos[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (concedido) {
-            actualizarUbicacionReal()
-        } else {
-            reportarErrorUbicacion()
         }
     }
 
@@ -396,42 +345,19 @@ fun PantallaRegistroPasoDireccion(
                     singleLine = true
                 )
 
-                ExposedDropdownMenuBox(
-                    expanded = desplegarComunas,
-                    onExpandedChange = { desplegarComunas = !desplegarComunas }
-                ) {
-                    OutlinedTextField(
-                        value = registro.comuna.ifBlank { "Seleccionar comuna" },
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Comuna") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegarComunas) },
-                        singleLine = true
-                    )
-                DropdownMenu(
-                    expanded = desplegarComunas,
-                    onDismissRequest = { desplegarComunas = false }
-                ) {
-                        comunas
-                            .sortedWith(
-                                compareBy<com.movil.contrabajo.domain.model.ComunaCatalogo> {
-                                    if (it.nombre.equals("Sin comuna", ignoreCase = true)) 0 else 1
-                                }.thenBy { it.nombre }
-                            )
-                            .forEach { comuna ->
-                            DropdownMenuItem(
-                                text = { Text(comuna.nombre) },
-                                onClick = {
-                                    viewModel.actualizarComuna(comuna.nombre)
-                                    desplegarComunas = false
-                                }
-                            )
-                        }
-                    }
+                val comunasOrdenadas = remember(comunas) {
+                    comunas.sortedWith(
+                        compareBy<com.movil.contrabajo.domain.model.ComunaCatalogo> {
+                            if (it.nombre.equals("Sin comuna", ignoreCase = true)) 0 else 1
+                        }.thenBy { it.nombre }
+                    ).map { it.nombre }
                 }
+                ComboComunaContrabajo(
+                    comunaSeleccionada = registro.comuna.ifBlank { "Seleccionar comuna" },
+                    comunas = comunasOrdenadas,
+                    onSeleccionar = viewModel::actualizarComuna,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 if (viewModel.uiState.cargandoComunas) {
                     Text(
@@ -466,32 +392,8 @@ fun PantallaRegistroPasoDireccion(
                     )
                 }
 
-                BotonPrimario(
-                    texto = "Obtener ubicación actual",
-                    onClick = {
-                        val tieneFine = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-                        val tieneCoarse = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-                        if (tieneFine || tieneCoarse) {
-                            actualizarUbicacionReal()
-                        } else {
-                            solicitudPermisosLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
-                            )
-                        }
-                    }
-                )
-
                 Text(
-                    text = "La dirección es opcional. Si no la ingresas, usaremos datos genéricos para continuar.",
+                    text = "La dirección es opcional. Las coordenadas se obtendrán automáticamente al usar la app.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -528,7 +430,7 @@ fun PantallaRegistroPasoDos(
     var intentoRegistro by rememberSaveable { mutableStateOf(false) }
 
     val errorUsername = if (registro.username.isBlank()) "Ingresa un nombre de usuario" else null
-    val errorCorreo = if (registro.correo.isBlank() || !registro.correo.contains("@")) "Ingresa un correo válido" else null
+    val errorCorreo = if (registro.correo.isBlank() || !registro.correo.contains("@") || !registro.correo.contains(".")) "Ingresa un correo válido" else null
     val errorContrasena = validarContrasenaRegistro(registro.contrasena)
     val errorConfirmacion = if (registro.contrasena != registro.confirmarContrasena) "Las contraseñas no coinciden" else null
     val formularioPasoTresValido = listOf(

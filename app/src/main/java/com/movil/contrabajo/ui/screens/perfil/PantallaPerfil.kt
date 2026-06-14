@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -15,8 +16,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -41,9 +48,16 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.ui.components.EstrellaPremiumAnimada
+import com.movil.contrabajo.ui.theme.LocalColoresContrabajo
 import com.movil.contrabajo.ui.components.EtiquetaEstado
 import com.movil.contrabajo.ui.components.FilaEtiquetaValor
 import com.movil.contrabajo.ui.components.OverlayPantallaCarga
@@ -100,7 +115,12 @@ fun PantallaPerfil(
 
     val pullToRefreshState = rememberPullToRefreshState()
 
-    Box(modifier = modifier.fillMaxSize()) {
+    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         PullToRefreshBox(
             isRefreshing = uiState.refrescando,
             onRefresh = viewModel::refrescarDesdeGesto,
@@ -111,7 +131,7 @@ fun PantallaPerfil(
                 PullToRefreshDefaults.Indicator(
                     state = pullToRefreshState,
                     isRefreshing = uiState.refrescando,
-                    containerColor = Color.White,
+                    containerColor = MaterialTheme.colorScheme.surface,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
@@ -119,13 +139,14 @@ fun PantallaPerfil(
             PantallaBase(
                 modifier = Modifier,
                 mostrarFondo = false,
-                scrollable = false
+                scrollable = false,
+                respetarNavegacionInferior = false
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .verticalScroll(scrollPerfil)
-                        .padding(bottom = 72.dp),
+                        .padding(top = 6.dp, bottom = navBarBottom + 70.dp),
                     verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
                     TarjetaBase {
@@ -421,68 +442,48 @@ fun PantallaPerfil(
                                             ) {
                                                 Row(
                                                     modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    Row(
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                        verticalAlignment = Alignment.CenterVertically
+                                                    Surface(
+                                                        modifier = Modifier
+                                                            .size(72.dp)
+                                                            .height(72.dp),
+                                                        shape = RoundedCornerShape(12.dp),
+                                                        color = MaterialTheme.colorScheme.surface
                                                     ) {
-                                                        Surface(
-                                                            modifier = Modifier
-                                                                .size(72.dp)
-                                                                .height(72.dp),
-                                                            shape = RoundedCornerShape(12.dp),
-                                                            color = MaterialTheme.colorScheme.surface
-                                                        ) {
-                                                            if (oferta.fotoUrlReferencia.isBlank()) {
-                                                                Box(contentAlignment = Alignment.Center) {
-                                                                    Icon(
-                                                                        imageVector = Icons.Filled.Build,
-                                                                        contentDescription = null,
-                                                                        tint = MaterialTheme.colorScheme.primary,
-                                                                        modifier = Modifier.size(34.dp)
-                                                                    )
-                                                                }
-                                                            } else {
-                                                                AsyncImage(
-                                                                    model = oferta.fotoUrlReferencia,
-                                                                    contentDescription = oferta.titulo,
-                                                                    modifier = Modifier.fillMaxWidth(),
-                                                                    contentScale = ContentScale.Crop
+                                                        if (oferta.fotoUrlReferencia.isBlank()) {
+                                                            Box(contentAlignment = Alignment.Center) {
+                                                                Icon(
+                                                                    imageVector = Icons.Filled.Build,
+                                                                    contentDescription = null,
+                                                                    tint = MaterialTheme.colorScheme.primary,
+                                                                    modifier = Modifier.size(34.dp)
                                                                 )
                                                             }
-                                                        }
-                                                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                                            Text(
-                                                                text = oferta.titulo,
-                                                                style = MaterialTheme.typography.titleMedium,
-                                                                fontWeight = FontWeight.SemiBold,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis
-                                                            )
-                                                            Text(
-                                                                text = oferta.precioTexto,
-                                                                style = MaterialTheme.typography.bodyMedium,
-                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis
+                                                        } else {
+                                                            AsyncImage(
+                                                                model = oferta.fotoUrlReferencia,
+                                                                contentDescription = oferta.titulo,
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                contentScale = ContentScale.Crop
                                                             )
                                                         }
                                                     }
-                                                    if (enCurso) {
-                                                        EstadoServicioEnCurso()
-                                                    } else {
-                                                        Switch(
-                                                            checked = oferta.disponible,
-                                                            onCheckedChange = { valor ->
-                                                                viewModel.cambiarDisponibilidadServicioRapido(
-                                                                    idOfertaServicio = oferta.idOfertaServicio,
-                                                                    valor = valor
-                                                                )
-                                                            },
-                                                            enabled = !bloqueadoPorCupo,
-                                                            modifier = Modifier.alpha(if (bloqueadoPorCupo) 0.35f else 1f)
+                                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                        Text(
+                                                            text = oferta.titulo,
+                                                            style = MaterialTheme.typography.titleMedium,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                        Text(
+                                                            text = oferta.precioTexto,
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
                                                         )
                                                     }
                                                 }
@@ -500,17 +501,38 @@ fun PantallaPerfil(
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
-                                                OutlinedButton(
-                                                    onClick = { onAbrirEditarServicio(oferta.idOfertaServicio) },
-                                                    modifier = Modifier.fillMaxWidth()
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
                                                 ) {
-                                                    Icon(
-                                                        imageVector = Icons.Outlined.Edit,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text("Editar servicio")
+                                                    OutlinedButton(
+                                                        onClick = { onAbrirEditarServicio(oferta.idOfertaServicio) },
+                                                        modifier = Modifier.weight(1f)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Outlined.Edit,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(18.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text("Editar servicio")
+                                                    }
+                                                    if (enCurso) {
+                                                        EstadoServicioEnCurso()
+                                                    } else {
+                                                        Switch(
+                                                            checked = oferta.disponible,
+                                                            onCheckedChange = { valor ->
+                                                                viewModel.cambiarDisponibilidadServicioRapido(
+                                                                    idOfertaServicio = oferta.idOfertaServicio,
+                                                                    valor = valor
+                                                                )
+                                                            },
+                                                            enabled = !bloqueadoPorCupo,
+                                                            modifier = Modifier.alpha(if (bloqueadoPorCupo) 0.35f else 1f)
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -541,30 +563,75 @@ fun PantallaPerfil(
                         }
                     }
 
-                    TextButton(
-                        onClick = onCerrarSesion,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = Color(0xFFD32F2F)
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Logout,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = Color(0xFFD32F2F)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Cerrar sesión",
-                            color = Color(0xFFD32F2F),
-                            fontWeight = FontWeight.SemiBold
-                        )
+                    val esModoOscuro = MaterialTheme.colorScheme.background.luminance() < 0.5f
+                    if (esModoOscuro) {
+                        androidx.compose.material3.Button(
+                            onClick = onCerrarSesion,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Logout,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onError
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Cerrar sesión",
+                                color = MaterialTheme.colorScheme.onError,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = onCerrarSesion,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Logout,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Cerrar sesión",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }
         }
+
+        // Fade superior: suaviza la desaparición del contenido al hacer scroll
+        val fadeColor = MaterialTheme.colorScheme.background
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(56.dp)
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(fadeColor, Color.Transparent),
+                            startY = 0f,
+                            endY = size.height
+                        )
+                    )
+                }
+        )
 
         OverlayPantallaCarga(
             visible = uiState.cargandoPantalla,
@@ -645,7 +712,7 @@ private fun ValoracionPerfil(
             Icon(
                 imageVector = Icons.Rounded.Star,
                 contentDescription = null,
-                tint = if (relleno > 0.4) Color(0xFFFFC93C) else Color(0xFFB0B7BF),
+                tint = if (relleno > 0.4) LocalColoresContrabajo.current.premiumEstrella else MaterialTheme.colorScheme.outline,
                 modifier = Modifier.size(15.dp)
             )
         }

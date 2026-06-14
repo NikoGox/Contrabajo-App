@@ -12,21 +12,34 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.movil.contrabajo.ui.notificaciones.NotificacionesMensajes
 import com.movil.contrabajo.ui.ContrabajoApp
 import com.movil.contrabajo.ui.theme.ContrabajoTheme
+import com.movil.contrabajo.ui.theme.ControladorPreferenciasUi
+import com.movil.contrabajo.ui.theme.ModoTema
 
 class MainActivity : FragmentActivity() {
     private var chatNotificacionPendienteId by mutableStateOf<Long?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val controladorPreferencias = ControladorPreferenciasUi(this)
+        val oscuro = when (controladorPreferencias.estado.modoTema) {
+            ModoTema.CLARO -> false
+            ModoTema.OSCURO -> true
+            ModoTema.SISTEMA -> (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        }
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         chatNotificacionPendienteId = extraerChatIdDesdeIntent(intent)
         NotificacionesMensajes.crearCanalSiNoExiste(this)
-        enableEdgeToEdge()
+
+        val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+        insetsController.isAppearanceLightStatusBars = !oscuro
+        insetsController.isAppearanceLightNavigationBars = !oscuro
         setContent {
             val solicitarPermisoNotificaciones = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.RequestPermission()
@@ -39,7 +52,8 @@ class MainActivity : FragmentActivity() {
                     solicitarPermisoNotificaciones.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
-            ContrabajoTheme {
+            val controladorPreferencias = remember { ControladorPreferenciasUi(this@MainActivity) }
+            ContrabajoTheme(controlador = controladorPreferencias) {
                 ContrabajoApp(
                     chatNotificacionPendienteId = chatNotificacionPendienteId,
                     onConsumirChatNotificacionPendiente = { chatNotificacionPendienteId = null }

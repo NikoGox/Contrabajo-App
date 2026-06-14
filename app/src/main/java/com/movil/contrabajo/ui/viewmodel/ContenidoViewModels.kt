@@ -414,6 +414,16 @@ class ChatsViewModel(
                     // 3. Pasamos la lista nueva a Compose limpiamente sin hacer recargas HTTP
                     uiState = uiState.copy(mensajesActivos = listaActual)
 
+                    // 4. Si es un mensaje del sistema, refrescar la cita
+                    if (mensaje.tipo == 1) {
+                        val citaActualizada = withContext(Dispatchers.IO) {
+                            repositorioChats.obtenerCitaPorChat(mensaje.idChatCita)
+                        }
+                        if (citaActualizada != null) {
+                            uiState = uiState.copy(citaActiva = citaActualizada)
+                        }
+                    }
+
                 } else {
                     // El chat no esta abierto: registrar entrega
                     withContext(Dispatchers.IO) {
@@ -432,9 +442,10 @@ class ChatsViewModel(
                         )
                         chatEnLista = nuevosChatsList.firstOrNull { it.idChatCita == mensaje.idChatCita }
                     }
-                    val usernameContacto = chatEnLista?.usernameContacto
+                    val nombreContacto = chatEnLista?.nombreContacto?.takeIf { it.isNotBlank() }
+                        ?: chatEnLista?.usernameContacto
                     val tituloNotif = when {
-                        !usernameContacto.isNullOrBlank() -> usernameContacto
+                        !nombreContacto.isNullOrBlank() -> nombreContacto
                         mensaje.tipo == 1      -> "Nuevo chat"
                         else                              -> "Nuevo mensaje"
                     }
@@ -538,7 +549,9 @@ class ChatsViewModel(
                     NotificacionMensajePendiente(
                         idMensajeChat = chat.idChatCita,  // usado como ID de la notificacion Android
                         idChatCita    = chat.idChatCita,
-                        titulo        = chat.usernameContacto.takeIf {
+                        titulo        = chat.nombreContacto.takeIf {
+                            chat.nombreContacto.isNotBlank()
+                        } ?: chat.usernameContacto.takeIf {
                             chat.usernameContacto.isNotBlank()
                         } ?: "Mensajes pendientes",
                         contenido     = "${chat.mensajesNoLeidos} mensaje(s) sin leer"
@@ -658,6 +671,15 @@ class ChatsViewModel(
     }
 
     fun abrirChat(idChatCita: Long) {
+        // Limpiar estado anterior inmediatamente para que el UI no muestre datos del chat previo
+        uiState = uiState.copy(
+            chatActivo = null,
+            mensajesActivos = emptyList(),
+            citaActiva = null,
+            valoracionExistente = null,
+            mostrarModalValoracion = false,
+            error = null
+        )
         viewModelScope.launch {
             val chat = withContext(Dispatchers.IO) { repositorioChats.obtenerChat(idChatCita) }
             if (chat == null) {
@@ -892,7 +914,13 @@ class ChatsViewModel(
                     mensajeSistema = mensajeExito,
                     error = null
                 )
-                abrirChat(idChatCita)
+                val mensajes = withContext(Dispatchers.IO) { repositorioChats.obtenerMensajes(idChatCita) }
+                val chat = uiState.chatActivo
+                if (chat != null) {
+                    uiState = uiState.copy(mensajesActivos = anexarAvisoServicioEliminado(chat, mensajes))
+                } else {
+                    uiState = uiState.copy(mensajesActivos = mensajes)
+                }
             }.onFailure {
                 uiState = uiState.copy(error = it.message ?: "No se pudo actualizar la cita")
             }
@@ -1534,6 +1562,11 @@ class PerfilViewModel(
     }
 
     fun guardarEdicionPerfil() {
+        val correo = uiState.correoPerfilInput.trim()
+        if (correo.isBlank() || !correo.contains("@") || !correo.contains(".")) {
+            uiState = uiState.copy(errorPerfilEdicion = "Ingresa un correo válido")
+            return
+        }
         viewModelScope.launch {
             uiState = uiState.copy(cargandoPantalla = true)
             delay(180)
@@ -1866,7 +1899,8 @@ data class DetalleServicioUiState(
     val longitudUsuario: Double? = null,
     val fotosOferta: List<FotoOferta> = emptyList(),
     val subiendoFoto: Boolean = false,
-    val errorFoto: String? = null
+    val errorFoto: String? = null,
+    val cargando: Boolean = true
 ) {
     val ofertaActual: OfertaServicio? get() = ofertas.getOrNull(indiceActual)
 }
@@ -1888,6 +1922,7 @@ class DetalleServicioViewModel(
     fun cargarOferta(idOfertaServicio: Long, forzarRecarga: Boolean = false) {
         if (!forzarRecarga && ofertaActualId == idOfertaServicio && uiState.ofertaActual != null) return
         ofertaActualId = idOfertaServicio
+        uiState = uiState.copy(cargando = true)
         viewModelScope.launch {
             data class Snapshot(
                 val idUsuarioActual: Long?,
@@ -1919,7 +1954,8 @@ class DetalleServicioViewModel(
                     indiceActual = 0,
                     idUsuarioActual = idUsuarioActual,
                     latitudUsuario = latitudUsuario,
-                    longitudUsuario = longitudUsuario
+                    longitudUsuario = longitudUsuario,
+                    cargando = false
                 )
                 return@launch
             }
@@ -1931,7 +1967,8 @@ class DetalleServicioViewModel(
                         indiceActual = 0,
                         idUsuarioActual = idUsuarioActual,
                         latitudUsuario = latitudUsuario,
-                        longitudUsuario = longitudUsuario
+                        longitudUsuario = longitudUsuario,
+                        cargando = false
                     )
                 } else if (ofertasContexto != null) {
                     uiState = uiState.copy(
@@ -1939,7 +1976,8 @@ class DetalleServicioViewModel(
                         indiceActual = 0,
                         idUsuarioActual = idUsuarioActual,
                         latitudUsuario = latitudUsuario,
-                        longitudUsuario = longitudUsuario
+                        longitudUsuario = longitudUsuario,
+                        cargando = false
                     )
                 } else {
                     val fallback = withContext(Dispatchers.IO) {
@@ -1951,7 +1989,8 @@ class DetalleServicioViewModel(
                         indiceActual = indiceFallback,
                         idUsuarioActual = idUsuarioActual,
                         latitudUsuario = latitudUsuario,
-                        longitudUsuario = longitudUsuario
+                        longitudUsuario = longitudUsuario,
+                        cargando = false
                     )
                 }
             } else {
@@ -1960,7 +1999,8 @@ class DetalleServicioViewModel(
                     indiceActual = indice,
                     idUsuarioActual = idUsuarioActual,
                     latitudUsuario = latitudUsuario,
-                    longitudUsuario = longitudUsuario
+                    longitudUsuario = longitudUsuario,
+                    cargando = false
                 )
             }
         }
@@ -2112,7 +2152,8 @@ data class PremiumHistorialContacto(
     val tituloServicio: String,
     val fechaTermino: String,
     val resultado: String,
-    val estrellas: Int? = null
+    val estrellas: Int? = null,
+    val comentarioValoracion: String? = null
 )
 
 data class PremiumStats(
@@ -2133,8 +2174,11 @@ data class PremiumStats(
     val ticketPromedio: Int = 0,
     val mejorDiaContactos: String = "—",
     val mejorDiaIngresos: String = "—",
+    val citasEnProceso: Int = 0,
     val contactosPorDia: List<PremiumSerieDia> = emptyList(),
-    val ingresosPorDia: List<PremiumSerieDia> = emptyList()
+    val ingresosPorDia: List<PremiumSerieDia> = emptyList(),
+    /** Conteo de votos por estrella, índice 0 = 1★ … índice 4 = 5★. */
+    val distribucionValoraciones: List<Int> = List(5) { 0 }
 )
 
 data class PremiumUiState(
@@ -2143,6 +2187,7 @@ data class PremiumUiState(
     val errorPago: String? = null,
     val checkoutUrl: String? = null,
     val cargandoStats: Boolean = true,
+    val cargandoHistorial: Boolean = true,
     val stats: PremiumStats = PremiumStats(),
     val historialContactos: List<PremiumHistorialContacto> = emptyList()
 )
@@ -2234,7 +2279,7 @@ class PremiumViewModel(
     }
 
     fun cargarEstadisticas() {
-        uiState = uiState.copy(cargandoStats = true)
+        uiState = uiState.copy(cargandoStats = true, cargandoHistorial = true)
         viewModelScope.launch {
           try {
             val stats = withContext(Dispatchers.IO) {
@@ -2261,7 +2306,8 @@ class PremiumViewModel(
                                 ?: cita?.fechaProgramada
                                 ?: chat.horaUltimoMensaje.ifBlank { chat.fechaCreacion },
                             resultado = describirResultadoContacto(chat, cita),
-                            estrellas = if (chat.chatCerrado) valoracion?.voto else null
+                            estrellas = if (chat.chatCerrado) valoracion?.voto else null,
+                            comentarioValoracion = if (chat.chatCerrado) valoracion?.comentario?.ifBlank { null } else null
                         )
                     }
                     .sortedByDescending { parseFechaPremium(it.fechaTermino) ?: LocalDateTime.MIN }
@@ -2280,6 +2326,11 @@ class PremiumViewModel(
                 }
                 val ingresoTotal = citasFinalizadas.sumOf { it.precioAcordado.coerceAtLeast(0) }
                 val ticketPromedio = if (citasFinalizadas.isEmpty()) 0 else ingresoTotal / citasFinalizadas.size
+                val finalizadasN = citas.count { it.estado == EstadoCita.FINALIZADO }
+                val canceladasN = citas.count { it.estado == EstadoCita.CANCELADO }
+                val rechazadasN = citas.count { it.estado == EstadoCita.RECHAZADA }
+                val enProcesoN = (citas.size - finalizadasN - canceladasN - rechazadasN).coerceAtLeast(0)
+                val distribucionVotos = (1..5).map { estrella -> votos.count { it == estrella } }
                 Pair(
                     PremiumStats(
                     chatsTotales = chats.size,
@@ -2299,8 +2350,10 @@ class PremiumViewModel(
                     ticketPromedio = ticketPromedio,
                     mejorDiaContactos = mejorEtiqueta(contactosPorDia),
                     mejorDiaIngresos = mejorEtiqueta(ingresosPorDia),
+                    citasEnProceso = enProcesoN,
                     contactosPorDia = contactosPorDia,
-                    ingresosPorDia = ingresosPorDia
+                    ingresosPorDia = ingresosPorDia,
+                    distribucionValoraciones = distribucionVotos
                     ),
                     historial
                 )
@@ -2308,12 +2361,13 @@ class PremiumViewModel(
             uiState = uiState.copy(
                 stats = stats.first,
                 historialContactos = stats.second,
-                cargandoStats = false
+                cargandoStats = false,
+                cargandoHistorial = false
             )
           } catch (e: Exception) {
             // Ante cualquier fallo (red caída, parseo, etc.) no dejamos el menú colgado:
             // se apaga el indicador de carga y se conservan las últimas estadísticas.
-            uiState = uiState.copy(cargandoStats = false)
+            uiState = uiState.copy(cargandoStats = false, cargandoHistorial = false)
           }
         }
     }

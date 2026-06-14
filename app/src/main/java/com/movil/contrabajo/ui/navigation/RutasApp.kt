@@ -29,6 +29,7 @@ sealed class RutasApp(val ruta: String) {
     data object AjustesPreguntas : RutasApp("ajustes/seguridad/preguntas")
     data object AjustesCuenta : RutasApp("ajustes/cuenta")
     data object AjustesUbicacion : RutasApp("ajustes/ubicacion")
+    data object AjustesPreferencias : RutasApp("ajustes/preferencias")
     data object AjustesModerarBaneos : RutasApp("ajustes/moderacion/baneos")
     data object ValoracionesServicios : RutasApp("perfil/valoraciones")
     data object ServicioEditor : RutasApp("servicio_editor/{modo}/{idOfertaServicio}") {
@@ -41,7 +42,7 @@ sealed class RutasApp(val ruta: String) {
     data object PremiumActivado : RutasApp("premium_activado")
     data object MenuPremium : RutasApp("menu_premium")
     data object PremiumHistorialContactos : RutasApp("premium_historial_contactos")
-    data object PremiumLecturaRapida : RutasApp("premium_lectura_rapida")
+    data object PremiumEstadisticas : RutasApp("premium_estadisticas")
 
     companion object {
         private val rutasPrincipales = listOf(

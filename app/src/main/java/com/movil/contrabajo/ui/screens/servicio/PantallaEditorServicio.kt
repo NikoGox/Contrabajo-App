@@ -165,7 +165,8 @@ fun PantallaEditorServicio(
             Text(
                 text = if (modo == "editar") "Editar servicio" else "Crear servicio",
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
 

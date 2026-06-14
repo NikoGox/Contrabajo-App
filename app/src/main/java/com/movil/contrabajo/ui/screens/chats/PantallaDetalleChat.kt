@@ -1,4 +1,4 @@
-package com.movil.contrabajo.ui.screens.chats
+﻿package com.movil.contrabajo.ui.screens.chats
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
@@ -33,6 +33,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.movil.contrabajo.ui.theme.LocalColoresContrabajo
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -240,7 +241,7 @@ fun PantallaDetalleChat(
                             "Chat cerrado: puedes leer mensajes, pero no escribir."
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (chat.servicioEliminado) Color(0xFFB00020) else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (chat.servicioEliminado) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
                     Row(
@@ -431,7 +432,7 @@ fun PantallaDetalleChat(
                 onCerrar = viewModel::cerrarModalValoracion,
                 onGuardar = viewModel::guardarValoracionChat,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
+                    .align(Alignment.Center)
                     .padding(horizontal = 12.dp, vertical = 14.dp)
             )
         }
@@ -541,6 +542,26 @@ private fun CabeceraChat(
     onReportarChat: () -> Unit,
     onAbrirServicioAsociado: () -> Unit
 ) {
+    val transicionTopbar = rememberInfiniteTransition(label = "shimmerTopbar")
+    val shimmerXTopbar by transicionTopbar.animateFloat(
+        initialValue = -600f,
+        targetValue = 1400f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1300, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmerXTopbar"
+    )
+    val shimmerTopbarBrush = Brush.linearGradient(
+        colors = listOf(
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.surfaceVariant
+        ),
+        start = Offset(shimmerXTopbar, 0f),
+        end = Offset(shimmerXTopbar + 500f, 300f)
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -551,41 +572,62 @@ private fun CabeceraChat(
         IconButton(onClick = onVolver) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Volver"
+                contentDescription = "Volver",
+                tint = MaterialTheme.colorScheme.primary
             )
         }
-        Surface(
-            modifier = Modifier
-                .weight(1f)
-                .clickable(enabled = chat?.idOfertaServicio != null, onClick = onAbrirServicioAsociado),
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.primary
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-                Text(
-                    text = chat?.tituloServicio?.ifBlank { "Conversación" } ?: "Conversación",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                val subtitulo = if (chat == null) {
-                    ""
-                } else {
-                    chat.usernameContacto.ifBlank { "usuario" }
+        if (chat == null) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(shimmerTopbarBrush)
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                    Text(
+                        text = " ",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Transparent
+                    )
+                    Text(
+                        text = " ",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.Transparent
+                    )
                 }
-                Text(
-                    text = subtitulo,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White.copy(alpha = 0.92f)
-                )
+            }
+        } else {
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(enabled = chat.idOfertaServicio != null, onClick = onAbrirServicioAsociado),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primary
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                    Text(
+                        text = chat.tituloServicio.ifBlank { "Conversación" },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Text(
+                        text = chat.nombreContacto.ifBlank { chat.usernameContacto.ifBlank { "usuario" } },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.92f)
+                    )
+                }
             }
         }
         Box {
             IconButton(onClick = { onCambiarMenu(true) }) {
                 Icon(
                     imageVector = Icons.Filled.MoreVert,
-                    contentDescription = "Opciones"
+                    contentDescription = "Opciones",
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
             DropdownMenu(
@@ -641,13 +683,14 @@ private fun BurbujaMensaje(
         return
     }
 
+    val extra = LocalColoresContrabajo.current
     val colorBurbuja = if (esPropio) {
-        Color(0xFFE7F0FF)
+        extra.infoContenedor
     } else {
         MaterialTheme.colorScheme.primary
     }
-    val colorTexto = if (esPropio) MaterialTheme.colorScheme.onSurface else Color.White
-    val colorMeta = if (esPropio) MaterialTheme.colorScheme.onSurfaceVariant else Color.White.copy(alpha = 0.84f)
+    val colorTexto = if (esPropio) extra.onInfoContenedor else MaterialTheme.colorScheme.onPrimary
+    val colorMeta = if (esPropio) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.84f)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -677,7 +720,11 @@ private fun BurbujaMensaje(
                         color = colorMeta
                     )
                     if (esPropio) {
-                        val (simbolo, color) = simboloEstadoMensaje(mensaje.idEstado)
+                        val (simbolo, color) = simboloEstadoMensaje(
+                            mensaje.idEstado,
+                            colorNormal = colorMeta,
+                            colorLeido = MaterialTheme.colorScheme.secondary
+                        )
                         Text(
                             text = simbolo,
                             style = MaterialTheme.typography.labelSmall,
@@ -948,7 +995,7 @@ private fun ModalValoracionCierre(
                     Icon(
                         imageVector = Icons.Rounded.Star,
                         contentDescription = "$estrellas estrellas",
-                        tint = if (estrellas <= voto) Color(0xFFFFC93C) else Color(0xFFB0B7BF),
+                        tint = if (estrellas <= voto) LocalColoresContrabajo.current.premiumEstrella else MaterialTheme.colorScheme.outline,
                         modifier = Modifier
                             .padding(horizontal = 3.dp)
                             .clickable { onCambiarVoto(estrellas) }
@@ -996,19 +1043,19 @@ private fun ModalInfoMensaje(
                     etiqueta = "Enviado",
                     valor = formatearFechaCompleta(mensaje.fechaEnvio),
                     simbolo = "✓",
-                    colorSimbolo = Color(0xFF8A95A3)
+                    colorSimbolo = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 FilaInfoMensaje(
                     etiqueta = "Entregado",
                     valor = mensaje.fechaRecibido?.let { formatearFechaCompleta(it) } ?: "Pendiente",
                     simbolo = "✓✓",
-                    colorSimbolo = if (mensaje.fechaRecibido != null) Color(0xFF8A95A3) else Color(0xFFB0B7BF)
+                    colorSimbolo = if (mensaje.fechaRecibido != null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline
                 )
                 FilaInfoMensaje(
                     etiqueta = "Leído",
                     valor = mensaje.fechaLeido?.let { formatearFechaCompleta(it) } ?: "Pendiente",
                     simbolo = "✓✓",
-                    colorSimbolo = if (mensaje.fechaLeido != null) Color(0xFF00A8C8) else Color(0xFFB0B7BF)
+                    colorSimbolo = if (mensaje.fechaLeido != null) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
                 )
             }
         },
@@ -1069,10 +1116,14 @@ private fun formatearFechaCompleta(fecha: String): String {
     return fecha
 }
 
-private fun simboloEstadoMensaje(idEstado: Long): Pair<String, Color> = when (idEstado) {
-    301L -> "✓" to Color(0xFF8A95A3)
-    302L -> "✓✓" to Color(0xFF8A95A3)
-    303L -> "✓✓" to Color(0xFF00A8C8)
+private fun simboloEstadoMensaje(
+    idEstado: Long,
+    colorNormal: Color,
+    colorLeido: Color
+): Pair<String, Color> = when (idEstado) {
+    301L -> "✓" to colorNormal
+    302L -> "✓✓" to colorNormal
+    303L -> "✓✓" to colorLeido
     else -> "" to Color.Transparent
 }
 
@@ -1191,9 +1242,9 @@ private fun SkeletonDetalleChat() {
     )
     val shimmerBrush = Brush.linearGradient(
         colors = listOf(
-            Color(0xFFE8ECF0),
-            Color(0xFFF5F7FA),
-            Color(0xFFE8ECF0)
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.surfaceVariant
         ),
         start = Offset(shimmerX, 0f),
         end = Offset(shimmerX + 500f, 300f)

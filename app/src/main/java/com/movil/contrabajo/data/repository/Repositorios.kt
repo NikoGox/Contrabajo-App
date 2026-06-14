@@ -49,6 +49,7 @@ interface RepositorioAutenticacion {
         confirmarContrasena: String
     ): Result<Unit>
     fun cerrarSesion()
+    fun verificarBackend(): Boolean
 }
 
 interface RepositorioPerfil {
@@ -317,7 +318,7 @@ class RepositorioAutenticacionLocal(
             !validarRut(registro.run, registro.dv) -> "El RUN no es valido"
             digitosTelefono(registro.telefono).length != 9 -> "Ingresa un telefono valido de 9 digitos"
             registro.username.isBlank() -> "Ingresa un nombre de usuario"
-            registro.correo.isBlank() || !registro.correo.contains("@") -> "Ingresa un correo valido"
+            registro.correo.isBlank() || !registro.correo.contains("@") || !registro.correo.contains(".") -> "Ingresa un correo valido"
             errorFechaNacimiento != null -> errorFechaNacimiento
             validarContrasenaSegura(registro.contrasena) != null -> validarContrasenaSegura(registro.contrasena).orEmpty()
             registro.contrasena != registro.confirmarContrasena -> "Las contrasenas no coinciden"
@@ -401,6 +402,8 @@ class RepositorioAutenticacionLocal(
             longitud = registro.longitud
         )
     }
+
+    override fun verificarBackend(): Boolean = true
 }
 
 class RepositorioPerfilLocal(
@@ -513,7 +516,7 @@ class RepositorioPerfilLocal(
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         val correoNormalizado = correo.trim().lowercase()
         val telefonoNormalizado = telefono.trim()
-        if (correoNormalizado.isBlank() || !correoNormalizado.contains("@")) {
+        if (correoNormalizado.isBlank() || !correoNormalizado.contains("@") || !correoNormalizado.contains(".")) {
             return Result.failure(IllegalArgumentException("Ingresa un correo valido"))
         }
         val digitos = telefonoNormalizado.filter { it.isDigit() }.let {

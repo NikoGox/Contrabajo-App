@@ -19,6 +19,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.movil.contrabajo.ui.theme.LocalColoresContrabajo
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -128,7 +129,7 @@ private fun TarjetaBaneado(
     desbaneoEnCurso: Boolean,
     onDesbanear: () -> Unit
 ) {
-    val colorSancion = if (usuario.tipoSancion == "BANEADO") Color(0xFFB71C1C) else Color(0xFFE65100)
+    val colorSancion = if (usuario.tipoSancion == "BANEADO") MaterialTheme.colorScheme.error else LocalColoresContrabajo.current.advertencia
 
     TarjetaBase(modifier = Modifier.fillMaxWidth()) {
         Row(

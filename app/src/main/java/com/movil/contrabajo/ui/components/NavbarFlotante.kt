@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -25,6 +28,7 @@ import androidx.compose.material.icons.outlined.ChatBubble
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,10 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.movil.contrabajo.ui.navigation.RutasApp
 import com.movil.contrabajo.ui.theme.Blanco
-import com.movil.contrabajo.ui.theme.NavbarBrillo
-import com.movil.contrabajo.ui.theme.NavbarIconoInactivo
-import com.movil.contrabajo.ui.theme.NavbarSeleccion
-import com.movil.contrabajo.ui.theme.NavbarVerde
+import com.movil.contrabajo.ui.theme.LocalColoresContrabajo
 import kotlin.math.abs
 
 private data class ItemNavbar(
@@ -53,7 +54,7 @@ private data class ItemNavbar(
     val icono: ImageVector
 )
 
-val PaddingNavbarFlotante = PaddingValues(bottom = 70.dp)
+val AlturaNavbarFlotante = 70.dp
 
 @Composable
 fun ContenedorConNavbarFlotante(
@@ -63,8 +64,21 @@ fun ContenedorConNavbarFlotante(
     modifier: Modifier = Modifier,
     content: @Composable (PaddingValues) -> Unit
 ) {
+    val navBarHeight = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bgColor = MaterialTheme.colorScheme.background
     Box(modifier = modifier.fillMaxSize()) {
-        content(PaddingNavbarFlotante)
+        content(PaddingValues.Zero)
+
+        // Rellena el área de la barra del sistema con el color de fondo, haciéndola opaca
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(navBarHeight)
+                .background(bgColor)
+                .zIndex(1f)
+        )
+
         NavbarFlotante(
             actual = actual,
             alNavegar = alNavegar,
@@ -83,6 +97,7 @@ fun NavbarFlotante(
     modoModerador: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val colores = LocalColoresContrabajo.current
     val items = if (modoModerador) {
         listOf(
             ItemNavbar(RutasApp.Perfil.ruta, "Perfil", Icons.Outlined.AccountCircle),
@@ -108,7 +123,7 @@ fun NavbarFlotante(
         Surface(
             modifier = Modifier.fillMaxWidth(0.84f),
             shape = RoundedCornerShape(30.dp),
-            color = NavbarVerde.copy(alpha = 0.9f),
+            color = colores.navbarFondo.copy(alpha = 0.9f),
             border = BorderStroke(1.dp, Blanco.copy(alpha = 0.28f)),
             shadowElevation = 16.dp
         ) {
@@ -117,11 +132,11 @@ fun NavbarFlotante(
                     .background(
                         brush = Brush.horizontalGradient(
                             colors = listOf(
-                                NavbarVerde.copy(alpha = 0.78f),
-                                NavbarBrillo.copy(alpha = 0.12f),
-                                NavbarVerde.copy(alpha = 0.96f),
-                                NavbarBrillo.copy(alpha = 0.12f),
-                                NavbarVerde.copy(alpha = 0.78f)
+                                colores.navbarFondo.copy(alpha = 0.78f),
+                                colores.navbarBrillo.copy(alpha = 0.12f),
+                                colores.navbarFondo.copy(alpha = 0.96f),
+                                colores.navbarBrillo.copy(alpha = 0.12f),
+                                colores.navbarFondo.copy(alpha = 0.78f)
                             )
                         )
                     )
@@ -147,7 +162,7 @@ fun NavbarFlotante(
                         .background(
                             Brush.linearGradient(
                                 colors = listOf(
-                                    NavbarSeleccion.copy(alpha = 0.36f),
+                                    colores.navbarSeleccion.copy(alpha = 0.36f),
                                     Blanco.copy(alpha = 0.14f)
                                 )
                             )
@@ -167,7 +182,7 @@ fun NavbarFlotante(
                             .coerceIn(0f, 1f)
                         val escala = 1f + (0.08f * intensidad)
                         val elevacionIcono = (-3f * intensidad).dp
-                        val colorIcono = lerp(NavbarIconoInactivo, Blanco, intensidad)
+                        val colorIcono = lerp(colores.navbarIconoInactivo, Blanco, intensidad)
 
                         Box(
                             modifier = Modifier

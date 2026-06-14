@@ -162,10 +162,11 @@ data class ChatDto(
     @SerializedName("ultimoMensaje")      val ultimoMensaje: String?,
     @SerializedName("fechaUltimoMensaje") val fechaUltimoMensaje: String?,
     @SerializedName("mensajesNoLeidos")   val mensajesNoLeidos: Long?,
-    // Datos de visualizacion desnormalizados
     @SerializedName("usernameTrabajador") val usernameTrabajador: String?,
     @SerializedName("usernameCliente")    val usernameCliente: String?,
-    @SerializedName("tituloServicio")     val tituloServicio: String?
+    @SerializedName("tituloServicio")     val tituloServicio: String?,
+    @SerializedName("idEmisorUltimoMensaje") val idEmisorUltimoMensaje: Long? = null,
+    @SerializedName("ultimoMensajeLeido") val ultimoMensajeLeido: Boolean? = null
 )
 
 data class MensajeChatDto(

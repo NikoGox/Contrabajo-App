@@ -262,7 +262,7 @@ class RepositorioAutenticacionRemoto(
             registro.username.trim().isBlank() -> "Ingresa un nombre de usuario"
             registro.username.trim().length > 20 -> "El nombre de usuario debe tener maximo 20 caracteres"
             registro.username.contains("@") -> "El nombre de usuario online no debe ser un correo"
-            registro.correo.trim().isBlank() || !registro.correo.contains("@") -> "Ingresa un correo valido"
+            registro.correo.trim().isBlank() || !registro.correo.contains("@") || !registro.correo.contains(".") -> "Ingresa un correo valido"
             registro.correo.trim().length > 254 -> "El correo permite hasta 254 caracteres"
             registro.telefono.normalizarTelefonoBackend().length != 8 ->
                 "Ingresa los 8 digitos restantes del celular"
@@ -302,6 +302,11 @@ class RepositorioAutenticacionRemoto(
         if (!correoDisponible) return "El correo ya existe."
 
         return null
+    }
+
+    override fun verificarBackend(): Boolean {
+        val resultado = ejecutarApi(api.validarSesion("health-check"))
+        return resultado.isSuccess
     }
 }
 
@@ -617,7 +622,7 @@ class RepositorioPerfilRemoto(
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         val correoNormalizado = correo.trim().lowercase()
         val telefonoNormalizado = telefono.normalizarTelefonoBackend()
-        if (correoNormalizado.isBlank() || !correoNormalizado.contains("@")) {
+        if (correoNormalizado.isBlank() || !correoNormalizado.contains("@") || !correoNormalizado.contains(".")) {
             return Result.failure(IllegalArgumentException("Ingresa un correo valido"))
         }
         if (correoNormalizado.length > 254) {
@@ -1008,6 +1013,7 @@ class RepositorioOfertasRemoto(
 class RepositorioChatRemoto(
     private val comunicacionesApi: ComunicacionesApiService,
     private val serviciosApi: ServiciosApiService,
+    private val usuariosApi: UsuariosApiService,
     private val sessionStore: RemoteSessionStore
 ) : RepositorioChats {
 
@@ -1024,15 +1030,38 @@ class RepositorioChatRemoto(
     // ────────────────────────────────────────────────────────────────────────────
     override fun obtenerChatsActuales(): List<ChatCita> {
         val token = sessionStore.obtenerToken() ?: return emptyList()
-        return ejecutarApiComunicaciones(comunicacionesApi.listarChats(bearer(token)))
+        val idUsuarioActual = sessionStore.obtenerUsuario()?.idUsuario ?: 0L
+        val chats = ejecutarApiComunicaciones(comunicacionesApi.listarChats(bearer(token)))
             .getOrDefault(emptyList())
             .mapNotNull { dto ->
                 val idChat = dto.id ?: return@mapNotNull null
-                // Actualizar caches
                 dto.idCita?.let { citaIdPorChat[idChat] = it.toLong() }
                 dto.idOfertaServicio?.let { ofertaIdPorChat[idChat] = it.toLong() }
-                dto.toChatCita(sessionStore.obtenerUsuario()?.idUsuario ?: 0L)
+                dto.toChatCita(idUsuarioActual)
             }
+
+        val idsContacto = chats.map { chat ->
+            if (chat.idCliente == idUsuarioActual) chat.idTrabajador else chat.idCliente
+        }.distinct().filter { it > 0L }
+
+        val nombresContacto = mutableMapOf<Long, String>()
+        for (idContacto in idsContacto) {
+            val dto = ejecutarApi(usuariosApi.buscarUsuario(bearer(token), idContacto.toInt())).getOrNull()
+            if (dto != null) {
+                val nombre = dto.nombre.orEmpty().trim()
+                val apellidos = dto.apellidos.orEmpty().trim()
+                val fullName = listOf(nombre, apellidos).filter { it.isNotBlank() }.joinToString(" ")
+                if (fullName.isNotBlank()) {
+                    nombresContacto[idContacto] = fullName
+                }
+            }
+        }
+
+        return chats.map { chat ->
+            val idContacto = if (chat.idCliente == idUsuarioActual) chat.idTrabajador else chat.idCliente
+            val nombre = nombresContacto[idContacto]
+            if (nombre != null) chat.copy(nombreContacto = nombre) else chat
+        }
     }
 
     override fun obtenerChat(idChatCita: Long): ChatCita? {
@@ -1317,7 +1346,9 @@ class RepositorioChatRemoto(
             ultimoMensaje     = ultimoMensaje ?: "",
             horaUltimoMensaje = fechaUltimoMensaje ?: "",
             mensajesNoLeidos  = mensajesNoLeidos?.toInt() ?: 0,
-            chatCerrado       = activo == false
+            chatCerrado       = activo == false,
+            idEmisorUltimoMensaje = idEmisorUltimoMensaje,
+            ultimoMensajeLeido   = ultimoMensajeLeido ?: false
         )
     }
 

@@ -22,11 +22,15 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Work
@@ -43,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -149,6 +154,106 @@ fun AvatarUsuarioAsync(
 }
 
 @Composable
+private fun AvatarServicioAsync(
+    idOfertaServicio: Long?,
+    tituloFallback: String,
+    modifier: Modifier = Modifier
+) {
+    if (idOfertaServicio == null || idOfertaServicio <= 0L) {
+        Box(
+            modifier = modifier.background(
+                androidx.compose.ui.graphics.Brush.linearGradient(
+                    listOf(com.movil.contrabajo.ui.theme.TurquesaBrillante, com.movil.contrabajo.ui.theme.AzulPetroleo)
+                )
+            ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = tituloFallback.take(1).uppercase().ifBlank { "?" },
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 19.sp
+            )
+        }
+        return
+    }
+
+    var urlFoto by remember(idOfertaServicio) { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    var cargado by remember(idOfertaServicio) { androidx.compose.runtime.mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    androidx.compose.runtime.LaunchedEffect(idOfertaServicio) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val token = com.movil.contrabajo.data.remote.RemoteSessionStore(context.applicationContext).obtenerToken()
+                    ?: return@withContext
+                val response = com.movil.contrabajo.data.remote.ServiciosApiClient.api
+                    .listarFotosOferta(
+                        authorization = com.movil.contrabajo.data.remote.bearer(token),
+                        idOferta = idOfertaServicio.toInt()
+                    ).execute()
+                if (response.isSuccessful) {
+                    urlFoto = response.body()?.firstOrNull()?.enlace
+                }
+            } catch (_: Exception) {
+            } finally {
+                cargado = true
+            }
+        }
+    }
+
+    val gradiente = listOf(com.movil.contrabajo.ui.theme.TurquesaBrillante, com.movil.contrabajo.ui.theme.AzulPetroleo)
+    val fallback: @Composable () -> Unit = {
+        Box(
+            modifier = modifier.background(androidx.compose.ui.graphics.Brush.linearGradient(gradiente)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = tituloFallback.take(1).uppercase().ifBlank { "?" },
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 19.sp
+            )
+        }
+    }
+
+    if (!cargado) {
+        Box(
+            modifier = modifier.background(androidx.compose.ui.graphics.Brush.linearGradient(gradiente)),
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.material3.CircularProgressIndicator(
+                color = Color.White,
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp
+            )
+        }
+    } else if (urlFoto.isNullOrBlank()) {
+        fallback()
+    } else {
+        coil.compose.SubcomposeAsyncImage(
+            model = urlFoto,
+            contentDescription = tituloFallback,
+            modifier = modifier,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            error = {
+                Box(
+                    modifier = Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.linearGradient(gradiente)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = tituloFallback.take(1).uppercase().ifBlank { "?" },
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 19.sp
+                    )
+                }
+            }
+        )
+    }
+}
+
+@Composable
 fun PantallaChats(
     viewModel: ChatsViewModel,
     onAbrirChat: (Long) -> Unit,
@@ -158,7 +263,8 @@ fun PantallaChats(
     val uiState = viewModel.uiState
     val chatsVisibles = uiState.chatsFiltrados
 
-    PantallaBase(modifier = modifier, mostrarFondo = false) {
+    PantallaBase(modifier = modifier, mostrarFondo = false, scrollable = false) {
+        val fadeColor = MaterialTheme.colorScheme.surface
 
         // ── Encabezado ─────────────────────────────────────────────
         TarjetaBase {
@@ -197,12 +303,17 @@ fun PantallaChats(
         }
 
         // ── Contenedor de mensajes: buscador + selector + lista ────
-        // Un solo TarjetaBase — el buscador vive dentro del mismo card que los chats
-        TarjetaBase(contentPadding = PaddingValues(0.dp)) {
+        // Column weight(1f) + Spacer(58dp) = el card termina justo en el borde del navbar flotante
+        Column(modifier = Modifier.weight(1f)) {
+        TarjetaBase(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(0.dp),
+            llenarAlto = true
+        ) {
             // Columna única como hijo directo para evitar el spacedBy(12dp) de TarjetaBase
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxSize()) {
 
-                // ── Sección de filtros (con padding propio) ────────
+                // ── Sección de filtros fija (con padding propio) ───
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -228,64 +339,87 @@ fun PantallaChats(
                     thickness = 0.5.dp
                 )
 
-                // ── Sección de lista ───────────────────────────────
-                if (chatsVisibles.isEmpty()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 28.dp, horizontal = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.ChatBubbleOutline,
-                            contentDescription = null,
-                            modifier = Modifier.size(52.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                        )
-                        Text(
-                            text = "No tienes conversaciones todavía.",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            text = if (uiState.busquedaChats.isNotBlank())
-                                "Ningún chat coincide con \"${uiState.busquedaChats}\"."
-                            else
-                                "Cuando alguien contacte un servicio, sus mensajes aparecerán aquí.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
-                    ) {
-                        chatsVisibles.forEachIndexed { index, chat ->
-                            val esComoTrabajador = uiState.idUsuarioActual != null &&
-                                chat.idTrabajador == uiState.idUsuarioActual
-                            FilaChatModerna(
-                                chat = chat,
-                                esComoTrabajador = esComoTrabajador,
-                                mostrarRolChip = esTrabajador,
-                                onClick = { onAbrirChat(chat.idChatCita) }
+                // ── Sección de lista con scroll independiente ──────
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    if (chatsVisibles.isEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(vertical = 28.dp, horizontal = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.ChatBubbleOutline,
+                                contentDescription = null,
+                                modifier = Modifier.size(52.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                             )
-                            if (index < chatsVisibles.lastIndex) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(start = 78.dp, end = 14.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                    thickness = 0.5.dp
+                            Text(
+                                text = "No tienes conversaciones todavía.",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = if (uiState.busquedaChats.isNotBlank())
+                                    "Ningún chat coincide con \"${uiState.busquedaChats}\"."
+                                else
+                                    "Cuando alguien contacte un servicio, sus mensajes aparecerán aquí.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(top = 6.dp, bottom = 4.dp)
+                        ) {
+                            chatsVisibles.forEachIndexed { index, chat ->
+                                val esComoTrabajador = uiState.idUsuarioActual != null &&
+                                    chat.idTrabajador == uiState.idUsuarioActual
+                                FilaChatModerna(
+                                    chat = chat,
+                                    esComoTrabajador = esComoTrabajador,
+                                    mostrarRolChip = esTrabajador,
+                                    onClick = { onAbrirChat(chat.idChatCita) }
                                 )
+                                if (index < chatsVisibles.lastIndex) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(start = 78.dp, end = 14.dp),
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                        thickness = 0.5.dp
+                                    )
+                                }
                             }
                         }
                     }
+
+                    // Fade en el borde superior de la lista (sobre la línea divisoria)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .height(20.dp)
+                            .drawBehind {
+                                drawRect(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(fadeColor, Color.Transparent),
+                                        startY = 0f,
+                                        endY = size.height
+                                    )
+                                )
+                            }
+                    )
                 }
             }
+        }
+        Spacer(modifier = Modifier.height(72.dp))
         }
     }
 }
@@ -464,12 +598,10 @@ private fun FilaChatModerna(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // ── Avatar ────────────────────────────────────────────────
-        val idContacto = if (esComoTrabajador) chat.idCliente else chat.idTrabajador
-
-        AvatarUsuarioAsync(
-            idUsuario = idContacto.toInt(),
-            nombreParaFallback = chat.nombreContacto,
+        // ── Avatar: imagen del servicio ────────────────────────────
+        AvatarServicioAsync(
+            idOfertaServicio = chat.idOfertaServicio,
+            tituloFallback = chat.tituloServicio.ifBlank { chat.nombreContacto },
             modifier = Modifier
                 .size(50.dp)
                 .clip(CircleShape)
@@ -478,9 +610,9 @@ private fun FilaChatModerna(
         // ── Contenido
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            // Línea 1: nombre del contacto + hora (¡Este es el Row que faltaba!)
+            // Línea 1: nombre del contacto + hora
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -506,42 +638,18 @@ private fun FilaChatModerna(
                 )
             }
 
-            // Línea 2: título del servicio (+ @username si tiene)
-            if (chat.tituloServicio.isNotBlank() || chat.usernameContacto.isNotBlank()) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    if (chat.tituloServicio.isNotBlank()) {
-                        Text(
-                            text = chat.tituloServicio,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                    }
-                    if (chat.tituloServicio.isNotBlank() && chat.usernameContacto.isNotBlank()) {
-                        Text(
-                            text = "·",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
-                        )
-                    }
-                    if (chat.usernameContacto.isNotBlank()) {
-                        Text(
-                            text = "@${chat.usernameContacto}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
+            // Línea 2: título del servicio
+            if (chat.tituloServicio.isNotBlank()) {
+                Text(
+                    text = chat.tituloServicio,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
 
-            // Línea 3: último mensaje + badge / chip de rol
+            // Línea 3: último mensaje + badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -566,7 +674,7 @@ private fun FilaChatModerna(
                 )
                 Spacer(Modifier.width(8.dp))
 
-                // Badge de no leídos (prioridad sobre chip de rol)
+                // Badge de no leídos
                 if (tieneNoLeidos) {
                     Surface(
                         shape = RoundedCornerShape(999.dp),

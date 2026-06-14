@@ -4,6 +4,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
 
 val Typography = Typography(
@@ -75,3 +76,34 @@ val Typography = Typography(
         lineHeight = 18.sp
     )
 )
+
+/**
+ * Devuelve la tipografía base escalada por [factor] (accesibilidad: tamaño de letra).
+ * Escala fontSize y lineHeight de los 15 estilos estándar de Material 3.
+ */
+fun escalarTipografia(factor: Float): Typography {
+    if (factor == 1f) return Typography
+
+    fun TextStyle.escalar(): TextStyle = copy(
+        fontSize = if (fontSize.isSpecified) fontSize * factor else fontSize,
+        lineHeight = if (lineHeight.isSpecified) lineHeight * factor else lineHeight
+    )
+
+    return Typography(
+        displayLarge = Typography.displayLarge.escalar(),
+        displayMedium = Typography.displayMedium.escalar(),
+        displaySmall = Typography.displaySmall.escalar(),
+        headlineLarge = Typography.headlineLarge.escalar(),
+        headlineMedium = Typography.headlineMedium.escalar(),
+        headlineSmall = Typography.headlineSmall.escalar(),
+        titleLarge = Typography.titleLarge.escalar(),
+        titleMedium = Typography.titleMedium.escalar(),
+        titleSmall = Typography.titleSmall.escalar(),
+        bodyLarge = Typography.bodyLarge.escalar(),
+        bodyMedium = Typography.bodyMedium.escalar(),
+        bodySmall = Typography.bodySmall.escalar(),
+        labelLarge = Typography.labelLarge.escalar(),
+        labelMedium = Typography.labelMedium.escalar(),
+        labelSmall = Typography.labelSmall.escalar()
+    )
+}

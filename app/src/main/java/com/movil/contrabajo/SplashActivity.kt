@@ -44,14 +44,27 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.movil.contrabajo.ui.theme.ContrabajoTheme
+import com.movil.contrabajo.ui.theme.ControladorPreferenciasUi
+import com.movil.contrabajo.ui.theme.ModoTema
 import kotlinx.coroutines.delay
 
 class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+        val controladorPreferencias = ControladorPreferenciasUi(this)
+        val oscuro = when (controladorPreferencias.estado.modoTema) {
+            ModoTema.CLARO -> false
+            ModoTema.OSCURO -> true
+            ModoTema.SISTEMA -> (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        }
         enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+
+        val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+        insetsController.isAppearanceLightStatusBars = !oscuro
+        insetsController.isAppearanceLightNavigationBars = !oscuro
         setContent {
-            ContrabajoTheme {
+            val controladorPreferencias = remember { ControladorPreferenciasUi(this@SplashActivity) }
+            ContrabajoTheme(controlador = controladorPreferencias) {
                 PantallaSplash(
                     onFinalizar = {
                         startActivity(

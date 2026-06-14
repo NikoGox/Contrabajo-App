@@ -23,6 +23,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.movil.contrabajo.ui.theme.LocalColoresContrabajo
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -109,6 +110,10 @@ fun PantallaReportesModerador(
     }
 
     PantallaBase(modifier = modifier, mostrarFondo = false) {
+        val glowAzul = LocalColoresContrabajo.current.info
+        val glowCyan = MaterialTheme.colorScheme.secondary
+        val glowVerde = LocalColoresContrabajo.current.exito
+        val colorCampoActivo = MaterialTheme.colorScheme.surface
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -122,10 +127,10 @@ fun PantallaReportesModerador(
                     drawRoundRect(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0xFF1E88E5).copy(alpha = alphaBase),
-                                Color(0xFF00BCD4).copy(alpha = (alphaBase * 1.05f).coerceAtMost(0.17f)),
-                                Color(0xFF17A673).copy(alpha = alphaBase),
-                                Color(0xFF1E88E5).copy(alpha = alphaBase)
+                                glowAzul.copy(alpha = alphaBase),
+                                glowCyan.copy(alpha = (alphaBase * 1.05f).coerceAtMost(0.17f)),
+                                glowVerde.copy(alpha = alphaBase),
+                                glowAzul.copy(alpha = alphaBase)
                             ),
                             start = Offset(fase - (size.width * 2f), 0f),
                             end = Offset(fase, size.height)
@@ -139,10 +144,10 @@ fun PantallaReportesModerador(
                     drawRoundRect(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0xFF1E88E5).copy(alpha = 0.8f),
-                                Color(0xFF00BCD4).copy(alpha = 0.88f),
-                                Color(0xFF17A673).copy(alpha = 0.8f),
-                                Color(0xFF1E88E5).copy(alpha = 0.8f)
+                                glowAzul.copy(alpha = 0.8f),
+                                glowCyan.copy(alpha = 0.88f),
+                                glowVerde.copy(alpha = 0.8f),
+                                glowAzul.copy(alpha = 0.8f)
                             ),
                             start = Offset(size.width - fase, 0f),
                             end = Offset(-fase, size.height)
@@ -151,7 +156,7 @@ fun PantallaReportesModerador(
                         style = Stroke(width = 2.4.dp.toPx())
                     )
                 },
-            color = lerp(MaterialTheme.colorScheme.primary, Color.White, progresoBuscador),
+            color = lerp(MaterialTheme.colorScheme.primary, colorCampoActivo, progresoBuscador),
             shape = RoundedCornerShape(18.dp),
             shadowElevation = (8f + (8f * progresoBuscador)).dp
         ) {
@@ -197,16 +202,16 @@ fun PantallaReportesModerador(
                         },
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color(0xFF0F2124),
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold
                     ),
-                    cursorBrush = SolidColor(Color(0xFF0F2124)),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
                     decorationBox = { innerTextField ->
                         if (uiState.busqueda.isBlank()) {
                             Text(
                                 text = "Buscar reportes",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                color = Color(0xFF60737A)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         innerTextField()
@@ -220,7 +225,7 @@ fun PantallaReportesModerador(
                         imageVector = Icons.Outlined.Search,
                         contentDescription = "Buscar",
                         tint = if (progresoBuscador > 0.02f) {
-                            Color(0xFF0F2124)
+                            MaterialTheme.colorScheme.onSurface
                         } else {
                             MaterialTheme.colorScheme.onPrimary
                         }

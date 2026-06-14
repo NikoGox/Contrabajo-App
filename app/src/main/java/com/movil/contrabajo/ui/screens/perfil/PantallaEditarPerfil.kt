@@ -22,6 +22,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import android.widget.Toast
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -63,11 +64,20 @@ fun PantallaEditarPerfil(
         viewModel.recargar()
     }
 
+    LaunchedEffect(uiState.mensajePerfilEdicion) {
+        if (uiState.mensajePerfilEdicion != null) {
+            Toast.makeText(context, uiState.mensajePerfilEdicion, Toast.LENGTH_SHORT).show()
+            viewModel.limpiarMensajesPerfilEdicion()
+            onVolver()
+        }
+    }
+
     PantallaBase(modifier = modifier, mostrarFondo = false) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.86f)
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.86f),
+            contentColor = MaterialTheme.colorScheme.onSurface
         ) {
             Box(modifier = Modifier.fillMaxWidth()) {
                 IconButton(
@@ -211,13 +221,6 @@ fun PantallaEditarPerfil(
                             text = it,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    uiState.mensajePerfilEdicion?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
                         )
                     }
 

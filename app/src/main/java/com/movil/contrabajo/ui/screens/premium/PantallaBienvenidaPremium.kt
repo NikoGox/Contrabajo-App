@@ -35,6 +35,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.movil.contrabajo.ui.theme.LocalColoresContrabajo
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,7 +72,7 @@ private data class VentajaPremium(val icono: ImageVector, val titulo: String, va
 
 private val ventajasPremium = listOf(
     VentajaPremium(Icons.Filled.Inventory2, "Más capacidad", "Publica hasta 5 servicios y mantén 3 activos al mismo tiempo."),
-    VentajaPremium(Icons.Filled.AutoGraph, "Dashboard real", "Revisa contactos, cierres, días fuertes y métricas útiles de tu actividad."),
+    VentajaPremium(Icons.Filled.AutoGraph, "Dashboard estadístico", "Revisa contactos, cierres, días fuertes y métricas útiles de tu actividad."),
     VentajaPremium(Icons.Filled.Star, "Perfil destacado", "Tu perfil se muestra como Trabajador Premium con una distinción visible."),
     VentajaPremium(Icons.AutoMirrored.Filled.TrendingUp, "Mejor seguimiento", "Toma decisiones rápidas con estadísticas simples y accionables.")
 )
@@ -182,7 +183,7 @@ fun PantallaBienvenidaPremium(
                         Text(
                             text = "Contrabajo Premium",
                             style = MaterialTheme.typography.headlineSmall,
-                            color = Color(0xFF114E61),
+                            color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.ExtraBold,
                             textAlign = TextAlign.Center
                         )
@@ -197,7 +198,7 @@ fun PantallaBienvenidaPremium(
                         Spacer(Modifier.height(12.dp))
                         Surface(
                             shape = RoundedCornerShape(18.dp),
-                            color = Color(0xFF0E8894).copy(alpha = 0.10f)
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
                         ) {
                             Column(
                                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
@@ -206,7 +207,7 @@ fun PantallaBienvenidaPremium(
                                 Text(
                                     text = "\$1.990 CLP",
                                     style = MaterialTheme.typography.headlineSmall,
-                                    color = Color(0xFF0D5B66),
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.ExtraBold
                                 )
                                 Spacer(Modifier.height(2.dp))
@@ -230,7 +231,7 @@ fun PantallaBienvenidaPremium(
                         text = "Lo que obtienes",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF114E61)
+                        color = MaterialTheme.colorScheme.primary
                     )
                     ventajasPremium.forEachIndexed { index, ventaja ->
                         AnimatedVisibility(
@@ -247,7 +248,7 @@ fun PantallaBienvenidaPremium(
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(14.dp),
-                                    color = Color(0xFF0E8894).copy(alpha = 0.12f)
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                                 ) {
                                     Box(
                                         modifier = Modifier.size(42.dp),
@@ -256,7 +257,7 @@ fun PantallaBienvenidaPremium(
                                         Icon(
                                             imageVector = ventaja.icono,
                                             contentDescription = null,
-                                            tint = Color(0xFF0E8894)
+                                            tint = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                 }
@@ -345,7 +346,7 @@ private fun BloqueActivacionPremium(
             .clip(RoundedCornerShape(20.dp))
             .background(
                 brush = Brush.horizontalGradient(
-                    listOf(Color(0xFF0D5B66), Color(0xFF118A7E))
+                    listOf(LocalColoresContrabajo.current.premiumInicio, LocalColoresContrabajo.current.premiumFin)
                 )
             )
             .bordeBrilloPremium(cornerRadius = 20.dp, anchoTrazo = 2.6.dp)
@@ -426,7 +427,7 @@ fun PantallaPremiumActivado(
                         Text(
                             text = "Pago procesado correctamente",
                             style = MaterialTheme.typography.titleMedium,
-                            color = Color(0xFF0D5B66),
+                            color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )
@@ -434,7 +435,7 @@ fun PantallaPremiumActivado(
                         Icon(
                             imageVector = Icons.Filled.CheckCircle,
                             contentDescription = null,
-                            tint = Color(0xFF17A673),
+                            tint = LocalColoresContrabajo.current.exito,
                             modifier = Modifier.size(78.dp)
                         )
                         Spacer(Modifier.height(10.dp))
@@ -472,7 +473,7 @@ private fun BloquePremiumActivo(onIrAMenu: () -> Unit) {
             Icon(
                 imageVector = Icons.Filled.CheckCircle,
                 contentDescription = null,
-                tint = Color(0xFF17A673),
+                tint = LocalColoresContrabajo.current.exito,
                 modifier = Modifier.size(58.dp)
             )
             Spacer(Modifier.height(12.dp))
@@ -506,7 +507,7 @@ private fun BotonIniciarSesionPremium(onIniciarSesion: () -> Unit) {
             .clip(RoundedCornerShape(20.dp))
             .background(
                 brush = Brush.horizontalGradient(
-                    listOf(Color(0xFF0D5B66), Color(0xFF118A8F))
+                    listOf(LocalColoresContrabajo.current.premiumInicio, LocalColoresContrabajo.current.premiumFin)
                 )
             )
             .clickable { onIniciarSesion() },
@@ -530,7 +531,7 @@ private fun BotonIrAMenuPremium(onIrAMenu: () -> Unit) {
             .clip(RoundedCornerShape(20.dp))
             .background(
                 brush = Brush.horizontalGradient(
-                    listOf(Color(0xFF0D5B66), Color(0xFF118A8F))
+                    listOf(LocalColoresContrabajo.current.premiumInicio, LocalColoresContrabajo.current.premiumFin)
                 )
             )
             .clickable { onIrAMenu() },

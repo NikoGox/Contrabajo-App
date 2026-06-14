@@ -82,7 +82,9 @@ data class ChatCita(
     val estadoCita: Int? = null,
     val chatCerrado: Boolean = false,
     val servicioEliminado: Boolean = false,
-    val bloqueadoHastaMs: Long? = null
+    val bloqueadoHastaMs: Long? = null,
+    val idEmisorUltimoMensaje: Long? = null,
+    val ultimoMensajeLeido: Boolean = false
 )
 
 data class MensajeChat(

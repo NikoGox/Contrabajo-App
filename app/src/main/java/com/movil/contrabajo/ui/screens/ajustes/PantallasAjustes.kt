@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
@@ -30,7 +32,10 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.ContactPhone
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -41,7 +46,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import com.movil.contrabajo.ui.theme.LocalColoresContrabajo
 import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
@@ -50,6 +57,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -70,6 +78,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.AnnotatedString
@@ -96,6 +105,7 @@ import com.movil.contrabajo.domain.model.TipoPerfil
 import com.movil.contrabajo.ui.components.BotonPrimario
 import com.movil.contrabajo.ui.components.CampoContrabajo
 import com.movil.contrabajo.ui.components.CampoSecretoContrabajo
+import com.movil.contrabajo.ui.components.ComboComunaContrabajo
 import com.movil.contrabajo.ui.components.EncabezadoPantalla
 import com.movil.contrabajo.ui.components.EtiquetaEstado
 import com.movil.contrabajo.ui.components.FilaEtiquetaValor
@@ -107,6 +117,7 @@ import com.movil.contrabajo.ui.viewmodel.PerfilViewModel
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
@@ -118,6 +129,7 @@ fun PantallaAjustes(
     onAbrirSeguridad: () -> Unit,
     onAbrirCuenta: () -> Unit,
     onAbrirUbicacion: () -> Unit,
+    onAbrirPreferencias: () -> Unit,
     onCerrarSesion: () -> Unit,
     esModerador: Boolean = false,
     onAbrirBaneos: () -> Unit = {},
@@ -147,10 +159,9 @@ fun PantallaAjustes(
                 onClick = onAbrirUbicacion
             )
             ItemAjuste(
-                titulo = "Preferencias",
-                subtitulo = "Disponible más adelante",
-                onClick = {},
-                habilitado = false
+                titulo = "Accesibilidad y apariencia",
+                subtitulo = "Modo oscuro, paletas para daltonismo y tamaño de letra",
+                onClick = onAbrirPreferencias
             )
         }
 
@@ -168,18 +179,38 @@ fun PantallaAjustes(
             }
         }
 
-        OutlinedButton(
-            onClick = onCerrarSesion,
-            modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(1.dp, Color(0xFFD32F2F)),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White)
-        ) {
-            Text(
-                text = "Cerrar sesión",
-                color = Color(0xFFD32F2F),
-                fontWeight = FontWeight.SemiBold
-            )
+        val esModoOscuro = MaterialTheme.colorScheme.background.luminance() < 0.5f
+        if (esModoOscuro) {
+            androidx.compose.material3.Button(
+                onClick = onCerrarSesion,
+                modifier = Modifier.fillMaxWidth(),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
+                Text(
+                    text = "Cerrar sesión",
+                    color = MaterialTheme.colorScheme.onError,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        } else {
+            OutlinedButton(
+                onClick = onCerrarSesion,
+                modifier = Modifier.fillMaxWidth(),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text(
+                    text = "Cerrar sesión",
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }
@@ -514,28 +545,14 @@ fun PantallaCuenta(
                     }
                 }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(IntrinsicSize.Max),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    TarjetaCuadradoCuenta(
-                        icono = Icons.Filled.Email,
-                        etiqueta = "Correo",
-                        valor = usuario.correo,
-                        modifier = Modifier.fillMaxWidth(0.58f).fillMaxHeight(),
-                        etiquetaAncho = 72.dp,
-                        maxLineasValor = 1
+                TarjetaHorizontalCuenta(
+                    icono = Icons.Filled.ContactPhone,
+                    titulo = "Contacto",
+                    filas = listOf(
+                        "Correo" to usuario.correo,
+                        "Telefono" to "+56 9 ${usuario.telefono}"
                     )
-                    TarjetaCuadradoCuenta(
-                        icono = Icons.Filled.Phone,
-                        etiqueta = "Teléfono",
-                        valor = usuario.telefono,
-                        prefijo = "+56 9 ",
-                        modifier = Modifier.fillMaxHeight().aspectRatio(1f)
-                    )
-                }
+                )
 
                 TarjetaHorizontalCuenta(
                     icono = Icons.Filled.Badge,
@@ -548,18 +565,38 @@ fun PantallaCuenta(
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
-                OutlinedButton(
-                    onClick = onCerrarSesion,
-                    modifier = Modifier.fillMaxWidth(),
-                    border = BorderStroke(1.dp, Color(0xFFD32F2F)),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White)
-                ) {
-                    Text(
-                        text = "Cerrar sesión",
-                        color = Color(0xFFD32F2F),
-                        fontWeight = FontWeight.SemiBold
-                    )
+                val esModoOscuro = MaterialTheme.colorScheme.background.luminance() < 0.5f
+                if (esModoOscuro) {
+                    androidx.compose.material3.Button(
+                        onClick = onCerrarSesion,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        )
+                    ) {
+                        Text(
+                            text = "Cerrar sesión",
+                            color = MaterialTheme.colorScheme.onError,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = onCerrarSesion,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Text(
+                            text = "Cerrar sesión",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
         }
@@ -675,17 +712,88 @@ fun PantallaUbicacion(
     PantallaBase(modifier = modifier, mostrarFondo = false, scrollable = false) {
         BarraSuperiorAjustes(titulo = "Ubicación", onVolver = onVolver, iconoDerecha = Icons.Filled.Tune)
 
-        TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
-            Text(
-                text = "Dirección",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = resumenUbicacion,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp)) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Filled.LocationOn,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Dirección",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Tu dirección de ubicación actual",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                    )
+
+                    if (ubicacion.calle.isNotBlank() || ubicacion.numero.isNotBlank()) {
+                        Text(
+                            text = listOf(ubicacion.calle, ubicacion.numero)
+                                .filter { it.isNotBlank() }
+                                .joinToString(" "),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    } else {
+                        Text(
+                            text = "Sin dirección registrada",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
+                    if (ubicacion.comuna.isNotBlank()) {
+                        Text(
+                            text = ubicacion.comuna,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        )
+                    }
+                    if (ubicacion.region.isNotBlank()) {
+                        Text(
+                            text = ubicacion.region,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             OutlinedButton(
                 onClick = {
                     comunaInput = ubicacion.comuna
@@ -693,17 +801,46 @@ fun PantallaUbicacion(
                     numeroInput = ubicacion.numero
                     mostrarModalDireccion = true
                 },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Editar ubicación") }
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Editar dirección")
+            }
         }
 
         if (esTrabajador) {
-            TarjetaBase {
-                Text(
-                    text = "Rango de disponibilidad: ${EscalaRango.formatear(ubicacion.rangoDisponibilidadM)}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
+            TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Rango de disponibilidad",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Surface(
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    ) {
+                        Text(
+                            text = EscalaRango.formatear(ubicacion.rangoDisponibilidadM),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
                 Slider(
                     value = posicionSliderDisponibilidad,
                     onValueChange = {
@@ -716,71 +853,85 @@ fun PantallaUbicacion(
             }
 
             TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(10.dp)) {
-                MapaUbicacionOpenStreetMap(
-                    latitud = ubicacion.latitud ?: -33.4489,
-                    longitud = ubicacion.longitud ?: -70.6693,
-                    rangoM = ubicacion.rangoDisponibilidadM,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(138.dp)
-                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    MapaUbicacionOpenStreetMap(
+                        latitud = ubicacion.latitud ?: -33.4489,
+                        longitud = ubicacion.longitud ?: -70.6693,
+                        rangoM = ubicacion.rangoDisponibilidadM,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(138.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                    )
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(6.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                        shadowElevation = 2.dp
+                    ) {
+                        Text(
+                            text = if (ubicacion.latitud == null || ubicacion.longitud == null) {
+                                "Sin coordenadas"
+                            } else {
+                                "${"%.5f".format(ubicacion.latitud)}, ${"%.5f".format(ubicacion.longitud)}"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            val tieneFine = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                            val tieneCoarse = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (tieneFine || tieneCoarse) {
+                                actualizarUbicacionReal()
+                            } else {
+                                solicitudPermisosLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(6.dp)
+                            .size(36.dp),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = "Actualizar coordenadas",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
         }
 
         TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
-            Row(
+            OutlinedButton(
+                onClick = viewModel::guardarUbicacionAjustes,
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        val tieneFine = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-                        val tieneCoarse = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-                        if (tieneFine || tieneCoarse) {
-                            actualizarUbicacionReal()
-                        } else {
-                            solicitudPermisosLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
-                            )
-                        }
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp)
-                ) { Text("Obtener ubicación") }
-                OutlinedButton(
-                    onClick = viewModel::guardarUbicacionAjustes,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(52.dp),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) { Text("Guardar") }
-            }
-            Text(
-                text = if (ubicacion.latitud == null || ubicacion.longitud == null) {
-                    "Coordenadas sin definir"
-                } else {
-                    "Coordenadas: ${"%.5f".format(ubicacion.latitud)}, ${"%.5f".format(ubicacion.longitud)}"
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
-            )
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) { Text("Guardar") }
         }
 
         if (uiState.errorUbicacion != null) {
@@ -799,7 +950,13 @@ fun PantallaUbicacion(
             containerColor = MaterialTheme.colorScheme.surface,
             dragHandle = { BottomSheetDefaults.DragHandle(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)) }
         ) {
-            ModalAjustesContenedor(
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 480.dp)
+                    .navigationBarsPadding()
+            ) {
+                ModalAjustesContenedor(
                 titulo = "Editar ubicación",
                 onCancelar = { mostrarModalDireccion = false },
                 onConfirmar = {
@@ -832,6 +989,7 @@ fun PantallaUbicacion(
                 CampoContrabajo(valor = calleInput, onValueChange = { calleInput = it }, etiqueta = "Calle")
                 CampoContrabajo(valor = numeroInput, onValueChange = { numeroInput = it }, etiqueta = "Número")
             }
+            }
         }
     }
 
@@ -848,7 +1006,6 @@ private fun ComboComunaRM(
     comunas: List<ComunaCatalogo>,
     onSeleccionar: (String) -> Unit
 ) {
-    var desplegado by rememberSaveable { mutableStateOf(false) }
     val comunasOrdenadas = remember(comunas) {
         comunas.sortedWith(
             compareBy<ComunaCatalogo> { if (it.nombre.equals("Sin comuna", ignoreCase = true)) 0 else 1 }
@@ -856,43 +1013,11 @@ private fun ComboComunaRM(
         ).map { it.nombre }
     }
 
-    ExposedDropdownMenuBox(
-        expanded = desplegado,
-        onExpandedChange = { desplegado = !desplegado }
-    ) {
-        OutlinedTextField(
-            value = comunaSeleccionada,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Comuna") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = desplegado) },
-            singleLine = true
-        )
-        DropdownMenu(
-            expanded = desplegado,
-            onDismissRequest = { desplegado = false }
-        ) {
-            if (comunasOrdenadas.isEmpty()) {
-                DropdownMenuItem(
-                    text = { Text("Sin comunas disponibles") },
-                    onClick = { desplegado = false }
-                )
-            } else {
-                comunasOrdenadas.forEach { comuna ->
-                    DropdownMenuItem(
-                        text = { Text(comuna) },
-                        onClick = {
-                            onSeleccionar(comuna)
-                            desplegado = false
-                        }
-                    )
-                }
-            }
-        }
-    }
+    ComboComunaContrabajo(
+        comunaSeleccionada = comunaSeleccionada,
+        comunas = comunasOrdenadas,
+        onSeleccionar = onSeleccionar
+    )
 }
 
 @Composable
@@ -907,6 +1032,8 @@ private fun MapaUbicacionOpenStreetMap(
     val rangoVisualM = maxOf(rangoNormalizadoM, 1000)
     val zoom = calcularZoomPorRangoM(rangoVisualM).toDouble()
     val radioMetros = rangoVisualM.toDouble()
+    val mapaRellenoArgb = LocalColoresContrabajo.current.mapaRelleno.toArgb()
+    val mapaBordeArgb = LocalColoresContrabajo.current.mapaBorde.toArgb()
 
     LaunchedEffect(Unit) {
         Configuration.getInstance().load(
@@ -920,9 +1047,12 @@ private fun MapaUbicacionOpenStreetMap(
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(false)
+            // Vista previa estatica: ocultar botones +/- y bloquear zoom/desplazamiento.
+            zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             controller.setZoom(zoom)
             controller.setCenter(GeoPoint(latitud, longitud))
-            setOnTouchListener { _, _ -> false }
+            // Consumir el touch para que el usuario no pueda mover ni hacer zoom al mapa.
+            setOnTouchListener { _, _ -> true }
         }
     }
 
@@ -948,8 +1078,8 @@ private fun MapaUbicacionOpenStreetMap(
 
             val circulo = Polygon(map).apply {
                 points = Polygon.pointsAsCircle(centro, radioMetros)
-                fillColor = Color(0x3319A1A8).toArgb()
-                strokeColor = Color(0xFF0E8C94).toArgb()
+                fillColor = mapaRellenoArgb
+                strokeColor = mapaBordeArgb
                 strokeWidth = 2f
             }
 

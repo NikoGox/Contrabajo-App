@@ -5,6 +5,12 @@ import android.widget.Toast
 import android.widget.ImageView
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -17,6 +23,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,6 +57,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.movil.contrabajo.ui.theme.LocalColoresContrabajo
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -73,6 +81,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
@@ -92,6 +101,7 @@ import coil.imageLoader
 import com.movil.contrabajo.R
 import com.movil.contrabajo.domain.model.EscalaRango
 import com.movil.contrabajo.domain.model.OfertaServicio
+import com.movil.contrabajo.ui.components.ComboContrabajo
 import com.movil.contrabajo.ui.screens.chats.AvatarUsuarioAsync
 import com.movil.contrabajo.ui.viewmodel.DetalleServicioViewModel
 import com.movil.contrabajo.ui.viewmodel.ReportesViewModel
@@ -139,7 +149,6 @@ fun PantallaDetalleServicio(
     var mostrarConfirmacionChat by rememberSaveable { mutableStateOf(false) }
     var ofertaPendienteChatId by rememberSaveable { mutableStateOf<Long?>(null) }
     var mostrarModalReporte by rememberSaveable { mutableStateOf(false) }
-    var menuTipoReporteAbierto by remember { mutableStateOf(false) }
     var menuOpcionesAbierto by rememberSaveable { mutableStateOf(false) }
     var idTipoReporteSeleccionado by rememberSaveable { mutableStateOf<Long?>(null) }
     var comentarioReporte by rememberSaveable { mutableStateOf("") }
@@ -333,14 +342,16 @@ fun PantallaDetalleServicio(
                 )
 
                 val oferta = uiState.ofertaActual
-                if (oferta == null) {
-                    Text(
-                        text = "No se pudo cargar la oferta.",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                } else {
-                    Box(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
+                    if (uiState.cargando && oferta == null) {
+                        SkeletonDetalleServicio()
+                    } else if (oferta == null) {
+                        Text(
+                            text = "No se pudo cargar la oferta.",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    } else {
                         HorizontalPager(
                             state = pagerState,
                             modifier = Modifier
@@ -630,35 +641,14 @@ fun PantallaDetalleServicio(
                 title = { Text("Reportar servicio") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Box {
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { menuTipoReporteAbierto = true },
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                            ) {
-                                Text(
-                                    text = tipoSeleccionado?.nombre ?: "Selecciona un tipo de reporte",
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = menuTipoReporteAbierto,
-                                onDismissRequest = { menuTipoReporteAbierto = false }
-                            ) {
-                                tiposReporte.forEach { tipo ->
-                                    DropdownMenuItem(
-                                        text = { Text(tipo.nombre) },
-                                        onClick = {
-                                            idTipoReporteSeleccionado = tipo.idTipoReporte
-                                            menuTipoReporteAbierto = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
+                        ComboContrabajo(
+                            valorSeleccionado = tipoSeleccionado?.nombre ?: "Selecciona un tipo de reporte",
+                            opciones = tiposReporte.map { it.nombre },
+                            onSeleccionar = { nombre ->
+                                idTipoReporteSeleccionado = tiposReporte.firstOrNull { it.nombre == nombre }?.idTipoReporte
+                            },
+                            etiqueta = "Tipo de reporte"
+                        )
                         OutlinedTextField(
                             value = comentarioReporte,
                             onValueChange = { comentarioReporte = it },
@@ -823,7 +813,7 @@ private fun TarjetaDetalleOferta(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxHeight(0.93f)
-            .padding(start = 2.dp, end = 2.dp, top = 4.dp, bottom = 2.dp),
+            .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 2.dp),
         shape = shapeTarjeta,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = elevacionVisualDp.dp)
@@ -1181,7 +1171,7 @@ private fun FilaValoracionDetalle(valor: Double) {
                 Icon(
                     imageVector = Icons.Rounded.Star,
                     contentDescription = null,
-                    tint = Color(0xFFB0B7BF),
+                    tint = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.matchParentSize()
                 )
                 if (fraccion > 0f) {
@@ -1194,7 +1184,7 @@ private fun FilaValoracionDetalle(valor: Double) {
                         Icon(
                             imageVector = Icons.Rounded.Star,
                             contentDescription = null,
-                            tint = Color(0xFFFFC93C),
+                            tint = LocalColoresContrabajo.current.premiumEstrella,
                             modifier = Modifier.matchParentSize()
                         )
                     }
@@ -1290,6 +1280,8 @@ private fun MapaRangoOpenStreetMap(
     val rangoVisualM = maxOf(rangoNormalizadoM, 1000)
     val zoom = calcularZoomPorRangoM(rangoVisualM).toDouble()
     val radioMetros = rangoVisualM.toDouble()
+    val mapaRellenoArgb = LocalColoresContrabajo.current.mapaRelleno.toArgb()
+    val mapaBordeArgb = LocalColoresContrabajo.current.mapaBorde.toArgb()
 
     LaunchedEffect(Unit) {
         Configuration.getInstance().load(
@@ -1336,8 +1328,8 @@ private fun MapaRangoOpenStreetMap(
 
             val circulo = Polygon(map).apply {
                 points = Polygon.pointsAsCircle(centro, radioMetros)
-                fillColor = Color(0x3319A1A8).toArgb()
-                strokeColor = Color(0xFF0E8C94).toArgb()
+                fillColor = mapaRellenoArgb
+                strokeColor = mapaBordeArgb
                 strokeWidth = 2f
             }
 
@@ -1463,4 +1455,124 @@ private fun formatearFechaPublicacion(fecha: String): String {
         return "$dia/$mes/$anio $hora"
     }
     return fecha
+}
+
+@Composable
+private fun SkeletonDetalleServicio() {
+    val transicion = rememberInfiniteTransition(label = "skeletonDetalle")
+    val x by transicion.animateFloat(
+        initialValue = -350f,
+        targetValue = 1100f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1_300, easing = LinearEasing)
+        ),
+        label = "shimmerX"
+    )
+    val base = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+    val brillo = MaterialTheme.colorScheme.surface
+    val shimmerBrush = Brush.linearGradient(
+        colors = listOf(base, brillo, base),
+        start = Offset(x, 0f),
+        end = Offset(x + 350f, 350f)
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.93f)
+            .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 2.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(282.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(shimmerBrush)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .height(28.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(shimmerBrush)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 80.dp, height = 16.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(shimmerBrush)
+                )
+                Box(
+                    modifier = Modifier
+                        .size(width = 100.dp, height = 16.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(shimmerBrush)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.4f)
+                    .height(20.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(shimmerBrush)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.5f)
+                    .height(14.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(shimmerBrush)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.35f)
+                    .height(14.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(shimmerBrush)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.25f)
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(shimmerBrush)
+            )
+            repeat(3) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(shimmerBrush)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.2f)
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(shimmerBrush)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(132.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(shimmerBrush)
+            )
+        }
+    }
 }

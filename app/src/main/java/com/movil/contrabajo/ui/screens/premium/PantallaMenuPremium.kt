@@ -3,6 +3,7 @@ package com.movil.contrabajo.ui.screens.premium
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -10,6 +11,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,36 +25,51 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.AutoGraph
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.QueryStats
+import androidx.compose.material.icons.filled.Redeem
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.movil.contrabajo.ui.theme.LocalColoresContrabajo
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -71,7 +88,7 @@ import kotlin.math.max
 fun PantallaMenuPremium(
     viewModel: PremiumViewModel,
     onAbrirHistorial: () -> Unit,
-    onAbrirLecturaRapida: () -> Unit,
+    onAbrirEstadisticas: () -> Unit,
     onVolver: () -> Unit
 ) {
     val uiState = viewModel.uiState
@@ -85,73 +102,185 @@ fun PantallaMenuPremium(
     PantallaBase(scrollable = true, mostrarFondo = true, respetarNavegacionInferior = false) {
         Spacer(Modifier.height(0.dp))
 
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            color = Color(0xFF0D5662),
-            shadowElevation = 8.dp
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(Color(0xFF0D5662), Color(0xFF11807B))
-                        )
-                    )
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onVolver) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Volver",
-                        tint = Color.White
-                    )
-                }
-                Text(
-                    text = "Menú Premium",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.size(40.dp))
-            }
-        }
+        TopbarPremiumAnimada(onVolver = onVolver)
 
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(4.dp))
+
+        BannerPremium()
+
+        Spacer(Modifier.height(4.dp))
 
         if (uiState.cargandoStats) {
             SkeletonMenuPremium()
         } else {
-            ResumenPremium(s = s)
-            Spacer(Modifier.height(2.dp))
             AccesosPremium(
                 onAbrirHistorial = onAbrirHistorial,
-                onAbrirLecturaRapida = onAbrirLecturaRapida
+                onAbrirEstadisticas = onAbrirEstadisticas
             )
-            Spacer(Modifier.height(2.dp))
-            DashboardSemanalDesplegable(
-                titulo = "Contactos por día",
-                subtitulo = "Días con más conversaciones iniciadas",
-                icono = Icons.Filled.ChatBubbleOutline,
-                color = Color(0xFF1F8BFF),
-                serie = s.contactosPorDia,
-                pie = "Mejor día: ${s.mejorDiaContactos}"
-            )
-            DashboardSemanalDesplegable(
-                titulo = "Días más rentables",
-                subtitulo = "Cierres finalizados por día de la semana",
-                icono = Icons.Filled.AttachMoney,
-                color = Color(0xFF0E8894),
-                serie = s.ingresosPorDia,
-                pie = "Mejor día: ${s.mejorDiaIngresos}"
-            )
+            Spacer(Modifier.height(8.dp))
+            FuncionesProximamente()
         }
 
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+/**
+ * Topbar Premium con gradiente animado celeste→azul oscuro y bordes redondeados.
+ */
+@Composable
+private fun TopbarPremiumAnimada(onVolver: () -> Unit) {
+    val colores = LocalColoresContrabajo.current
+    val brushGradiente = Brush.horizontalGradient(
+        colors = listOf(
+            colores.premiumInicio,
+            colores.premiumMedio,
+            colores.premiumFin
+        )
+    )
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = Color.Transparent,
+        shadowElevation = 6.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .background(brush = brushGradiente, shape = RoundedCornerShape(20.dp))
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onVolver) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Volver",
+                    tint = Color.White
+                )
+            }
+            Text(
+                text = "Menú Premium",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.size(48.dp))
+        }
+    }
+}
+
+@Composable
+private fun BannerPremium() {
+    val colores = LocalColoresContrabajo.current
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = colores.premiumBrillo
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            EstrellaPremiumAnimada(tamano = 42.dp)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Premium",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = colores.premiumInicio
+                )
+                Text(
+                    text = "Funcionalidades extendidas para el trabajador",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colores.premiumInicio
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Funciones futuras del menú Premium. Se muestran en gris/opaco para comunicar
+ * que no están disponibles aún, sin ser botones pulsables.
+ */
+@Composable
+private fun FuncionesProximamente() {
+    val colores = LocalColoresContrabajo.current
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = "Próximamente",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+        )
+        FuncionFutura(
+            titulo = "Funcionalidades IA",
+            subtitulo = "Funciones especializadas potenciadas con Inteligencia Artificial",
+            icono = Icons.Filled.SmartToy
+        )
+        FuncionFutura(
+            titulo = "Campañas de publicidad",
+            subtitulo = "Impulsa tus servicios para llegar a más clientes",
+            icono = Icons.Filled.Campaign
+        )
+        FuncionFutura(
+            titulo = "Puntos y canjes",
+            subtitulo = "Acumula puntos por tu actividad y canjéalos",
+            icono = Icons.Filled.Redeem
+        )
+    }
+}
+
+@Composable
+private fun FuncionFutura(
+    titulo: String,
+    subtitulo: String,
+    icono: ImageVector
+) {
+    val greyed = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+    val greyedBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    val greyedIcon = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = greyedBg
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(shape = RoundedCornerShape(10.dp), color = greyedIcon.copy(alpha = 0.15f)) {
+                Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                    Icon(icono, contentDescription = null, tint = greyedIcon, modifier = Modifier.size(20.dp))
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = titulo,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = greyed
+                )
+                Text(
+                    text = subtitulo,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = greyed.copy(alpha = 0.8f)
+                )
+            }
+        }
     }
 }
 
@@ -174,7 +303,9 @@ fun PantallaHistorialContactosPremium(
             mostrarEstrella = false
         )
         Spacer(Modifier.height(4.dp))
-        if (uiState.historialContactos.isEmpty()) {
+        if (uiState.cargandoHistorial) {
+            SkeletonHistorialContactos()
+        } else if (uiState.historialContactos.isEmpty()) {
             TarjetaBase {
                 Text(
                     text = "Aún no hay contactos cerrados o registrados para mostrar.",
@@ -192,7 +323,7 @@ fun PantallaHistorialContactosPremium(
 }
 
 @Composable
-fun PantallaLecturaRapidaPremium(
+fun PantallaEstadisticasPremium(
     viewModel: PremiumViewModel,
     onVolver: () -> Unit
 ) {
@@ -206,13 +337,163 @@ fun PantallaLecturaRapidaPremium(
     PantallaBase(scrollable = true, mostrarFondo = true, respetarNavegacionInferior = false) {
         Spacer(Modifier.height(0.dp))
         EncabezadoSecundarioPremium(
-            titulo = "Lectura rápida",
+            titulo = "Estadísticas",
             onVolver = onVolver
         )
         Spacer(Modifier.height(4.dp))
-        TarjetaMiniMetricas(s = s)
-        TarjetaOperativa(s = s)
+        if (uiState.cargandoStats) {
+            SkeletonMenuPremium()
+        } else {
+            CarruselGraficosPremium(s = s)
+            TarjetaMiniMetricas(s = s)
+            TarjetaOperativa(s = s)
+        }
         Spacer(Modifier.height(10.dp))
+    }
+}
+
+private data class GraficoPremium(
+    val titulo: String,
+    val subtitulo: String,
+    val icono: ImageVector,
+    val color: Color,
+    val serie: List<PremiumSerieDia>,
+    val pie: String
+)
+
+/**
+ * Visor de gráficos con navegación por flechas (◀ ▶). Reúne los gráficos de la
+ * actividad del trabajador: contactos y cierres por día, embudo de conversión,
+ * resultados de citas y distribución de valoraciones.
+ */
+@Composable
+private fun CarruselGraficosPremium(s: PremiumStats) {
+    val info = LocalColoresContrabajo.current.info
+    val advertencia = LocalColoresContrabajo.current.advertencia
+    val primary = MaterialTheme.colorScheme.primary
+    val secondary = MaterialTheme.colorScheme.secondary
+    val tertiary = MaterialTheme.colorScheme.tertiary
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+
+    val graficos = remember(s) {
+        listOf(
+            GraficoPremium(
+                titulo = "Contactos por día",
+                subtitulo = "Conversaciones iniciadas por día de la semana",
+                icono = Icons.Filled.ChatBubbleOutline,
+                color = info,
+                serie = s.contactosPorDia,
+                pie = "Mejor día: ${s.mejorDiaContactos}"
+            ),
+            GraficoPremium(
+                titulo = "Cierres por día",
+                subtitulo = "Trabajos finalizados por día de la semana",
+                icono = Icons.Filled.AttachMoney,
+                color = primary,
+                serie = s.ingresosPorDia,
+                pie = "Mejor día: ${s.mejorDiaIngresos}"
+            ),
+            GraficoPremium(
+                titulo = "Embudo de conversión",
+                subtitulo = "De contacto a trabajo cerrado",
+                icono = Icons.Filled.FilterAlt,
+                color = secondary,
+                serie = listOf(
+                    PremiumSerieDia("Chats", s.chatsTotales),
+                    PremiumSerieDia("Citas", s.citasTotales),
+                    PremiumSerieDia("Finalizadas", s.citasFinalizadas, destacado = true)
+                ),
+                pie = "Conversión chat → cita: ${s.tasaConversionCita}%"
+            ),
+            GraficoPremium(
+                titulo = "Resultados de citas",
+                subtitulo = "Cómo terminan tus citas",
+                icono = Icons.Filled.CalendarMonth,
+                color = tertiary,
+                serie = listOf(
+                    PremiumSerieDia("Finalizadas", s.citasFinalizadas, destacado = true),
+                    PremiumSerieDia("En proceso", s.citasEnProceso),
+                    PremiumSerieDia("Canceladas", s.citasCanceladas),
+                    PremiumSerieDia("Rechazadas", s.citasRechazadas)
+                ),
+                pie = "Total de citas: ${s.citasTotales}"
+            ),
+            GraficoPremium(
+                titulo = "Valoraciones",
+                subtitulo = "Distribución de tus estrellas",
+                icono = Icons.Filled.Star,
+                color = advertencia,
+                serie = s.distribucionValoraciones
+                    .mapIndexed { i, c -> PremiumSerieDia("${i + 1}★", c, destacado = i == 4) }
+                    .reversed(),
+                pie = if (s.valoracionesTotales == 0) "Aún sin valoraciones"
+                else "Promedio: ${"%.1f".format(s.promedioValoracion)} · ${s.valoracionesTotales} reseñas"
+            )
+        )
+    }
+
+    var indice by rememberSaveable { mutableStateOf(0) }
+    val pos = indice.coerceIn(0, graficos.lastIndex)
+    val actual = graficos[pos]
+
+    val entradaAnimada by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = tween(400),
+        label = "chartEntrada"
+    )
+
+    TarjetaBase(modifier = Modifier.padding(bottom = 4.dp), contentPadding = PaddingValues(18.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(shape = RoundedCornerShape(12.dp), color = actual.color.copy(alpha = 0.14f)) {
+                Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                    Icon(actual.icono, contentDescription = null, tint = actual.color)
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(actual.titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(actual.subtitulo, style = MaterialTheme.typography.bodySmall, color = onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Box(modifier = Modifier.graphicsLayer { alpha = entradaAnimada; scaleX = entradaAnimada; scaleY = entradaAnimada }) {
+            when (pos) {
+                4 -> GraficoDonut(s = s, color = actual.color)
+                2 -> GraficoEmbudo(s = s, color = actual.color)
+                else -> SerieBarras(serie = actual.serie, color = actual.color)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(actual.pie, style = MaterialTheme.typography.bodySmall, color = onSurfaceVariant, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = {
+                indice = (pos - 1 + graficos.size) % graficos.size
+            }) {
+                Icon(Icons.Filled.ChevronLeft, contentDescription = "Gráfico anterior", tint = primary)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                graficos.indices.forEach { i ->
+                    Box(
+                        modifier = Modifier
+                            .size(if (i == pos) 9.dp else 7.dp)
+                            .clip(CircleShape)
+                            .background(if (i == pos) actual.color else onSurfaceVariant.copy(alpha = 0.3f))
+                    )
+                }
+            }
+            IconButton(onClick = {
+                indice = (pos + 1) % graficos.size
+            }) {
+                Icon(Icons.Filled.ChevronRight, contentDescription = "Gráfico siguiente", tint = primary)
+            }
+        }
     }
 }
 
@@ -222,21 +503,29 @@ private fun EncabezadoSecundarioPremium(
     onVolver: () -> Unit,
     mostrarEstrella: Boolean = true
 ) {
+    val colores = LocalColoresContrabajo.current
+    val brushGradiente = Brush.horizontalGradient(
+        colors = listOf(
+            colores.premiumInicio,
+            colores.premiumMedio,
+            colores.premiumFin
+        )
+    )
+
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = Color(0xFF0D5662),
-        shadowElevation = 8.dp
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(20.dp),
+        color = Color.Transparent,
+        shadowElevation = 6.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(Color(0xFF0D5662), Color(0xFF11807B))
-                    )
-                )
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .height(56.dp)
+                .background(brush = brushGradiente, shape = RoundedCornerShape(20.dp))
+                .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onVolver) {
@@ -248,7 +537,7 @@ private fun EncabezadoSecundarioPremium(
             }
             Text(
                 text = titulo,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White,
                 modifier = Modifier.weight(1f),
@@ -256,11 +545,11 @@ private fun EncabezadoSecundarioPremium(
             )
             if (mostrarEstrella) {
                 EstrellaPremiumAnimada(
-                    tamano = 24.dp,
-                    modifier = Modifier.padding(end = 8.dp)
+                    tamano = 22.dp,
+                    modifier = Modifier.padding(end = 12.dp)
                 )
             } else {
-                Spacer(Modifier.size(40.dp))
+                Spacer(Modifier.size(46.dp))
             }
         }
     }
@@ -278,7 +567,7 @@ private fun ResumenPremium(s: PremiumStats) {
             valor = "${s.serviciosActivos}/3",
             detalle = "${s.serviciosTotales}/5 publicados",
             icono = Icons.Filled.Inventory2,
-            color = Color(0xFF0E8894)
+            color = MaterialTheme.colorScheme.primary
         )
         TarjetaResumen(
             modifier = Modifier.weight(1f),
@@ -286,7 +575,7 @@ private fun ResumenPremium(s: PremiumStats) {
             valor = if (s.valoracionesTotales == 0) "—" else String.format("%.1f", s.promedioValoracion),
             detalle = "${s.valoracionesTotales} reseñas",
             icono = Icons.Filled.Star,
-            color = Color(0xFFF5A623)
+            color = LocalColoresContrabajo.current.advertencia
         )
     }
 }
@@ -294,68 +583,85 @@ private fun ResumenPremium(s: PremiumStats) {
 @Composable
 private fun AccesosPremium(
     onAbrirHistorial: () -> Unit,
-    onAbrirLecturaRapida: () -> Unit
+    onAbrirEstadisticas: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         BotonAccesoPremium(
-            modifier = Modifier.weight(1f),
-            titulo = "Historial",
-            subtitulo = "Mis contactos",
+            titulo = "Historial de contactos",
+            subtitulo = "Revisa tus interacciones anteriores",
             icono = Icons.Filled.ChatBubbleOutline,
-            color = Color(0xFF0E8894),
             onClick = onAbrirHistorial
         )
         BotonAccesoPremium(
-            modifier = Modifier.weight(1f),
-            titulo = "Lectura rápida",
-            subtitulo = "Estado operativo",
-            icono = Icons.Filled.AutoGraph,
-            color = Color(0xFF0D5B66),
-            onClick = onAbrirLecturaRapida
+            titulo = "Estadísticas",
+            subtitulo = "Gráficos, métricas y rendimiento",
+            icono = Icons.Filled.QueryStats,
+            onClick = onAbrirEstadisticas
         )
     }
 }
 
 @Composable
 private fun BotonAccesoPremium(
-    modifier: Modifier = Modifier,
     titulo: String,
     subtitulo: String,
     icono: ImageVector,
-    color: Color,
     onClick: () -> Unit
 ) {
-    TarjetaBase(
-        modifier = modifier
-            .clickable { onClick() }
-            .background(
-                color = color.copy(alpha = 0.06f),
-                shape = RoundedCornerShape(18.dp)
-            ),
-        contentPadding = PaddingValues(16.dp)
+    val colores = LocalColoresContrabajo.current
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 4.dp
     ) {
         Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            colores.premiumInicio.copy(alpha = 0.06f),
+                            colores.premiumFin.copy(alpha = 0.02f)
+                        )
+                    )
+                )
+                .padding(horizontal = 18.dp, vertical = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = color.copy(alpha = 0.14f)
+                shape = RoundedCornerShape(14.dp),
+                color = colores.premiumInicio.copy(alpha = 0.1f)
             ) {
                 Box(
-                    modifier = Modifier.size(38.dp),
+                    modifier = Modifier.size(48.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(icono, contentDescription = null, tint = color)
+                    Icon(icono, contentDescription = null, tint = colores.premiumInicio, modifier = Modifier.size(24.dp))
                 }
             }
-            Column {
-                Text(titulo, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Text(subtitulo, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    titulo,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = colores.premiumInicio
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    subtitulo,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = colores.premiumMedio,
+                modifier = Modifier.size(22.dp)
+            )
         }
     }
 }
@@ -544,6 +850,147 @@ private fun SerieBarras(
 }
 
 @Composable
+private fun GraficoDonut(s: PremiumStats, color: Color) {
+    val total = s.distribucionValoraciones.sum().coerceAtLeast(1)
+    val colores = listOf(
+        Color(0xFFE53935),
+        Color(0xFFFF9800),
+        Color(0xFFFFC107),
+        Color(0xFF8BC34A),
+        color
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier.size(160.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.size(160.dp)) {
+                val grosor = 24.dp.toPx()
+                val radio = (size.minDimension - grosor) / 2f
+                var anguloInicio = -90f
+                s.distribucionValoraciones.forEachIndexed { i, valor ->
+                    val barrido = (valor.toFloat() / total) * 360f
+                    if (valor > 0) {
+                        drawArc(
+                            color = colores[i],
+                            startAngle = anguloInicio,
+                            sweepAngle = barrido - 2f,
+                            useCenter = false,
+                            topLeft = Offset(grosor / 2f, grosor / 2f),
+                            size = Size(radio * 2, radio * 2),
+                            style = Stroke(width = grosor, cap = StrokeCap.Round)
+                        )
+                    }
+                    anguloInicio += barrido
+                }
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "${s.valoracionesTotales}",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = color
+                )
+                Text(
+                    text = "reseñas",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            s.distribucionValoraciones.forEachIndexed { i, valor ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(colores[i]))
+                    Text(
+                        "${i + 1}★",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "$valor",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GraficoEmbudo(s: PremiumStats, color: Color) {
+    val pasos = listOf(
+        Triple("Chats", s.chatsTotales, 1f),
+        Triple("Citas", s.citasTotales, 0.7f),
+        Triple("Finalizadas", s.citasFinalizadas, 0.4f)
+    )
+    val maximo = max(1, pasos.maxOf { it.second })
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        pasos.forEachIndexed { i, (etiqueta, cantidad, factorAncho) ->
+            val proporcion = (cantidad.toFloat() / maximo).coerceIn(0.15f, 1f)
+            val anchoAnimado by animateFloatAsState(
+                targetValue = proporcion * factorAncho,
+                animationSpec = tween(600, delayMillis = i * 200),
+                label = "funnel$i"
+            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth((0.4f + 0.6f * anchoAnimado)),
+                    shape = RoundedCornerShape(12.dp),
+                    color = color.copy(alpha = 0.15f + (0.2f * (i + 1) / pasos.size))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = etiqueta,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = color,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = cantidad.toString(),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                }
+                if (i < pasos.lastIndex) {
+                    Icon(
+                        imageVector = Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = color.copy(alpha = 0.4f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun TarjetaMiniMetricas(s: PremiumStats) {
     TarjetaBase(
         modifier = Modifier.padding(bottom = 4.dp),
@@ -554,12 +1001,10 @@ private fun TarjetaMiniMetricas(s: PremiumStats) {
                 text = "Lectura rápida",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF114E61)
+                color = MaterialTheme.colorScheme.primary
             )
             FilaMetrica("Contactos últimos 7 días", s.contactosUltimos7Dias.toString())
             FilaMetrica("Conversión a cita", "${s.tasaConversionCita}%")
-            FilaMetrica("Ingreso total cerrado", "$${s.ingresoTotalCerrado}")
-            FilaMetrica("Ticket promedio", if (s.ticketPromedio == 0) "—" else "$${s.ticketPromedio}")
         }
     }
 }
@@ -575,35 +1020,76 @@ private fun TarjetaOperativa(s: PremiumStats) {
                 text = "Estado operativo",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF114E61)
+                color = MaterialTheme.colorScheme.primary
             )
-            FilaMetricaConIcono(Icons.Filled.ChatBubbleOutline, "Chats activos", s.chatsActivos.toString(), Color(0xFF1F8BFF))
-            FilaMetricaConIcono(Icons.Filled.CalendarMonth, "Citas finalizadas", s.citasFinalizadas.toString(), Color(0xFF8E24AA))
-            FilaMetricaConIcono(Icons.Filled.AutoGraph, "Mensajes no leídos", s.mensajesNoLeidos.toString(), Color(0xFF0E8894))
+            FilaMetricaConIcono(Icons.Filled.ChatBubbleOutline, "Chats activos", s.chatsActivos.toString(), LocalColoresContrabajo.current.info)
+            FilaMetricaConIcono(Icons.Filled.CalendarMonth, "Citas finalizadas", s.citasFinalizadas.toString(), MaterialTheme.colorScheme.tertiary)
+            FilaMetricaConIcono(Icons.Filled.AutoGraph, "Mensajes no leídos", s.mensajesNoLeidos.toString(), MaterialTheme.colorScheme.primary)
         }
     }
 }
 
 @Composable
 private fun TarjetaHistorialContacto(item: PremiumHistorialContacto) {
+    val colores = LocalColoresContrabajo.current
     TarjetaBase(
         modifier = Modifier.padding(bottom = 6.dp),
         contentPadding = PaddingValues(18.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = item.nombreContacto,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold
-            )
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.nombreContacto,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = colores.premiumInicio.copy(alpha = 0.1f)
+                ) {
+                    Text(
+                        text = item.resultado,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colores.premiumInicio,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
             Text(
                 text = item.tituloServicio,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            FilaMetrica("Terminó", item.fechaTermino)
-            FilaMetrica("Resultado", item.resultado)
-            FilaMetrica("Valoración", item.estrellas?.let { "$it estrellas" } ?: "—")
+            if (item.estrellas != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    repeat(5) { i ->
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = null,
+                            tint = if (i < item.estrellas!!) colores.premiumEstrella else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+            if (!item.comentarioValoracion.isNullOrBlank()) {
+                Text(
+                    text = "\"${item.comentarioValoracion}\"",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontStyle = FontStyle.Italic
+                )
+            }
+            FilaMetrica("Fecha", item.fechaTermino)
         }
     }
 }
@@ -697,30 +1183,26 @@ private fun CajaSkeleton(modifier: Modifier = Modifier, alto: Dp, brush: Brush) 
 }
 
 @Composable
+private fun SkeletonHistorialContactos() {
+    val brush = rememberShimmerBrushPremium()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        repeat(4) {
+            CajaSkeleton(Modifier.fillMaxWidth(), alto = 96.dp, brush = brush)
+        }
+    }
+}
+
+@Composable
 private fun SkeletonMenuPremium() {
     val brush = rememberShimmerBrushPremium()
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Dos tarjetas de resumen
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            CajaSkeleton(Modifier.weight(1f), alto = 124.dp, brush = brush)
-            CajaSkeleton(Modifier.weight(1f), alto = 124.dp, brush = brush)
-        }
-        // Dos accesos rápidos
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            CajaSkeleton(Modifier.weight(1f), alto = 80.dp, brush = brush)
-            CajaSkeleton(Modifier.weight(1f), alto = 80.dp, brush = brush)
-        }
-        // Dos dashboards
-        CajaSkeleton(Modifier.fillMaxWidth(), alto = 92.dp, brush = brush)
-        CajaSkeleton(Modifier.fillMaxWidth(), alto = 92.dp, brush = brush)
+        CajaSkeleton(Modifier.fillMaxWidth(), alto = 96.dp, brush = brush)
+        CajaSkeleton(Modifier.fillMaxWidth(), alto = 96.dp, brush = brush)
+        CajaSkeleton(Modifier.fillMaxWidth(), alto = 80.dp, brush = brush)
+        CajaSkeleton(Modifier.fillMaxWidth(), alto = 80.dp, brush = brush)
+        CajaSkeleton(Modifier.fillMaxWidth(), alto = 80.dp, brush = brush)
     }
 }
