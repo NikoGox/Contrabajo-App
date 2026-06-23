@@ -12,8 +12,8 @@ android {
         applicationId = "com.movil.contrabajo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 18
-        versionName = "0.16.0-Alpha"
+        versionCode = 19
+        versionName = "0.16.1-Alpha"
 
         // ─────────────────────────────────────────────────────────────────────
         // CONFIGURACIÓN DE ENTORNO (URLs de los microservicios)

@@ -63,6 +63,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -96,6 +97,7 @@ import com.movil.contrabajo.ui.theme.AzulPetroleo
 import com.movil.contrabajo.ui.theme.GrisAcero
 import com.movil.contrabajo.ui.theme.TurquesaBrillante
 import com.movil.contrabajo.ui.theme.TurquesaSuave
+import android.graphics.Bitmap
 import com.movil.contrabajo.ui.viewmodel.PerfilViewModel
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -104,7 +106,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 // ---------------------------------------------------------------------------
 // Máquina de estados interna del flujo de verificación OCR
 // ---------------------------------------------------------------------------
-private enum class VerificacionPaso { BIENVENIDA, CAPTURA, PROCESANDO, RESULTADO }
+private enum class VerificacionPaso { BIENVENIDA, CAPTURA, ANALIZANDO, RESULTADO }
 
 // ---------------------------------------------------------------------------
 // Punto de entrada — reemplaza a la pantalla anterior de formulario manual
@@ -119,21 +121,24 @@ fun PantallaVerificarCuentaTrabajador(
     var paso by rememberSaveable { mutableStateOf(VerificacionPaso.BIENVENIDA) }
     var resultadoExitoso by rememberSaveable { mutableStateOf(false) }
     var mensajeResultado by rememberSaveable { mutableStateOf("") }
+    var bitmapCapturado by remember { mutableStateOf<Bitmap?>(null) }
 
     LaunchedEffect(Unit) { viewModel.recargar() }
 
     // Escuchar respuesta del backend → transición a RESULTADO
     LaunchedEffect(uiState.mensajeVerificacion) {
-        if (paso == VerificacionPaso.PROCESANDO && uiState.mensajeVerificacion != null) {
+        if (paso == VerificacionPaso.ANALIZANDO && uiState.mensajeVerificacion != null) {
             resultadoExitoso = true
             mensajeResultado = uiState.mensajeVerificacion!!
+            bitmapCapturado = null
             paso = VerificacionPaso.RESULTADO
         }
     }
     LaunchedEffect(uiState.errorVerificacion) {
-        if (paso == VerificacionPaso.PROCESANDO && uiState.errorVerificacion != null) {
+        if (paso == VerificacionPaso.ANALIZANDO && uiState.errorVerificacion != null) {
             resultadoExitoso = false
             mensajeResultado = uiState.errorVerificacion!!
+            bitmapCapturado = null
             paso = VerificacionPaso.RESULTADO
         }
     }
@@ -156,12 +161,9 @@ fun PantallaVerificarCuentaTrabajador(
                 runEsperado = uiState.runVerificacion,
                 dvEsperado = uiState.dvVerificacion,
                 onVolver = { paso = VerificacionPaso.BIENVENIDA },
-                onDatosExtraidos = { run, dv, numDoc ->
-                    viewModel.actualizarRunVerificacion(run)
-                    viewModel.actualizarDvVerificacion(dv)
-                    viewModel.actualizarNumeroDocumentoVerificacion(numDoc)
-                    paso = VerificacionPaso.PROCESANDO
-                    viewModel.solicitarVerificacionTrabajador()
+                onImagenCapturada = { bitmap ->
+                    bitmapCapturado = bitmap
+                    paso = VerificacionPaso.ANALIZANDO
                 },
                 onErrorOcr = { mensaje ->
                     resultadoExitoso = false
@@ -169,12 +171,45 @@ fun PantallaVerificarCuentaTrabajador(
                     paso = VerificacionPaso.RESULTADO
                 }
             )
-            VerificacionPaso.PROCESANDO -> PantallaProcesandoVerificacion()
+            VerificacionPaso.ANALIZANDO -> {
+                val bitmap = bitmapCapturado
+                val contextLocal = LocalContext.current
+                if (bitmap != null) {
+                    PantallaAnalizandoDocumento()
+                    LaunchedEffect(bitmap) {
+                        procesarBitmapOcr(
+                            contextLocal, bitmap,
+                            uiState.runVerificacion, uiState.dvVerificacion,
+                            onDatosExtraidos = { run, dv, numDoc ->
+                                viewModel.actualizarRunVerificacion(run)
+                                viewModel.actualizarDvVerificacion(dv)
+                                viewModel.actualizarNumeroDocumentoVerificacion(numDoc)
+                            },
+                            onErrorOcr = { mensaje ->
+                                resultadoExitoso = false
+                                mensajeResultado = mensaje
+                                paso = VerificacionPaso.RESULTADO
+                            },
+                            onExitoOcr = { }
+                        )
+                    }
+                    // Escuchar cuando los datos OCR estén listos → llamar al backend
+                    LaunchedEffect(uiState.numeroDocumentoVerificacion) {
+                        if (uiState.numeroDocumentoVerificacion.isNotEmpty()) {
+                            delay(5500L)
+                            viewModel.solicitarVerificacionTrabajador()
+                        }
+                    }
+                } else {
+                    paso = VerificacionPaso.CAPTURA
+                }
+            }
             VerificacionPaso.RESULTADO -> PantallaResultadoVerificacion(
                 exitoso = resultadoExitoso,
                 mensaje = mensajeResultado,
                 onReintentar = {
                     viewModel.limpiarEstadoVerificacion()
+                    bitmapCapturado = null
                     paso = VerificacionPaso.BIENVENIDA
                 },
                 onCerrarSesion = { viewModel.cerrarSesion() }
@@ -361,7 +396,7 @@ private fun PantallaCapturaOcr(
     runEsperado: String,
     dvEsperado: String,
     onVolver: () -> Unit,
-    onDatosExtraidos: (String, String, String) -> Unit,
+    onImagenCapturada: (Bitmap) -> Unit,
     onErrorOcr: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -433,6 +468,28 @@ private fun PantallaCapturaOcr(
                 ProcessCameraProvider.getInstance(context).get()?.unbindAll()
             } catch (_: Exception) { }
         }
+    }
+
+    // Función para capturar bitmap de la cámara
+    fun capturarBitmap() {
+        val ic = imageCapture ?: return
+        procesando = true
+        ic.takePicture(
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: ImageProxy) {
+                    val bitmap = image.toBitmap()
+                    image.close()
+                    procesando = false
+                    onImagenCapturada(bitmap)
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    procesando = false
+                    onErrorOcr("No se pudo capturar la imagen. Intenta nuevamente.")
+                }
+            }
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
@@ -519,13 +576,7 @@ private fun PantallaCapturaOcr(
                                 if (procesando) Color.White.copy(alpha = 0.55f) else Color.White
                             )
                             .clickable(enabled = !procesando && imageCapture != null) {
-                                procesando = true
-                                val ic = imageCapture ?: return@clickable
-                                procesarImagenOcr(
-                                    context, ic,
-                                    runEsperado, dvEsperado,
-                                    onDatosExtraidos, onErrorOcr
-                                ) { procesando = false }
+                                capturarBitmap()
                             },
                         contentAlignment = Alignment.Center
                     ) {
@@ -584,6 +635,55 @@ private fun PantallaCapturaOcr(
                 )
                 Spacer(Modifier.weight(1f))
             }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pantalla 2b: Analizando documento (OCR + validación)
+// ---------------------------------------------------------------------------
+@Composable
+private fun PantallaAnalizandoDocumento() {
+    Box(modifier = Modifier.fillMaxSize()) {
+        FondoContrabajo(modifier = Modifier.fillMaxSize())
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(modifier = Modifier.size(100.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(84.dp),
+                    color = AzulPetroleo,
+                    strokeWidth = 5.dp
+                )
+                Icon(
+                    Icons.Filled.Security,
+                    contentDescription = null,
+                    tint = AzulPetroleo,
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+            Spacer(Modifier.height(32.dp))
+            Text(
+                "Estamos analizando tu documento",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = AzulPetroleo,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Un momento por favor mientras confirmamos los datos de tu cédula de identidad...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = GrisAcero,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
         }
     }
 }
@@ -754,6 +854,8 @@ private fun procesarImagenOcr(
     onErrorOcr: (String) -> Unit,
     onFinish: () -> Unit
 ) {
+    val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
     imageCapture.takePicture(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageCapturedCallback() {
@@ -773,32 +875,48 @@ private fun procesarImagenOcr(
                         when (resultado) {
                             is ResultadoOcr.Exito -> {
                                 onDatosExtraidos(resultado.run, resultado.dv, resultado.numDoc)
+                                onFinish()
                             }
                             is ResultadoOcr.RutNoEncontrado -> {
-                                // Incluir diagnóstico del texto reconocido para depuración
-                                val muestra = texto.take(120).replace("\n", " | ")
-                                onErrorOcr(
-                                    "No se detectó el RUT en la imagen.\n" +
-                                        "Texto leído: \"$muestra\"\n\n" +
-                                        "Asegúrate de encuadrar bien el frente de la cédula, " +
-                                        "con buena iluminación y sin reflejos."
-                                )
+                                handler.postDelayed({
+                                    onErrorOcr(
+                                        "No se pudo leer el documento. Asegúrate de encuadrar bien " +
+                                            "el frente de la cédula, con buena iluminación y sin reflejos. " +
+                                            "Intenta nuevamente."
+                                    )
+                                    onFinish()
+                                }, 3000L)
                             }
                             is ResultadoOcr.RutNoCoincide -> {
-                                onErrorOcr(
-                                    "El RUT del carnet no coincide con el de tu cuenta.\n" +
-                                        "Carnet leído: ${resultado.rutLeido}-${resultado.dvLeido}\n" +
-                                        "Verifica que estás usando tu propio carnet."
-                                )
+                                handler.postDelayed({
+                                    onErrorOcr(
+                                        "El RUT del carnet no coincide con el de tu cuenta.\n" +
+                                            "Carnet leído: ${resultado.rutLeido}-${resultado.dvLeido}\n" +
+                                            "Verifica que estás usando tu propio carnet."
+                                    )
+                                    onFinish()
+                                }, 3000L)
                             }
                             is ResultadoOcr.DocNoEncontrado -> {
-                                onErrorOcr(
-                                    "RUT verificado, pero no se pudo leer el N° de documento.\n" +
-                                        "Asegúrate de que toda la cédula esté visible y bien iluminada."
-                                )
+                                handler.postDelayed({
+                                    onErrorOcr(
+                                        "RUT verificado, pero no se pudo leer el N° de documento.\n" +
+                                            "Asegúrate de que toda la cédula esté visible y bien iluminada."
+                                    )
+                                    onFinish()
+                                }, 3000L)
+                            }
+                            is ResultadoOcr.DocumentoVencido -> {
+                                handler.postDelayed({
+                                    onErrorOcr(
+                                        "Tu documento de identidad está vencido.\n" +
+                                            "No es posible verificar una cédula de identidad caducada. " +
+                                            "Debes renovar tu documento en el Registro Civil."
+                                    )
+                                    onFinish()
+                                }, 3000L)
                             }
                         }
-                        onFinish()
                     }
                     .addOnFailureListener {
                         onErrorOcr("Error al procesar la imagen. Intenta nuevamente.")
@@ -815,6 +933,72 @@ private fun procesarImagenOcr(
 }
 
 // ---------------------------------------------------------------------------
+// OCR: procesa un Bitmap ya capturado (nuevo flujo con previsualización)
+// ---------------------------------------------------------------------------
+private fun procesarBitmapOcr(
+    context: Context,
+    bitmap: Bitmap,
+    runEsperado: String,
+    dvEsperado: String,
+    onDatosExtraidos: (String, String, String) -> Unit,
+    onErrorOcr: (String) -> Unit,
+    onExitoOcr: () -> Unit
+) {
+    val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    val inputImage = InputImage.fromBitmap(bitmap, 0)
+    recognizer.process(inputImage)
+        .addOnSuccessListener { visionText ->
+            val texto = visionText.text
+            val resultado = extraerDatosCedula(texto, runEsperado, dvEsperado)
+            when (resultado) {
+                is ResultadoOcr.Exito -> {
+                    onDatosExtraidos(resultado.run, resultado.dv, resultado.numDoc)
+                    onExitoOcr()
+                }
+                is ResultadoOcr.RutNoEncontrado -> {
+                    handler.postDelayed({
+                        onErrorOcr(
+                            "No se pudo leer el documento. Asegúrate de encuadrar bien " +
+                                "el frente de la cédula, con buena iluminación y sin reflejos. " +
+                                "Intenta nuevamente."
+                        )
+                    }, 3000L)
+                }
+                is ResultadoOcr.RutNoCoincide -> {
+                    handler.postDelayed({
+                        onErrorOcr(
+                            "El RUT del carnet no coincide con el de tu cuenta.\n" +
+                                "Carnet leído: ${resultado.rutLeido}-${resultado.dvLeido}\n" +
+                                "Verifica que estás usando tu propio carnet."
+                        )
+                    }, 3000L)
+                }
+                is ResultadoOcr.DocNoEncontrado -> {
+                    handler.postDelayed({
+                        onErrorOcr(
+                            "RUT verificado, pero no se pudo leer el N° de documento.\n" +
+                                "Asegúrate de que toda la cédula esté visible y bien iluminada."
+                        )
+                    }, 3000L)
+                }
+                is ResultadoOcr.DocumentoVencido -> {
+                    handler.postDelayed({
+                        onErrorOcr(
+                            "Tu documento de identidad está vencido.\n" +
+                                "No es posible verificar una cédula de identidad caducada. " +
+                                "Debes renovar tu documento en el Registro Civil."
+                        )
+                    }, 3000L)
+                }
+            }
+        }
+        .addOnFailureListener {
+            onErrorOcr("Error al procesar la imagen. Intenta nuevamente.")
+        }
+}
+
+// ---------------------------------------------------------------------------
 // Modelos de resultado de extracción OCR
 // ---------------------------------------------------------------------------
 private sealed class ResultadoOcr {
@@ -822,6 +1006,7 @@ private sealed class ResultadoOcr {
     object RutNoEncontrado : ResultadoOcr()
     data class RutNoCoincide(val rutLeido: String, val dvLeido: String) : ResultadoOcr()
     object DocNoEncontrado : ResultadoOcr()
+    object DocumentoVencido : ResultadoOcr()
 }
 
 // ---------------------------------------------------------------------------
@@ -852,6 +1037,15 @@ private fun extraerDatosCedula(
         return ResultadoOcr.RutNoCoincide(rutExtraido, dvExtraido)
     }
 
+    // Validar fecha de caducidad del documento
+    val fechaVencimiento = extraerFechaVencimiento(texto)
+    if (fechaVencimiento != null) {
+        val hoy = java.time.LocalDate.now()
+        if (fechaVencimiento.isBefore(hoy)) {
+            return ResultadoOcr.DocumentoVencido
+        }
+    }
+
     // N° documento: 9 dígitos consecutivos que no sean el RUN mismo
     val runPadded = runEsperado.padStart(9, '0')
     // Intentar primero el formato visual de la cédula chilena: XXX.XXX.XXX
@@ -873,6 +1067,94 @@ private fun extraerDatosCedula(
     if (numDoc.isEmpty()) return ResultadoOcr.DocNoEncontrado
 
     return ResultadoOcr.Exito(rutExtraido, dvExtraido, numDoc)
+}
+
+/**
+ * Extrae la fecha de vencimiento de la cédula chilena.
+ * Busca patrones como "FECHA DE VENCIMIENTO" seguido de DD MM AAAA,
+ * "VÁLIDA HASTA DD/MM/AAAA", "HASTA DD.MM.AAAA", etc.
+ * Retorna la fecha como LocalDate o null si no se encuentra.
+ */
+private fun extraerFechaVencimiento(texto: String): java.time.LocalDate? {
+    val textoNorm = texto
+        .replace("\r\n", " ")
+        .replace("\n", " ")
+        .replace("\r", " ")
+
+    // Patrón 1: FECHA DE VENCIMIENTO seguido de DD MM AAAA (con o sin separadores)
+    val patron1 = Regex(
+        """(?i)fecha\s+de\s+vencimiento\s+(\d{1,2})[\s./-](\d{1,2})[\s./-](\d{2,4})""",
+        RegexOption.IGNORE_CASE
+    )
+    patron1.find(textoNorm)?.let { m ->
+        return parsearFecha(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+    }
+
+    // Patrón 2: FECHA DE VENCIMIENTO con la fecha en la siguiente línea/espacio
+    // Busca "FECHA DE VENCIMIENTO" y luego busca la fecha en los siguientes 20 caracteres
+    val patron2 = Regex(
+        """(?i)fecha\s+de\s+vencimiento\s+.{0,20}?(\d{1,2})[\s./-](\d{1,2})[\s./-](\d{2,4})""",
+        RegexOption.IGNORE_CASE
+    )
+    patron2.find(textoNorm)?.let { m ->
+        return parsearFecha(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+    }
+
+    // Patrón 3: VÁLIDA HASTA DD/MM/AAAA o VÁLIDA HASTA DD.MM.AAAA
+    val patron3 = Regex(
+        """(?i)valida\s+hasta\s+(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})""",
+        RegexOption.IGNORE_CASE
+    )
+    patron3.find(textoNorm)?.let { m ->
+        return parsearFecha(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+    }
+
+    // Patrón 4: HASTA DD/MM/AAAA o HASTA DD.MM.AAAA
+    val patron4 = Regex(
+        """(?i)hasta\s+(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})""",
+        RegexOption.IGNORE_CASE
+    )
+    patron4.find(textoNorm)?.let { m ->
+        return parsearFecha(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+    }
+
+    // Patrón 5: Buscar "VENCIMIENTO" y luego una fecha cercana
+    val patron5 = Regex(
+        """(?i)vencimiento\s+.{0,20}?(\d{1,2})[\s./-](\d{1,2})[\s./-](\d{2,4})""",
+        RegexOption.IGNORE_CASE
+    )
+    patron5.find(textoNorm)?.let { m ->
+        return parsearFecha(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+    }
+
+    // Patrón 6: Solo fecha en formato DD/MM/AAAA (como último recurso)
+    val patron6 = Regex("""(\d{2})[/.\-](\d{2})[/.\-](\d{4})""")
+    patron6.findAll(textoNorm).forEach { m ->
+        val fecha = parsearFecha(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+        if (fecha != null) return fecha
+    }
+
+    return null
+}
+
+/**
+ * Parsea una fecha desde componentes día, mes, año.
+ * Maneja años de 2 o 4 dígitos (si son 2, asume siglo XXI).
+ * Retorna null si la fecha es inválida.
+ */
+private fun parsearFecha(diaStr: String, mesStr: String, anioStr: String): java.time.LocalDate? {
+    return try {
+        val dia = diaStr.toInt()
+        val mes = mesStr.toInt()
+        val anio = if (anioStr.length == 2) {
+            2000 + anioStr.toInt()
+        } else {
+            anioStr.toInt()
+        }
+        java.time.LocalDate.of(anio, mes, dia)
+    } catch (e: Exception) {
+        null
+    }
 }
 
 /**

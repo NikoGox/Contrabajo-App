@@ -1,3 +1,12 @@
+VERSION 0.16.1-Alpha
+───────
+├─• Se restauró el mapa de ubicación y el botón de refrescar GPS para clientes en Ajustes.
+├─• El slider de rango de disponibilidad sigue siendo exclusivo para trabajadores.
+├─• Se corrigió que el círculo de rango no se muestra para usuarios con perfil cliente.
+├─• Se ajustó el tiempo de respuesta en la verificación de documento de cédula de identidad para una experiencia más fluida.
+├─• Se ocultó el texto parcial leído por OCR cuando el documento no se reconoce, mejorando la seguridad de datos.
+└─• Se agregó validación de fecha de caducidad de cédula de identidad: si el documento está vencido, se informa al usuario que debe renovarlo.
+
 VERSION 0.16.0-Alpha
 ───────
 ├─• Primera versión Alpha del producto.

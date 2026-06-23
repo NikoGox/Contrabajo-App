@@ -851,73 +851,73 @@ fun PantallaUbicacion(
                     steps = EscalaRango.valoresMetros.size - 2
                 )
             }
+        }
 
-            TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(10.dp)) {
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    MapaUbicacionOpenStreetMap(
-                        latitud = ubicacion.latitud ?: -33.4489,
-                        longitud = ubicacion.longitud ?: -70.6693,
-                        rangoM = ubicacion.rangoDisponibilidadM,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(138.dp)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                    )
-                    Surface(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(6.dp),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                        shadowElevation = 2.dp
-                    ) {
-                        Text(
-                            text = if (ubicacion.latitud == null || ubicacion.longitud == null) {
-                                "Sin coordenadas"
-                            } else {
-                                "${"%.5f".format(ubicacion.latitud)}, ${"%.5f".format(ubicacion.longitud)}"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            val tieneFine = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.ACCESS_FINE_LOCATION
-                            ) == PackageManager.PERMISSION_GRANTED
-                            val tieneCoarse = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                            ) == PackageManager.PERMISSION_GRANTED
-                            if (tieneFine || tieneCoarse) {
-                                actualizarUbicacionReal()
-                            } else {
-                                solicitudPermisosLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
-                                )
-                            }
+        TarjetaBase(contentPadding = androidx.compose.foundation.layout.PaddingValues(10.dp)) {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                MapaUbicacionOpenStreetMap(
+                    latitud = ubicacion.latitud ?: -33.4489,
+                    longitud = ubicacion.longitud ?: -70.6693,
+                    rangoM = if (esTrabajador) ubicacion.rangoDisponibilidadM else 0,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(138.dp)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                )
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(6.dp),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                    shadowElevation = 2.dp
+                ) {
+                    Text(
+                        text = if (ubicacion.latitud == null || ubicacion.longitud == null) {
+                            "Sin coordenadas"
+                        } else {
+                            "${"%.5f".format(ubicacion.latitud)}, ${"%.5f".format(ubicacion.longitud)}"
                         },
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(6.dp)
-                            .size(36.dp),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Refresh,
-                            contentDescription = "Actualizar coordenadas",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        val tieneFine = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                        val tieneCoarse = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (tieneFine || tieneCoarse) {
+                            actualizarUbicacionReal()
+                        } else {
+                            solicitudPermisosLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                        .size(36.dp),
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Refresh,
+                        contentDescription = "Actualizar coordenadas",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
@@ -1028,9 +1028,10 @@ private fun MapaUbicacionOpenStreetMap(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val mostrarCirculo = rangoM > 0
     val rangoNormalizadoM = EscalaRango.normalizar(rangoM)
-    val rangoVisualM = maxOf(rangoNormalizadoM, 1000)
-    val zoom = calcularZoomPorRangoM(rangoVisualM).toDouble()
+    val rangoVisualM = if (mostrarCirculo) maxOf(rangoNormalizadoM, 1000) else 0
+    val zoom = calcularZoomPorRangoM(if (mostrarCirculo) rangoVisualM else 15).toDouble()
     val radioMetros = rangoVisualM.toDouble()
     val mapaRellenoArgb = LocalColoresContrabajo.current.mapaRelleno.toArgb()
     val mapaBordeArgb = LocalColoresContrabajo.current.mapaBorde.toArgb()
@@ -1076,14 +1077,16 @@ private fun MapaUbicacionOpenStreetMap(
                 icon = ContextCompat.getDrawable(context, R.drawable.ic_pin_marcador_azul)
             }
 
-            val circulo = Polygon(map).apply {
-                points = Polygon.pointsAsCircle(centro, radioMetros)
-                fillColor = mapaRellenoArgb
-                strokeColor = mapaBordeArgb
-                strokeWidth = 2f
+            if (mostrarCirculo) {
+                val circulo = Polygon(map).apply {
+                    points = Polygon.pointsAsCircle(centro, radioMetros)
+                    fillColor = mapaRellenoArgb
+                    strokeColor = mapaBordeArgb
+                    strokeWidth = 2f
+                }
+                map.overlays.add(circulo)
             }
 
-            map.overlays.add(circulo)
             map.overlays.add(marcador)
             map.invalidate()
         }
