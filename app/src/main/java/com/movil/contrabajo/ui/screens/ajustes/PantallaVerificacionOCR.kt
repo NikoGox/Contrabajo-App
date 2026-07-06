@@ -180,6 +180,7 @@ fun PantallaVerificarCuentaTrabajador(
                         procesarBitmapOcr(
                             contextLocal, bitmap,
                             uiState.runVerificacion, uiState.dvVerificacion,
+                            uiState.usuario?.fechaNacimiento.orEmpty(),
                             onDatosExtraidos = { run, dv, numDoc ->
                                 viewModel.actualizarRunVerificacion(run)
                                 viewModel.actualizarDvVerificacion(dv)
@@ -258,7 +259,7 @@ private fun PantallaBienvenidaVerificacion(
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             InstruccionItem("1", "Ten tu cédula de identidad a mano")
             InstruccionItem("2", "Encuadra el frente de la cédula en el marco")
-            InstruccionItem("3", "La app leerá tu RUT automáticamente")
+            InstruccionItem("3", "La app leerá tu RUT y tu fecha de nacimiento automáticamente")
         }
 
         BotonPrimario(texto = "Continuar", onClick = onContinuar)
@@ -916,6 +917,18 @@ private fun procesarImagenOcr(
                                     onFinish()
                                 }, 3000L)
                             }
+                            is ResultadoOcr.FechaNacimientoNoCoincide -> {
+                                handler.postDelayed({
+                                    onErrorOcr(
+                                        "La fecha de nacimiento del carnet no coincide con la registrada " +
+                                            "en tu cuenta, por lo que no se pudo verificar tu documento.\n" +
+                                            "Fecha leída del carnet: ${resultado.fechaLeida}\n" +
+                                            "Si ingresaste una fecha de nacimiento incorrecta al registrarte, " +
+                                            "contáctanos por el canal de soporte para corregirla."
+                                    )
+                                    onFinish()
+                                }, 3000L)
+                            }
                         }
                     }
                     .addOnFailureListener {
@@ -940,6 +953,7 @@ private fun procesarBitmapOcr(
     bitmap: Bitmap,
     runEsperado: String,
     dvEsperado: String,
+    fechaNacimientoEsperada: String,
     onDatosExtraidos: (String, String, String) -> Unit,
     onErrorOcr: (String) -> Unit,
     onExitoOcr: () -> Unit
@@ -950,7 +964,7 @@ private fun procesarBitmapOcr(
     recognizer.process(inputImage)
         .addOnSuccessListener { visionText ->
             val texto = visionText.text
-            val resultado = extraerDatosCedula(texto, runEsperado, dvEsperado)
+            val resultado = extraerDatosCedula(texto, runEsperado, dvEsperado, fechaNacimientoEsperada)
             when (resultado) {
                 is ResultadoOcr.Exito -> {
                     onDatosExtraidos(resultado.run, resultado.dv, resultado.numDoc)
@@ -991,6 +1005,17 @@ private fun procesarBitmapOcr(
                         )
                     }, 3000L)
                 }
+                is ResultadoOcr.FechaNacimientoNoCoincide -> {
+                    handler.postDelayed({
+                        onErrorOcr(
+                            "La fecha de nacimiento del carnet no coincide con la registrada " +
+                                "en tu cuenta, por lo que no se pudo verificar tu documento.\n" +
+                                "Fecha leída del carnet: ${resultado.fechaLeida}\n" +
+                                "Si ingresaste una fecha de nacimiento incorrecta al registrarte, " +
+                                "contáctanos por el canal de soporte para corregirla."
+                        )
+                    }, 3000L)
+                }
             }
         }
         .addOnFailureListener {
@@ -1007,6 +1032,7 @@ private sealed class ResultadoOcr {
     data class RutNoCoincide(val rutLeido: String, val dvLeido: String) : ResultadoOcr()
     object DocNoEncontrado : ResultadoOcr()
     object DocumentoVencido : ResultadoOcr()
+    data class FechaNacimientoNoCoincide(val fechaLeida: String) : ResultadoOcr()
 }
 
 // ---------------------------------------------------------------------------
@@ -1015,7 +1041,8 @@ private sealed class ResultadoOcr {
 private fun extraerDatosCedula(
     texto: String,
     runEsperado: String,
-    dvEsperado: String
+    dvEsperado: String,
+    fechaNacimientoEsperada: String = ""
 ): ResultadoOcr {
     // Normalizar: unir líneas y limpiar caracteres problemáticos del OCR
     val textoNorm = texto
@@ -1046,6 +1073,16 @@ private fun extraerDatosCedula(
         }
     }
 
+    // Cotejar la fecha de nacimiento del documento contra la registrada en la cuenta
+    val fechaRegistrada = parsearFechaRegistrada(fechaNacimientoEsperada)
+    if (fechaRegistrada != null) {
+        val fechaNacimientoLeida = extraerFechaNacimiento(texto)
+        if (fechaNacimientoLeida != null && fechaNacimientoLeida != fechaRegistrada) {
+            val formato = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+            return ResultadoOcr.FechaNacimientoNoCoincide(fechaNacimientoLeida.format(formato))
+        }
+    }
+
     // N° documento: 9 dígitos consecutivos que no sean el RUN mismo
     val runPadded = runEsperado.padStart(9, '0')
     // Intentar primero el formato visual de la cédula chilena: XXX.XXX.XXX
@@ -1067,6 +1104,75 @@ private fun extraerDatosCedula(
     if (numDoc.isEmpty()) return ResultadoOcr.DocNoEncontrado
 
     return ResultadoOcr.Exito(rutExtraido, dvExtraido, numDoc)
+}
+
+/**
+ * Meses abreviados tal como aparecen impresos en la cédula chilena.
+ * Se incluye SET como variante de SEP por errores comunes del OCR.
+ */
+private val MESES_CEDULA = mapOf(
+    "ENE" to 1, "FEB" to 2, "MAR" to 3, "ABR" to 4, "MAY" to 5, "JUN" to 6,
+    "JUL" to 7, "AGO" to 8, "SEP" to 9, "SET" to 9, "OCT" to 10, "NOV" to 11, "DIC" to 12
+)
+
+/**
+ * Extrae la fecha de nacimiento de la cédula chilena.
+ * Solo busca fechas ancladas a la etiqueta "NACIMIENTO" para no capturar
+ * por error las fechas de emisión o vencimiento del documento.
+ * Soporta el formato impreso "DD MMM AAAA" (ej: 22 SEP 1990) y variantes
+ * numéricas "DD MM AAAA" con distintos separadores.
+ * Retorna la fecha como LocalDate o null si no se encuentra.
+ */
+private fun extraerFechaNacimiento(texto: String): java.time.LocalDate? {
+    val textoNorm = texto
+        .replace("\r\n", " ")
+        .replace("\n", " ")
+        .replace("\r", " ")
+
+    // Patrón 1: NACIMIENTO seguido de DD MMM AAAA (mes abreviado en español)
+    val mesesAlt = MESES_CEDULA.keys.joinToString("|")
+    val patronMesTexto = Regex(
+        """(?i)nacimiento\s+.{0,20}?(\d{1,2})\s+($mesesAlt)[A-ZÁÉÍÓÚ]*\.?\s+(\d{4})""",
+        RegexOption.IGNORE_CASE
+    )
+    patronMesTexto.find(textoNorm)?.let { m ->
+        val mes = MESES_CEDULA[m.groupValues[2].uppercase()] ?: return@let
+        return try {
+            java.time.LocalDate.of(m.groupValues[3].toInt(), mes, m.groupValues[1].toInt())
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // Patrón 2: NACIMIENTO seguido de DD MM AAAA (numérico, año de 4 dígitos)
+    val patronNumerico = Regex(
+        """(?i)nacimiento\s+.{0,20}?(\d{1,2})[\s./-](\d{1,2})[\s./-](\d{4})""",
+        RegexOption.IGNORE_CASE
+    )
+    patronNumerico.find(textoNorm)?.let { m ->
+        return parsearFecha(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+    }
+
+    return null
+}
+
+/**
+ * Parsea la fecha de nacimiento registrada en la cuenta del usuario.
+ * El backend la entrega en formato ISO (yyyy-MM-dd); se aceptan además
+ * variantes dd/MM/yyyy y dd-MM-yyyy por robustez.
+ */
+private fun parsearFechaRegistrada(valor: String): java.time.LocalDate? {
+    val limpio = valor.trim()
+    if (limpio.isEmpty()) return null
+    // Formato ISO: yyyy-MM-dd (el que persiste el backend y SQLite)
+    try {
+        return java.time.LocalDate.parse(limpio)
+    } catch (_: Exception) { }
+    // Variantes dd/MM/yyyy o dd-MM-yyyy
+    Regex("""(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})""").find(limpio)?.let { m ->
+        return parsearFecha(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+    }
+    return null
 }
 
 /**

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.ContactPhone
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -474,9 +475,9 @@ fun PantallaPreguntasSeguridad(
 fun PantallaCuenta(
     viewModel: PerfilViewModel,
     onVolver: () -> Unit,
-    onCerrarSesion: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     LaunchedEffect(Unit) { viewModel.recargar() }
     val usuario = viewModel.uiState.usuario
 
@@ -565,38 +566,35 @@ fun PantallaCuenta(
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
-                val esModoOscuro = MaterialTheme.colorScheme.background.luminance() < 0.5f
-                if (esModoOscuro) {
-                    androidx.compose.material3.Button(
-                        onClick = onCerrarSesion,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError
-                        )
-                    ) {
-                        Text(
-                            text = "Cerrar sesión",
-                            color = MaterialTheme.colorScheme.onError,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = onCerrarSesion,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text(
-                            text = "Cerrar sesión",
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                OutlinedButton(
+                    onClick = {
+                        val subject = "Solicitud de eliminación de cuenta - @${usuario.username}"
+                        val body = "Hola, solicito la eliminación de mi cuenta.\n\nUsername: @${usuario.username}\nRUN: ${usuario.run}-${usuario.dv}\n\nMotivo: "
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
+                            data = android.net.Uri.parse("mailto:")
+                            putExtra(android.content.Intent.EXTRA_EMAIL, arrayOf("soporte@contrabajo.cl"))
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, subject)
+                            putExtra(android.content.Intent.EXTRA_TEXT, body)
+                        }
+                        context.startActivity(android.content.Intent.createChooser(intent, "Enviar correo"))
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Solicitar eliminación de cuenta",
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }

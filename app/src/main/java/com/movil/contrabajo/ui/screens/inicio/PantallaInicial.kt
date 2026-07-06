@@ -3,6 +3,7 @@ package com.movil.contrabajo.ui.screens.inicio
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -112,7 +113,9 @@ fun PantallaInicial(
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(20.dp),
-                                color = cs.surface.copy(alpha = 0.5f)
+                                color = cs.surface.copy(alpha = 0.92f),
+                                border = BorderStroke(1.dp, cs.outline.copy(alpha = 0.25f)),
+                                shadowElevation = 6.dp
                             ) {
                                 Column(
                                     modifier = Modifier.padding(24.dp),
@@ -190,16 +193,9 @@ fun PantallaInicial(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
+
                             Spacer(modifier = Modifier.weight(0.15f))
 
-                            Text(
-                                text = "Bienvenido a",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = cs.onBackground.copy(alpha = 0.6f),
-                                fontWeight = FontWeight.Medium
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
 
                             androidx.compose.foundation.Image(
                                 painter = painterResource(id = R.drawable.ct_icon_mini_t),
@@ -208,7 +204,15 @@ fun PantallaInicial(
                                 contentScale = ContentScale.Fit
                             )
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
+
+
+                            Text(
+                                text = "Bienvenido a",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = cs.onBackground.copy(alpha = 0.6f),
+                                fontWeight = FontWeight.Medium
+                            )
 
                             Text(
                                 text = "Contrabajo",
@@ -217,12 +221,14 @@ fun PantallaInicial(
                                 color = cs.primary
                             )
 
-                            Spacer(modifier = Modifier.height(32.dp))
+                            Spacer(modifier = Modifier.height(40.dp))
 
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(20.dp),
-                                color = cs.surface.copy(alpha = 0.5f)
+                                color = cs.surface.copy(alpha = 0.92f),
+                                border = BorderStroke(1.dp, cs.outline.copy(alpha = 0.25f)),
+                                shadowElevation = 6.dp
                             ) {
                                 Column(
                                     modifier = Modifier.padding(24.dp),
@@ -257,8 +263,13 @@ fun PantallaInicial(
                                 shape = RoundedCornerShape(14.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = cs.primary
+                                ),
+                                elevation = ButtonDefaults.buttonElevation(
+                                    defaultElevation = 3.dp,
+                                    pressedElevation = 6.dp
                                 )
                             ) {
+
                                 Text(
                                     text = "Comenzar",
                                     fontSize = 16.sp,
@@ -267,7 +278,7 @@ fun PantallaInicial(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(26.dp))
 
                             Text(
                                 text = "Versión $versionApp",

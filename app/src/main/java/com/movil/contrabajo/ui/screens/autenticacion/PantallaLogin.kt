@@ -43,6 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -188,12 +189,7 @@ fun PantallaLogin(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = "Bienvenido a",
-                style = MaterialTheme.typography.titleLarge,
-                color = cs.onBackground.copy(alpha = 0.6f),
-                fontWeight = FontWeight.Medium
-            )
+
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -205,6 +201,13 @@ fun PantallaLogin(
             )
 
             Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Bienvenido a",
+                style = MaterialTheme.typography.titleLarge,
+                color = cs.onBackground.copy(alpha = 0.6f),
+                fontWeight = FontWeight.Medium
+            )
 
             Text(
                 text = "Contrabajo",
@@ -228,14 +231,16 @@ fun PantallaLogin(
                 OutlinedTextField(
                     value = uiState.identificador,
                     onValueChange = viewModel::actualizarIdentificador,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(2.dp, RoundedCornerShape(14.dp), clip = false),
                     placeholder = { Text("Ingresa tu usuario") },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = cs.surface.copy(alpha = 0.7f),
+                        unfocusedContainerColor = cs.surface,
                         focusedContainerColor = cs.surface,
-                        unfocusedBorderColor = cs.outline.copy(alpha = 0.4f),
+                        unfocusedBorderColor = cs.outline.copy(alpha = 0.5f),
                         focusedBorderColor = cs.primary,
                         cursorColor = cs.primary,
                         focusedTextColor = cs.onSurface,
@@ -252,7 +257,9 @@ fun PantallaLogin(
                 OutlinedTextField(
                     value = uiState.contrasena,
                     onValueChange = viewModel::actualizarContrasena,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(2.dp, RoundedCornerShape(14.dp), clip = false),
                     placeholder = { Text("Ingresa tu contraseña") },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
@@ -271,9 +278,9 @@ fun PantallaLogin(
                         }
                     },
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = cs.surface.copy(alpha = 0.7f),
+                        unfocusedContainerColor = cs.surface,
                         focusedContainerColor = cs.surface,
-                        unfocusedBorderColor = cs.outline.copy(alpha = 0.4f),
+                        unfocusedBorderColor = cs.outline.copy(alpha = 0.5f),
                         focusedBorderColor = cs.primary,
                         cursorColor = cs.primary,
                         focusedTextColor = cs.onSurface,
@@ -373,11 +380,20 @@ fun PantallaLogin(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            TextButton(onClick = onVolver) {
+            androidx.compose.material3.OutlinedButton(
+                onClick = onVolver,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, cs.outline.copy(alpha = 0.4f)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = cs.surface.copy(alpha = 0.7f),
+                    contentColor = cs.onSurface
+                )
+            ) {
                 Text(
                     text = "Volver",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = cs.onSurface.copy(alpha = 0.4f)
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
@@ -453,14 +469,16 @@ fun PantallaRecuperarCuenta(
                 OutlinedTextField(
                     value = uiState.recuperacionIdentificador,
                     onValueChange = viewModel::actualizarIdentificadorRecuperacion,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(2.dp, RoundedCornerShape(14.dp), clip = false),
                     placeholder = { Text("Tu usuario") },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = cs.surface.copy(alpha = 0.7f),
+                        unfocusedContainerColor = cs.surface,
                         focusedContainerColor = cs.surface,
-                        unfocusedBorderColor = cs.outline.copy(alpha = 0.4f),
+                        unfocusedBorderColor = cs.outline.copy(alpha = 0.5f),
                         focusedBorderColor = cs.primary,
                         cursorColor = cs.primary,
                         focusedTextColor = cs.onSurface,
@@ -496,14 +514,16 @@ fun PantallaRecuperarCuenta(
                     OutlinedTextField(
                         value = uiState.recuperacionRespuesta1,
                         onValueChange = viewModel::actualizarRespuestaRecuperacion1,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(2.dp, RoundedCornerShape(14.dp), clip = false),
                         placeholder = { Text("Tu respuesta") },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = cs.surface.copy(alpha = 0.7f),
+                            unfocusedContainerColor = cs.surface,
                             focusedContainerColor = cs.surface,
-                            unfocusedBorderColor = cs.outline.copy(alpha = 0.4f),
+                            unfocusedBorderColor = cs.outline.copy(alpha = 0.5f),
                             focusedBorderColor = cs.primary,
                             cursorColor = cs.primary,
                             focusedTextColor = cs.onSurface,
@@ -520,14 +540,16 @@ fun PantallaRecuperarCuenta(
                     OutlinedTextField(
                         value = uiState.recuperacionRespuesta2,
                         onValueChange = viewModel::actualizarRespuestaRecuperacion2,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(2.dp, RoundedCornerShape(14.dp), clip = false),
                         placeholder = { Text("Tu respuesta") },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = cs.surface.copy(alpha = 0.7f),
+                            unfocusedContainerColor = cs.surface,
                             focusedContainerColor = cs.surface,
-                            unfocusedBorderColor = cs.outline.copy(alpha = 0.4f),
+                            unfocusedBorderColor = cs.outline.copy(alpha = 0.5f),
                             focusedBorderColor = cs.primary,
                             cursorColor = cs.primary,
                             focusedTextColor = cs.onSurface,
@@ -564,14 +586,16 @@ fun PantallaRecuperarCuenta(
                     OutlinedTextField(
                         value = uiState.nuevaContrasenaRecuperacion,
                         onValueChange = viewModel::actualizarNuevaContrasenaRecuperacion,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(2.dp, RoundedCornerShape(14.dp), clip = false),
                         placeholder = { Text("Mínimo 8 caracteres, 1 mayúscula, 1 número, 1 símbolo") },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = cs.surface.copy(alpha = 0.7f),
+                            unfocusedContainerColor = cs.surface,
                             focusedContainerColor = cs.surface,
-                            unfocusedBorderColor = cs.outline.copy(alpha = 0.4f),
+                            unfocusedBorderColor = cs.outline.copy(alpha = 0.5f),
                             focusedBorderColor = cs.primary,
                             cursorColor = cs.primary,
                             focusedTextColor = cs.onSurface,
@@ -588,14 +612,16 @@ fun PantallaRecuperarCuenta(
                     OutlinedTextField(
                         value = uiState.confirmarContrasenaRecuperacion,
                         onValueChange = viewModel::actualizarConfirmarContrasenaRecuperacion,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(2.dp, RoundedCornerShape(14.dp), clip = false),
                         placeholder = { Text("Repite tu contraseña") },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = cs.surface.copy(alpha = 0.7f),
+                            unfocusedContainerColor = cs.surface,
                             focusedContainerColor = cs.surface,
-                            unfocusedBorderColor = cs.outline.copy(alpha = 0.4f),
+                            unfocusedBorderColor = cs.outline.copy(alpha = 0.5f),
                             focusedBorderColor = cs.primary,
                             cursorColor = cs.primary,
                             focusedTextColor = cs.onSurface,

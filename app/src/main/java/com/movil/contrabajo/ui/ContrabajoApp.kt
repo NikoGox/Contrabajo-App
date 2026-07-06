@@ -638,8 +638,7 @@ fun ContrabajoApp(
             composable(RutasApp.AjustesCuenta.ruta) {
                 PantallaCuenta(
                     viewModel = perfilViewModel,
-                    onVolver = { navController.popBackStack() },
-                    onCerrarSesion = { perfilViewModel.cerrarSesion() }
+                    onVolver = { navController.popBackStack() }
                 )
             }
             composable(RutasApp.AjustesUbicacion.ruta) {

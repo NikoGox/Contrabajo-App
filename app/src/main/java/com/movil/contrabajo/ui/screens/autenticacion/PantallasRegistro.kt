@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -38,11 +39,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
@@ -57,6 +66,7 @@ import com.movil.contrabajo.ui.components.IndicadorPasos
 import com.movil.contrabajo.ui.components.LogoContrabajo
 import com.movil.contrabajo.ui.components.PantallaBase
 import com.movil.contrabajo.ui.components.TarjetaBase
+import com.movil.contrabajo.ui.screens.legal.PantallaTerminosCondiciones
 import com.movil.contrabajo.ui.viewmodel.RegistroViewModel
 import java.time.LocalDate
 
@@ -310,10 +320,60 @@ fun PantallaRegistroPasoDireccion(
     val context = LocalContext.current
     val scrollPasoDireccion = rememberScrollState()
 
+    // Captura de coordenadas al entrar al paso: se piden los permisos de
+    // ubicación de inmediato para que la cuenta quede con coordenadas
+    // configuradas desde el primer ingreso a la app.
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var permisoUbicacionDenegado by rememberSaveable { mutableStateOf(false) }
+
+    fun obtenerCoordenadasActuales() {
+        try {
+            fusedLocationClient.getCurrentLocation(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                CancellationTokenSource().token
+            ).addOnSuccessListener { ubicacion ->
+                if (ubicacion != null) {
+                    viewModel.actualizarCoordenadasRegistro(ubicacion.latitude, ubicacion.longitude)
+                }
+            }
+        } catch (_: SecurityException) {
+        }
+    }
+
+    val permisosUbicacionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permisos ->
+        val concedido = permisos[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            permisos[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (concedido) {
+            permisoUbicacionDenegado = false
+            obtenerCoordenadasActuales()
+        } else {
+            permisoUbicacionDenegado = true
+        }
+    }
+
     LaunchedEffect(Unit) {
         viewModel.cargarComunas()
         if (registro.region.isBlank()) {
             viewModel.actualizarRegion("Región Metropolitana")
+        }
+        val permisoConcedido = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (permisoConcedido) {
+            if (registro.latitud == null || registro.longitud == null) {
+                obtenerCoordenadasActuales()
+            }
+        } else {
+            permisosUbicacionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
     }
 
@@ -393,10 +453,24 @@ fun PantallaRegistroPasoDireccion(
                 }
 
                 Text(
-                    text = "La dirección es opcional. Las coordenadas se obtendrán automáticamente al usar la app.",
+                    text = "La dirección es opcional. Tu ubicación actual se usará para configurar tus coordenadas y mostrarte publicaciones cercanas.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                when {
+                    registro.latitud != null && registro.longitud != null -> Text(
+                        text = "",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    permisoUbicacionDenegado -> Text(
+                        text = "Sin el permiso de ubicación puedes registrarte igual, pero para usar la app deberás obtener tus coordenadas desde Ajustes › Ubicación.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
 
             Row(
@@ -428,6 +502,8 @@ fun PantallaRegistroPasoDos(
     val registro = uiState.registro
     val scrollPasoDos = rememberScrollState()
     var intentoRegistro by rememberSaveable { mutableStateOf(false) }
+    var aceptaTerminos by rememberSaveable { mutableStateOf(false) }
+    var mostrarTerminos by rememberSaveable { mutableStateOf(false) }
 
     val errorUsername = if (registro.username.isBlank()) "Ingresa un nombre de usuario" else null
     val errorCorreo = if (registro.correo.isBlank() || !registro.correo.contains("@") || !registro.correo.contains(".")) "Ingresa un correo válido" else null
@@ -525,6 +601,41 @@ fun PantallaRegistroPasoDos(
                         fontWeight = FontWeight.Medium
                     )
                 }
+
+                val colorEnlaceTerminos = MaterialTheme.colorScheme.primary
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = aceptaTerminos,
+                        onCheckedChange = {
+                            intentoRegistro = false
+                            aceptaTerminos = it
+                        }
+                    )
+                    Text(
+                        text = buildAnnotatedString {
+                            append("Acepto los ")
+                            withLink(LinkAnnotation.Clickable(tag = "TERMINOS_CONDICIONES") { mostrarTerminos = true }) {
+                                withStyle(
+                                    SpanStyle(
+                                        color = colorEnlaceTerminos,
+                                        textDecoration = TextDecoration.Underline,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                ) {
+                                    append("términos y condiciones de uso")
+                                }
+                            }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (intentoRegistro && !aceptaTerminos) {
+                    TextoErrorCampo("Debes aceptar los términos y condiciones para continuar")
+                }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -537,16 +648,25 @@ fun PantallaRegistroPasoDos(
                 )
                 BotonPrimario(
                     texto = "Siguiente",
-                    enabled = formularioPasoTresValido && !uiState.validandoDisponibilidad,
+                    enabled = formularioPasoTresValido && aceptaTerminos && !uiState.validandoDisponibilidad,
                     onClick = {
                         intentoRegistro = true
-                        if (formularioPasoTresValido) {
+                        if (formularioPasoTresValido && aceptaTerminos) {
                             viewModel.verificarCuentaDisponibleAntesDeContinuar(onContinuar)
                         }
                     },
                     modifier = Modifier.weight(1f)
                 )
             }
+        }
+    }
+
+    if (mostrarTerminos) {
+        Dialog(
+            onDismissRequest = { mostrarTerminos = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            PantallaTerminosCondiciones(onCerrar = { mostrarTerminos = false })
         }
     }
 }
@@ -665,8 +785,8 @@ fun PantallaRegistroPasoSeguridad(
                     modifier = Modifier.weight(1f)
                 )
                 BotonPrimario(
-                    texto = "Registrarse",
-                    enabled = formularioValido,
+                    texto = if (uiState.registrando) "Registrando..." else "Registrarse",
+                    enabled = formularioValido && !uiState.registrando,
                     onClick = {
                         intentoRegistro = true
                         if (formularioValido) {

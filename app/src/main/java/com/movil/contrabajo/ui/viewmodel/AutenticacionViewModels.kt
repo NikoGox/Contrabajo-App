@@ -346,6 +346,7 @@ data class RegistroUiState(
     val errorUsernameDisponible: String? = null,
     val errorCorreoDisponible: String? = null,
     val error: String? = null,
+    val registrando: Boolean = false,
     val registroExitoso: Boolean = false
 )
 
@@ -494,17 +495,21 @@ class RegistroViewModel(
     }
 
     fun registrarUsuario() {
+        // Evita el doble envío: un segundo tap mientras el registro está en vuelo
+        // volvía a validar disponibilidad y encontraba el RUN recién creado.
+        if (uiState.registrando || uiState.registroExitoso) return
         val registro = uiState.registro
         viewModelScope.launch {
+            uiState = uiState.copy(registrando = true, error = null)
             val resultado = withContext(Dispatchers.IO) {
                 repositorioAutenticacion.registrarUsuario(registro)
             }
             resultado
             .onSuccess {
-                uiState = uiState.copy(error = null, registroExitoso = true)
+                uiState = uiState.copy(error = null, registrando = false, registroExitoso = true)
             }
             .onFailure {
-                uiState = uiState.copy(error = it.message, registroExitoso = false)
+                uiState = uiState.copy(error = it.message, registrando = false, registroExitoso = false)
             }
         }
     }
