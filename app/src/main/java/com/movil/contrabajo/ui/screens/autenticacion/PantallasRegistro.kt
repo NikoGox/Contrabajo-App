@@ -70,6 +70,13 @@ import com.movil.contrabajo.ui.screens.legal.PantallaTerminosCondiciones
 import com.movil.contrabajo.ui.viewmodel.RegistroViewModel
 import java.time.LocalDate
 
+private const val LIMITE_NOMBRE_REGISTRO = 60
+private const val LIMITE_CALLE_REGISTRO = 120
+private const val LIMITE_NUMERO_DIRECCION_REGISTRO = 20
+private const val LIMITE_USERNAME_REGISTRO = 20
+private const val LIMITE_CORREO_REGISTRO = 254
+private const val LIMITE_RESPUESTA_SEGURIDAD_REGISTRO = 200
+
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun PantallaRegistroPasoUno(
@@ -123,8 +130,21 @@ fun PantallaRegistroPasoUno(
         viewModel.actualizarFechaNacimiento("%04d-%02d-%02d".format(anio, mesSeleccionado, diaSeleccionado))
     }
 
-    val errorNombre = if (registro.nombre.isBlank()) "Ingresa tu nombre" else null
-    val errorApellidoPaterno = if (registro.apellidoPaterno.isBlank()) "Ingresa tu apellido paterno" else null
+    val errorNombre = when {
+        registro.nombre.isBlank() -> "Ingresa tu nombre"
+        registro.nombre.trim().length > LIMITE_NOMBRE_REGISTRO -> "El nombre permite hasta 60 caracteres"
+        else -> null
+    }
+    val errorApellidoPaterno = when {
+        registro.apellidoPaterno.isBlank() -> "Ingresa tu apellido paterno"
+        registro.apellidoPaterno.trim().length > LIMITE_NOMBRE_REGISTRO -> "El apellido paterno permite hasta 60 caracteres"
+        else -> null
+    }
+    val errorApellidoMaterno = when {
+        registro.apellidoMaterno.isBlank() -> "Ingresa tu apellido materno"
+        registro.apellidoMaterno.trim().length > LIMITE_NOMBRE_REGISTRO -> "El apellido materno permite hasta 60 caracteres"
+        else -> null
+    }
     val errorRun = when {
         registro.run.length !in 7..8 -> "El RUN debe tener 7 u 8 dígitos"
         registro.dv.isBlank() -> null
@@ -143,6 +163,7 @@ fun PantallaRegistroPasoUno(
     val formularioPasoUnoValido = listOf(
         errorNombre,
         errorApellidoPaterno,
+        errorApellidoMaterno,
         errorRun,
         errorDv,
         errorTelefono,
@@ -196,7 +217,7 @@ fun PantallaRegistroPasoUno(
                     },
                     etiqueta = "Apellido materno"
                 )
-                if (intentoContinuar) TextoErrorCampo(if (registro.apellidoMaterno.isBlank()) "Ingresa tu apellido materno" else null)
+                if (intentoContinuar) TextoErrorCampo(errorApellidoMaterno)
 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -319,6 +340,13 @@ fun PantallaRegistroPasoDireccion(
     val comunas = viewModel.uiState.comunas
     val context = LocalContext.current
     val scrollPasoDireccion = rememberScrollState()
+    val errorCalle = if (registro.calle.trim().length > LIMITE_CALLE_REGISTRO) {
+        "La calle permite hasta 120 caracteres"
+    } else null
+    val errorNumeroDireccion = if (registro.numeroDireccion.trim().length > LIMITE_NUMERO_DIRECCION_REGISTRO) {
+        "El número permite hasta 20 caracteres"
+    } else null
+    val formularioPasoDireccionValido = listOf(errorCalle, errorNumeroDireccion).all { it == null }
 
     // Captura de coordenadas al entrar al paso: se piden los permisos de
     // ubicación de inmediato para que la cuenta quede con coordenadas
@@ -451,6 +479,8 @@ fun PantallaRegistroPasoDireccion(
                         modifier = Modifier.weight(0.33f)
                     )
                 }
+                TextoErrorCampo(errorCalle)
+                TextoErrorCampo(errorNumeroDireccion)
 
                 Text(
                     text = "La dirección es opcional. Tu ubicación actual se usará para configurar tus coordenadas y mostrarte publicaciones cercanas.",
@@ -484,6 +514,7 @@ fun PantallaRegistroPasoDireccion(
                 )
                 BotonPrimario(
                     texto = "Siguiente",
+                    enabled = formularioPasoDireccionValido,
                     onClick = onContinuar,
                     modifier = Modifier.weight(1f)
                 )
@@ -505,8 +536,16 @@ fun PantallaRegistroPasoDos(
     var aceptaTerminos by rememberSaveable { mutableStateOf(false) }
     var mostrarTerminos by rememberSaveable { mutableStateOf(false) }
 
-    val errorUsername = if (registro.username.isBlank()) "Ingresa un nombre de usuario" else null
-    val errorCorreo = if (registro.correo.isBlank() || !registro.correo.contains("@") || !registro.correo.contains(".")) "Ingresa un correo válido" else null
+    val errorUsername = when {
+        registro.username.isBlank() -> "Ingresa un nombre de usuario"
+        registro.username.trim().length > LIMITE_USERNAME_REGISTRO -> "El nombre de usuario permite hasta 20 caracteres"
+        else -> null
+    }
+    val errorCorreo = when {
+        registro.correo.isBlank() || !registro.correo.contains("@") || !registro.correo.contains(".") -> "Ingresa un correo válido"
+        registro.correo.trim().length > LIMITE_CORREO_REGISTRO -> "El correo permite hasta 254 caracteres"
+        else -> null
+    }
     val errorContrasena = validarContrasenaRegistro(registro.contrasena)
     val errorConfirmacion = if (registro.contrasena != registro.confirmarContrasena) "Las contraseñas no coinciden" else null
     val formularioPasoTresValido = listOf(
@@ -686,13 +725,23 @@ fun PantallaRegistroPasoSeguridad(
     val opcionesPreguntaDos = preguntasCatalogo.filter { it != registro.preguntaSeguridad1 || it == registro.preguntaSeguridad2 }
 
     val errorPregunta1 = if (registro.preguntaSeguridad1.isBlank()) "Selecciona la primera pregunta" else null
-    val errorRespuesta1 = if (registro.respuestaSeguridad1.isBlank()) "Ingresa la respuesta 1" else null
+    val errorRespuesta1 = when {
+        registro.respuestaSeguridad1.isBlank() -> "Ingresa la respuesta 1"
+        registro.respuestaSeguridad1.trim().length > LIMITE_RESPUESTA_SEGURIDAD_REGISTRO ->
+            "La respuesta 1 permite hasta 200 caracteres"
+        else -> null
+    }
     val errorPregunta2 = when {
         registro.preguntaSeguridad2.isBlank() -> "Selecciona la segunda pregunta"
         registro.preguntaSeguridad2 == registro.preguntaSeguridad1 -> "Las preguntas deben ser distintas"
         else -> null
     }
-    val errorRespuesta2 = if (registro.respuestaSeguridad2.isBlank()) "Ingresa la respuesta 2" else null
+    val errorRespuesta2 = when {
+        registro.respuestaSeguridad2.isBlank() -> "Ingresa la respuesta 2"
+        registro.respuestaSeguridad2.trim().length > LIMITE_RESPUESTA_SEGURIDAD_REGISTRO ->
+            "La respuesta 2 permite hasta 200 caracteres"
+        else -> null
+    }
     val formularioValido = listOf(errorPregunta1, errorRespuesta1, errorPregunta2, errorRespuesta2).all { it == null }
 
     LaunchedEffect(uiState.registroExitoso) {

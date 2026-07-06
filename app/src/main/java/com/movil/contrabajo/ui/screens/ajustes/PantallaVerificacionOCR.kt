@@ -122,15 +122,19 @@ fun PantallaVerificarCuentaTrabajador(
     var resultadoExitoso by rememberSaveable { mutableStateOf(false) }
     var mensajeResultado by rememberSaveable { mutableStateOf("") }
     var bitmapCapturado by remember { mutableStateOf<Bitmap?>(null) }
+    var solicitudBackendPendiente by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) { viewModel.recargar() }
+    LaunchedEffect(Unit) {
+        viewModel.limpiarEstadoVerificacion()
+        viewModel.recargar()
+    }
 
     // Escuchar respuesta del backend → transición a RESULTADO
     LaunchedEffect(uiState.mensajeVerificacion) {
         if (paso == VerificacionPaso.ANALIZANDO && uiState.mensajeVerificacion != null) {
             resultadoExitoso = true
             mensajeResultado = uiState.mensajeVerificacion!!
-            bitmapCapturado = null
+            solicitudBackendPendiente = false
             paso = VerificacionPaso.RESULTADO
         }
     }
@@ -138,7 +142,7 @@ fun PantallaVerificarCuentaTrabajador(
         if (paso == VerificacionPaso.ANALIZANDO && uiState.errorVerificacion != null) {
             resultadoExitoso = false
             mensajeResultado = uiState.errorVerificacion!!
-            bitmapCapturado = null
+            solicitudBackendPendiente = false
             paso = VerificacionPaso.RESULTADO
         }
     }
@@ -155,19 +159,27 @@ fun PantallaVerificarCuentaTrabajador(
         when (pasoActual) {
             VerificacionPaso.BIENVENIDA -> PantallaBienvenidaVerificacion(
                 onVolver = onVolver,
-                onContinuar = { paso = VerificacionPaso.CAPTURA }
+                onContinuar = {
+                    viewModel.limpiarEstadoVerificacion()
+                    bitmapCapturado = null
+                    solicitudBackendPendiente = false
+                    paso = VerificacionPaso.CAPTURA
+                }
             )
             VerificacionPaso.CAPTURA -> PantallaCapturaOcr(
                 runEsperado = uiState.runVerificacion,
                 dvEsperado = uiState.dvVerificacion,
                 onVolver = { paso = VerificacionPaso.BIENVENIDA },
                 onImagenCapturada = { bitmap ->
+                    viewModel.limpiarEstadoVerificacion()
                     bitmapCapturado = bitmap
+                    solicitudBackendPendiente = false
                     paso = VerificacionPaso.ANALIZANDO
                 },
                 onErrorOcr = { mensaje ->
                     resultadoExitoso = false
                     mensajeResultado = mensaje
+                    solicitudBackendPendiente = false
                     paso = VerificacionPaso.RESULTADO
                 }
             )
@@ -185,24 +197,30 @@ fun PantallaVerificarCuentaTrabajador(
                                 viewModel.actualizarRunVerificacion(run)
                                 viewModel.actualizarDvVerificacion(dv)
                                 viewModel.actualizarNumeroDocumentoVerificacion(numDoc)
+                                solicitudBackendPendiente = true
                             },
                             onErrorOcr = { mensaje ->
                                 resultadoExitoso = false
                                 mensajeResultado = mensaje
+                                solicitudBackendPendiente = false
                                 paso = VerificacionPaso.RESULTADO
                             },
                             onExitoOcr = { }
                         )
                     }
-                    // Escuchar cuando los datos OCR estén listos → llamar al backend
-                    LaunchedEffect(uiState.numeroDocumentoVerificacion) {
-                        if (uiState.numeroDocumentoVerificacion.isNotEmpty()) {
+                    // Cuando el OCR deja datos válidos listos, disparamos una sola solicitud al backend.
+                    LaunchedEffect(solicitudBackendPendiente) {
+                        if (paso == VerificacionPaso.ANALIZANDO && solicitudBackendPendiente) {
                             delay(5500L)
+                            solicitudBackendPendiente = false
                             viewModel.solicitarVerificacionTrabajador()
                         }
                     }
                 } else {
-                    paso = VerificacionPaso.CAPTURA
+                    LaunchedEffect(Unit) {
+                        solicitudBackendPendiente = false
+                        paso = VerificacionPaso.CAPTURA
+                    }
                 }
             }
             VerificacionPaso.RESULTADO -> PantallaResultadoVerificacion(
@@ -211,9 +229,10 @@ fun PantallaVerificarCuentaTrabajador(
                 onReintentar = {
                     viewModel.limpiarEstadoVerificacion()
                     bitmapCapturado = null
+                    solicitudBackendPendiente = false
                     paso = VerificacionPaso.BIENVENIDA
                 },
-                onCerrarSesion = { viewModel.cerrarSesion() }
+                onFinalizarExito = onVolver
             )
         }
     }
@@ -746,7 +765,7 @@ private fun PantallaResultadoVerificacion(
     exitoso: Boolean,
     mensaje: String,
     onReintentar: () -> Unit,
-    onCerrarSesion: () -> Unit
+    onFinalizarExito: () -> Unit
 ) {
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
@@ -773,7 +792,7 @@ private fun PantallaResultadoVerificacion(
         ) {
             BarraSuperiorAjustes(
                 titulo = if (exitoso) "Verificación exitosa" else "Verificación fallida",
-                onVolver = onReintentar,
+                onVolver = if (exitoso) onFinalizarExito else onReintentar,
                 iconoDerecha = if (exitoso) Icons.Filled.CheckCircle else Icons.Filled.Cancel
             )
 
@@ -828,8 +847,8 @@ private fun PantallaResultadoVerificacion(
                     // Acción principal
                     if (exitoso) {
                         BotonPrimario(
-                            texto = "Iniciar sesión nuevamente",
-                            onClick = onCerrarSesion
+                            texto = "Volver",
+                            onClick = onFinalizarExito
                         )
                     } else {
                         BotonPrimario(

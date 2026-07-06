@@ -432,11 +432,11 @@ class RegistroViewModel(
     }
 
     fun actualizarCalle(valor: String) {
-        actualizarRegistro(uiState.registro.copy(calle = valor.take(120)))
+        actualizarRegistro(uiState.registro.copy(calle = valor))
     }
 
     fun actualizarNumeroDireccion(valor: String) {
-        actualizarRegistro(uiState.registro.copy(numeroDireccion = valor.take(20)))
+        actualizarRegistro(uiState.registro.copy(numeroDireccion = valor))
     }
 
     fun actualizarCoordenadasRegistro(latitud: Double?, longitud: Double?) {
@@ -445,7 +445,7 @@ class RegistroViewModel(
 
     fun actualizarUsername(valor: String) {
         uiState = uiState.copy(
-            registro = uiState.registro.copy(username = valor.trim().take(20)),
+            registro = uiState.registro.copy(username = valor.trim()),
             error = null,
             errorUsernameDisponible = null
         )
@@ -453,7 +453,7 @@ class RegistroViewModel(
 
     fun actualizarCorreo(valor: String) {
         uiState = uiState.copy(
-            registro = uiState.registro.copy(correo = valor.trim().take(254)),
+            registro = uiState.registro.copy(correo = valor.trim()),
             error = null,
             errorCorreoDisponible = null
         )
@@ -472,19 +472,19 @@ class RegistroViewModel(
     }
 
     fun actualizarPreguntaSeguridad1(valor: String) {
-        actualizarRegistro(uiState.registro.copy(preguntaSeguridad1 = valor.take(200)))
+        actualizarRegistro(uiState.registro.copy(preguntaSeguridad1 = valor))
     }
 
     fun actualizarRespuestaSeguridad1(valor: String) {
-        actualizarRegistro(uiState.registro.copy(respuestaSeguridad1 = valor.take(200)))
+        actualizarRegistro(uiState.registro.copy(respuestaSeguridad1 = valor))
     }
 
     fun actualizarPreguntaSeguridad2(valor: String) {
-        actualizarRegistro(uiState.registro.copy(preguntaSeguridad2 = valor.take(200)))
+        actualizarRegistro(uiState.registro.copy(preguntaSeguridad2 = valor))
     }
 
     fun actualizarRespuestaSeguridad2(valor: String) {
-        actualizarRegistro(uiState.registro.copy(respuestaSeguridad2 = valor.take(200)))
+        actualizarRegistro(uiState.registro.copy(respuestaSeguridad2 = valor))
     }
 
     private fun ordenarComunasIntegracion(comunas: List<ComunaCatalogo>): List<ComunaCatalogo> {
@@ -600,7 +600,6 @@ class RegistroViewModel(
             .filter { caracter ->
                 caracter.isLetter() || caracter == ' ' || caracter == '\'' || caracter == '-'
             }
-            .take(60)
     }
 
     private fun normalizarTelefonoMovilSinPrefijo(valor: String): String {

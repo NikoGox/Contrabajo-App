@@ -1,3 +1,14 @@
+VERSION 0.16.3-Alpha
+───────
+├─• La verificación OCR ahora evita que la cámara reaparezca después de una validación exitosa y muestra correctamente la pantalla final de éxito.
+├─• Se eliminó el filtro "Solo trabajadores verificados" de la sección "Filtrar y ordenar" del marketplace, junto con su aplicación interna.
+├─• Los mensajes demasiado largos en chat ahora muestran el aviso "Tu mensaje es muy largo. Reintenta nuevamente." en lugar de exponer un error `400` del backend.
+├─• Se reforzó la lógica de lectura del chat para actualizar el doble check cuando el receptor tiene la conversación abierta y lee el mensaje.
+├─• El registro dejó de recortar silenciosamente textos largos en nombre, apellidos, dirección, usuario, correo y respuestas de seguridad; ahora valida longitudes antes de enviar.
+├─• Los errores crudos de truncamiento o SQL durante el registro ahora se traducen a un mensaje amigable cuando alguna respuesta no cumple con el formato esperado.
+├─• Se actualizó el correo de eliminación de cuenta en Ajustes > Cuenta a `soportecontrabajo@gmail.com`.
+└─• Se actualizó la documentación del proyecto para reflejar estos cambios en el README.
+
 VERSION 0.16.2-Alpha
 ───────
 ├─• La verificación OCR ahora lee y coteja la fecha de nacimiento de la cédula contra la registrada en la cuenta: si no coinciden, la verificación falla indicando la fecha leída y cómo solicitar la corrección por soporte.

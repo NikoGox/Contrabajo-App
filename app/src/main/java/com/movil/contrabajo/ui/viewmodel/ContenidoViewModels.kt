@@ -182,7 +182,6 @@ class PrincipalViewModel(
     fun aplicarFiltros(
         categoriaId: Long?,
         tipoPrecio: Int?,
-        soloVerificados: Boolean,
         filtroZonaComunaActivo: Boolean,
         comunaFiltro: String,
         orden: OrdenMarketplace
@@ -195,7 +194,7 @@ class PrincipalViewModel(
         uiState = uiState.copy(
             filtroCategoriaId = categoriaId,
             filtroTipoPrecio = tipoPrecio,
-            soloTrabajadorVerificado = soloVerificados,
+            soloTrabajadorVerificado = false,
             filtroZonaComunaActivo = filtroZonaComunaActivo,
             comunaFiltro = comunaNormalizada,
             ordenMarketplace = orden
@@ -252,9 +251,6 @@ class PrincipalViewModel(
             }
             .filter { oferta ->
                 uiState.filtroTipoPrecio?.let { oferta.tipoPrecio == it } ?: true
-            }
-            .filter { oferta ->
-                if (uiState.soloTrabajadorVerificado) oferta.trabajadorVerificado else true
             }
             .filter { oferta ->
                 if (!uiState.filtroZonaComunaActivo) return@filter true
@@ -421,6 +417,18 @@ class ChatsViewModel(
                         }
                         if (citaActualizada != null) {
                             uiState = uiState.copy(citaActiva = citaActualizada)
+                        }
+                    }
+
+                    // Si el mensaje lo envio la contraparte y el chat esta visible,
+                    // confirmamos lectura de inmediato para que el emisor vea el doble check.
+                    if (mensaje.idReceptor == uiState.idUsuarioActual) {
+                        val mensajesActualizados = withContext(Dispatchers.IO) {
+                            repositorioChats.marcarLeidos(mensaje.idChatCita)
+                            repositorioChats.obtenerMensajes(mensaje.idChatCita)
+                        }
+                        if (uiState.chatActivo?.idChatCita == mensaje.idChatCita) {
+                            uiState = uiState.copy(mensajesActivos = mensajesActualizados)
                         }
                     }
 
@@ -1351,6 +1359,7 @@ class PerfilViewModel(
 
     fun limpiarEstadoVerificacion() {
         uiState = uiState.copy(
+            numeroDocumentoVerificacion = "",
             errorVerificacion = null,
             mensajeVerificacion = null
         )

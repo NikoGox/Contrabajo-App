@@ -572,7 +572,7 @@ fun PantallaCuenta(
                         val body = "Hola, solicito la eliminación de mi cuenta.\n\nUsername: @${usuario.username}\nRUN: ${usuario.run}-${usuario.dv}\n\nMotivo: "
                         val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
                             data = android.net.Uri.parse("mailto:")
-                            putExtra(android.content.Intent.EXTRA_EMAIL, arrayOf("soporte@contrabajo.cl"))
+                            putExtra(android.content.Intent.EXTRA_EMAIL, arrayOf("soportecontrabajo@gmail.com"))
                             putExtra(android.content.Intent.EXTRA_SUBJECT, subject)
                             putExtra(android.content.Intent.EXTRA_TEXT, body)
                         }

@@ -31,6 +31,8 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeParseException
 import java.time.format.DateTimeFormatter
 
+private const val LIMITE_MENSAJE_CHAT_LOCAL = 255
+
 interface RepositorioAutenticacion {
     fun obtenerSesionActiva(): Usuario?
     fun iniciarSesion(identificador: String, contrasena: String, recordarme: Boolean): Result<Usuario>
@@ -308,18 +310,25 @@ class RepositorioAutenticacionLocal(
 
         return when {
             registro.nombre.isBlank() -> "Ingresa tu nombre"
+            registro.nombre.trim().length > 60 -> "El nombre permite hasta 60 caracteres"
             !esNombrePersonaValido(registro.nombre) -> "El nombre solo puede contener letras"
             registro.apellidoPaterno.isBlank() -> "Ingresa tu apellido paterno"
+            registro.apellidoPaterno.trim().length > 60 -> "El apellido paterno permite hasta 60 caracteres"
             !esNombrePersonaValido(registro.apellidoPaterno) -> "El apellido paterno solo puede contener letras"
             registro.apellidoMaterno.isBlank() -> "Ingresa tu apellido materno"
+            registro.apellidoMaterno.trim().length > 60 -> "El apellido materno permite hasta 60 caracteres"
             !esNombrePersonaValido(registro.apellidoMaterno) -> "El apellido materno solo puede contener letras"
             registro.run.isBlank() || registro.dv.isBlank() -> "Ingresa un RUN valido"
             limpiarRun(registro.run).length !in 7..8 -> "El RUN debe tener 7 u 8 digitos"
             !validarRut(registro.run, registro.dv) -> "El RUN no es valido"
             digitosTelefono(registro.telefono).length != 9 -> "Ingresa un telefono valido de 9 digitos"
             registro.username.isBlank() -> "Ingresa un nombre de usuario"
+            registro.username.trim().length > 20 -> "El nombre de usuario debe tener maximo 20 caracteres"
             registro.correo.isBlank() || !registro.correo.contains("@") || !registro.correo.contains(".") -> "Ingresa un correo valido"
+            registro.correo.trim().length > 254 -> "El correo permite hasta 254 caracteres"
             errorFechaNacimiento != null -> errorFechaNacimiento
+            registro.calle.trim().length > 120 -> "La calle permite hasta 120 caracteres"
+            registro.numeroDireccion.trim().length > 20 -> "El numero de direccion permite hasta 20 caracteres"
             validarContrasenaSegura(registro.contrasena) != null -> validarContrasenaSegura(registro.contrasena).orEmpty()
             registro.contrasena != registro.confirmarContrasena -> "Las contrasenas no coinciden"
             !PreguntasSeguridadCatalogo.esValida(registro.preguntaSeguridad1) -> "Selecciona una pregunta de seguridad valida (1)"
@@ -328,6 +337,8 @@ class RepositorioAutenticacionLocal(
                 "Debes seleccionar dos preguntas de seguridad diferentes"
             registro.respuestaSeguridad1.trim().isBlank() || registro.respuestaSeguridad2.trim().isBlank() ->
                 "Debes responder ambas preguntas de seguridad"
+            registro.respuestaSeguridad1.trim().length > 200 -> "La respuesta de seguridad 1 permite hasta 200 caracteres"
+            registro.respuestaSeguridad2.trim().length > 200 -> "La respuesta de seguridad 2 permite hasta 200 caracteres"
             else -> null
         }
     }
@@ -965,6 +976,9 @@ class RepositorioChatsLocal(
         }
         val texto = contenido.trim()
         if (texto.isBlank()) return Result.failure(IllegalArgumentException("Escribe un mensaje"))
+        if (texto.length > LIMITE_MENSAJE_CHAT_LOCAL) {
+            return Result.failure(IllegalArgumentException("Tu mensaje es muy largo. Reintenta nuevamente."))
+        }
         val idReceptor = if (chat.idCliente == usuario.idUsuario) chat.idTrabajador else chat.idCliente
         val idMensaje = db.insertarMensajeChat(
             idChatCita = idChatCita,

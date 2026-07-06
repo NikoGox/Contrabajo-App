@@ -77,6 +77,8 @@ import com.movil.contrabajo.domain.model.ValoracionesServicio
 import java.math.BigDecimal
 import retrofit2.Call
 
+private const val LIMITE_MENSAJE_CHAT = 255
+
 class RepositorioAutenticacionRemoto(
     private val api: UsuariosApiService,
     private val sessionStore: RemoteSessionStore
@@ -197,7 +199,7 @@ class RepositorioAutenticacionRemoto(
                     recordarme = true
                 )
             },
-            onFailure = { Result.failure(it) }
+            onFailure = { Result.failure(IllegalArgumentException(it.mensajeAmigableRegistro(), it)) }
         )
     }
 
@@ -1136,10 +1138,20 @@ class RepositorioChatRemoto(
             ?: return Result.failure(IllegalStateException("No hay sesion activa"))
         val texto = contenido.trim()
         if (texto.isBlank()) return Result.failure(IllegalArgumentException("Escribe un mensaje"))
+        if (texto.length > LIMITE_MENSAJE_CHAT) {
+            return Result.failure(IllegalArgumentException("Tu mensaje es muy largo. Reintenta nuevamente."))
+        }
         val tipoSeguro = if (tipo == 1) 1 else 0
         return ejecutarApiComunicaciones(
             comunicacionesApi.enviarMensaje(bearer(token), MensajeChatEnviarDto(idChatCita, texto, tipoSeguro))
-        ).mapCatching { it?.toMensajeChat() ?: throw IllegalStateException("Respuesta vacia al enviar mensaje") }
+        ).fold(
+            onSuccess = {
+                runCatching {
+                    it?.toMensajeChat() ?: throw IllegalStateException("Respuesta vacia al enviar mensaje")
+                }
+            },
+            onFailure = { Result.failure(IllegalArgumentException(it.mensajeAmigableEnvioChat(), it)) }
+        )
     }
 
     // ────────────────────────────────────────────────────────────────────────────
@@ -1734,6 +1746,40 @@ private fun RegistroPendiente.toRegistroRequest(): UsuarioRegistroRequestDto {
             longitud = longitud
         )
     )
+}
+
+private fun Throwable.mensajeAmigableRegistro(): String {
+    val mensaje = message.orEmpty()
+    return when {
+        mensaje.indicaErrorDatosLargosOInvalidos() ->
+            "Alguna de tus respuestas no cumplen con el formato especificado. Revisa los datos e intenta nuevamente."
+        else -> mensaje.ifBlank { "No se pudo completar el registro" }
+    }
+}
+
+private fun Throwable.mensajeAmigableEnvioChat(): String {
+    val mensaje = message.orEmpty()
+    return when {
+        mensaje.indicaMensajeChatDemasiadoLargo() ->
+            "Tu mensaje es muy largo. Reintenta nuevamente."
+        else -> mensaje.ifBlank { "No se pudo enviar el mensaje" }
+    }
+}
+
+private fun String.indicaErrorDatosLargosOInvalidos(): Boolean {
+    return contains("truncat", ignoreCase = true) ||
+        contains("String or binary data would be truncated", ignoreCase = true) ||
+        contains("could not execute statement", ignoreCase = true) ||
+        contains("insert into", ignoreCase = true) ||
+        contains("SQL", ignoreCase = true) ||
+        contains("Error del servidor (400)", ignoreCase = true)
+}
+
+private fun String.indicaMensajeChatDemasiadoLargo(): Boolean {
+    return contains("truncat", ignoreCase = true) ||
+        contains("String or binary data would be truncated", ignoreCase = true) ||
+        contains("Error del servidor de comunicaciones (400)", ignoreCase = true) ||
+        contains("too long", ignoreCase = true)
 }
 
 private fun PreguntasSeguridadDto.toPreguntasConfig(): List<PreguntaSeguridadConfig> {

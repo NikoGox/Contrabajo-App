@@ -150,7 +150,6 @@ fun PantallaPrincipal(
     var posicionSliderRangoBusqueda by rememberSaveable { mutableFloatStateOf(0f) }
     var categoriaTemporal by rememberSaveable { mutableStateOf<Long?>(null) }
     var tipoPrecioTemporal by rememberSaveable { mutableStateOf<Int?>(null) }
-    var soloVerificadosTemporal by rememberSaveable { mutableStateOf(false) }
     var filtroZonaComunaTemporal by rememberSaveable { mutableStateOf(false) }
     var comunaTemporal by rememberSaveable { mutableStateOf("") }
     var ordenTemporal by rememberSaveable { mutableStateOf(OrdenMarketplace.FECHA_RECIENTES.name) }
@@ -212,7 +211,6 @@ fun PantallaPrincipal(
         if (mostrarModalFiltros) {
             categoriaTemporal = uiState.filtroCategoriaId
             tipoPrecioTemporal = uiState.filtroTipoPrecio
-            soloVerificadosTemporal = uiState.soloTrabajadorVerificado
             filtroZonaComunaTemporal = uiState.filtroZonaComunaActivo
             comunaTemporal = uiState.comunaFiltro
             ordenTemporal = uiState.ordenMarketplace.name
@@ -488,7 +486,6 @@ fun PantallaPrincipal(
                         uiState.busqueda.isNotBlank() ||
                             uiState.filtroCategoriaId != null ||
                             uiState.filtroTipoPrecio != null ||
-                            uiState.soloTrabajadorVerificado ||
                             uiState.filtroZonaComunaActivo
                     val textoEstado = if (uiState.filtroPorCoordenadasActivo) {
                         if (hayBusquedaOFiltrosActivos) {
@@ -638,14 +635,12 @@ fun PantallaPrincipal(
             categorias = uiState.categoriasDisponibles.map { it.idCategoriaServicio to it.nombre },
             categoriaSeleccionada = categoriaTemporal,
             tipoPrecioSeleccionado = tipoPrecioTemporal,
-            soloVerificados = soloVerificadosTemporal,
             filtroZonaComunaActivo = filtroZonaComunaTemporal,
             comunaSeleccionada = comunaTemporal,
             comunas = uiState.comunasDisponibles.map { it.nombre },
             ordenActual = OrdenMarketplace.valueOf(ordenTemporal),
             onCategoriaSeleccionada = { categoriaTemporal = it },
             onTipoPrecioSeleccionado = { tipoPrecioTemporal = it },
-            onSoloVerificadosCambiado = { soloVerificadosTemporal = it },
             onFiltroZonaComunaCambiado = { filtroZonaComunaTemporal = it },
             onComunaSeleccionada = { comunaTemporal = it },
             onOrdenSeleccionado = { ordenTemporal = it.name },
@@ -653,7 +648,6 @@ fun PantallaPrincipal(
                 viewModel.aplicarFiltros(
                     categoriaId = categoriaTemporal,
                     tipoPrecio = tipoPrecioTemporal,
-                    soloVerificados = soloVerificadosTemporal,
                     filtroZonaComunaActivo = filtroZonaComunaTemporal,
                     comunaFiltro = comunaTemporal,
                     orden = OrdenMarketplace.valueOf(ordenTemporal)
@@ -675,14 +669,12 @@ private fun FiltroMarketplaceDialog(
     categorias: List<Pair<Long, String>>,
     categoriaSeleccionada: Long?,
     tipoPrecioSeleccionado: Int?,
-    soloVerificados: Boolean,
     filtroZonaComunaActivo: Boolean,
     comunaSeleccionada: String,
     comunas: List<String>,
     ordenActual: OrdenMarketplace,
     onCategoriaSeleccionada: (Long?) -> Unit,
     onTipoPrecioSeleccionado: (Int?) -> Unit,
-    onSoloVerificadosCambiado: (Boolean) -> Unit,
     onFiltroZonaComunaCambiado: (Boolean) -> Unit,
     onComunaSeleccionada: (String) -> Unit,
     onOrdenSeleccionado: (OrdenMarketplace) -> Unit,
@@ -766,21 +758,6 @@ private fun FiltroMarketplaceDialog(
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Solo trabajadores verificados",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Switch(
-                    checked = soloVerificados,
-                    onCheckedChange = { onSoloVerificadosCambiado(it) }
-                )
-            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

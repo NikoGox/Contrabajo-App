@@ -223,7 +223,7 @@ private fun parsearMarkdown(md: String): List<BloqueTC> {
             val marca = mItem.groupValues[1]
             val vinneta = if (marca == "-" || marca == "*") "•" else marca
             bloques += BloqueTC.Item(vinneta, desescapar(mItem.groupValues[2]))
-            i++; continue
+            i++; continue 
         }
 
         // Párrafo normal (puede llevar **negrita**, la resolvemos al render)

@@ -14,15 +14,25 @@ La plataforma busca reducir la fricción en la búsqueda de servicios técnicos,
 
 ## Últimos cambios
 
+### ❚❙❘ VERSIÓN 0.16.3-Alpha
+
+- Verificación OCR corregida: al validar exitosamente el documento ya no reaparece la cámara; ahora se muestra la pantalla de éxito y el flujo queda alineado con el estado real de la sesión.
+- Marketplace: se eliminó el filtro "Solo trabajadores verificados" del modal "Filtrar y ordenar", junto con su aplicación oculta sobre los resultados.
+- Chat: los mensajes demasiado largos ahora se rechazan con feedback claro ("Tu mensaje es muy largo. Reintenta nuevamente.") en vez de exponer un `400` del backend.
+- Chat en tiempo real: se reforzó la lógica de lectura para que, si el receptor tiene la conversación abierta, el doble check se actualice apenas el mensaje sea leído usando el flujo del WebSocket.
+- Registro: se dejó de recortar silenciosamente texto largo en nombre, apellidos, dirección, usuario, correo y respuestas de seguridad; ahora el formulario muestra errores explícitos de longitud antes de enviar.
+- Registro: los errores crudos de truncamiento/SQL del backend se traducen a un mensaje amigable cuando alguna respuesta no cumple con el formato esperado.
+- Ajustes > Cuenta: el botón "Solicitar eliminación de cuenta" ahora abre el correo pre-cargado a `soportecontrabajo@gmail.com`.
+
 ### ❚❙❘ VERSIÓN 0.16.2-Alpha
 
-- Verificación OCR: se lee y coteja la fecha de nacimiento de la cédula contra la registrada en la cuenta; si no coinciden, la verificación falla indicando la fecha leída y cómo solicitar la corrección por soporte.
-- Bordes y sombras definidos en las tarjetas y campos de la pantalla de bienvenida y del login, coherentes con el resto de la app en todos los modos de color (claro, oscuro y paletas de daltonismo).
-- Registro: el paso de dirección pide el permiso de ubicación de inmediato y captura las coordenadas GPS al tiro, dejando la cuenta configurada desde el primer ingreso. Si se deniega el permiso, se informa que puede registrarse igual y obtener las coordenadas después desde Ajustes › Ubicación.
-- Corregido el destello del mensaje "El RUN ya existe" tras un registro exitoso: el botón Registrarse se deshabilita y muestra "Registrando..." mientras el registro está en curso, evitando el doble envío que re-validaba el RUN recién creado.
-- Botón "Volver" en login y recuperar cuenta con fondo y borde para mejor visibilidad en ambos modos de color.
-- Botón "Solicitar eliminación de cuenta" en Ajustes > Cuenta que abre correo pre-cargado a soporte@contrabajo.cl.
-- Checkbox de aceptación de términos y condiciones en el registro.
+* Verificación OCR: se lee y coteja la fecha de nacimiento de la cédula contra la registrada en la cuenta; si no coinciden, la verificación falla indicando la fecha leída y cómo solicitar la corrección por soporte.
+* Bordes y sombras definidos en las tarjetas y campos de la pantalla de bienvenida y del login, coherentes con el resto de la app en todos los modos de color (claro, oscuro y paletas de daltonismo).
+* Registro: el paso de dirección pide el permiso de ubicación de inmediato y captura las coordenadas GPS al tiro, dejando la cuenta configurada desde el primer ingreso. Si se deniega el permiso, se informa que puede registrarse igual y obtener las coordenadas después desde Ajustes › Ubicación.
+* Corregido el destello del mensaje "El RUN ya existe" tras un registro exitoso: el botón Registrarse se deshabilita y muestra "Registrando..." mientras el registro está en curso, evitando el doble envío que re-validaba el RUN recién creado.
+* Botón "Volver" en login y recuperar cuenta con fondo y borde para mejor visibilidad en ambos modos de color.
+* Botón "Solicitar eliminación de cuenta" en Ajustes > Cuenta que abre correo pre-cargado a soporte@contrabajo.cl.
+* Checkbox de aceptación de términos y condiciones en el registro.
 
 ### ❚❙❘ VERSIÓN 0.16.1-Alpha
 
